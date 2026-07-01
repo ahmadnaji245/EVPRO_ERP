@@ -1,10 +1,15 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from io import BytesIO
+from types import SimpleNamespace
 
 from sqlalchemy import func, or_
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
 
 from database.db import db
 from models import Brand, Nota, NotaCustomer, NotaItem, NotaPayment, NotaProduct, SalesOrder
 from services.number_generator import generate_nota_number
+from utils.formatters import pretty_date
 
 
 NOTA_STATUSES = (
@@ -27,9 +32,79 @@ DEFAULT_NOTA_PRODUCTS = [
     ("SL", "Diskon special line", -10000),
 ]
 
+INVOICE_BRAND_EVPRO = {
+    "key": "evpro",
+    "display_name": "Evpro",
+    "template_name": "Evpro",
+}
+INVOICE_BRAND_RDR = {
+    "key": "evpro",
+    "display_name": "RDR Apparel",
+    "template_name": "Evpro",
+}
+INVOICE_BRAND_FF = {
+    "key": "ff_apparel",
+    "display_name": "FF Apparel",
+    "template_name": "FF Apparel",
+}
+
 
 def list_brands():
     return Brand.query.filter_by(status="active").order_by(Brand.name).all()
+
+
+def list_invoice_brand_options():
+    defaults = ["Evpro", "RDR Apparel", "FF Apparel"]
+    names = [brand.name for brand in Brand.query.order_by(Brand.name.asc()).all()]
+    options = []
+    for name in defaults + names:
+        if name and name not in options:
+            options.append(name)
+    return options
+
+
+def get_invoice_brand(brand_name):
+    normalized = " ".join(str(brand_name or "").strip().casefold().split())
+    if normalized == "ff apparel" or normalized == "ff":
+        return INVOICE_BRAND_FF
+    if normalized == "rdr apparel" or normalized == "rdr":
+        return INVOICE_BRAND_RDR
+    return INVOICE_BRAND_EVPRO
+
+
+def get_invoice_brand_group(brand_name):
+    normalized = " ".join(str(brand_name or "").strip().casefold().split())
+    if normalized in ("ff apparel", "ff"):
+        return "FF Apparel"
+    if normalized in ("rdr apparel", "rdr"):
+        return "RDR Apparel"
+    return "EVPRO"
+
+
+def invoice_brand_filter_options():
+    return ["FF Apparel", "RDR Apparel", "EVPRO"]
+
+
+def format_so_number_for_invoice(sales_order):
+    if not sales_order:
+        return "Manual"
+    brand = sales_order.brand
+    brand_name = brand.name if brand else ""
+    brand_code = brand.code if brand else ""
+    group = get_invoice_brand_group(brand_name or brand_code)
+    so_number = sales_order.so_number or "-"
+    if group in ("FF Apparel", "RDR Apparel"):
+        return so_number
+    parts = so_number.split("/", 1)
+    if len(parts) != 2:
+        return so_number
+    prefix_source = brand_code or parts[0]
+    abbreviation = _brand_abbreviation(prefix_source)
+    return f"EV-{abbreviation}/{parts[1]}"
+
+
+def format_invoice_so_code(sales_order):
+    return format_so_number_for_invoice(sales_order)
 
 
 def list_customers():
@@ -38,6 +113,28 @@ def list_customers():
 
 def list_products():
     return NotaProduct.query.order_by(NotaProduct.code).all()
+
+
+def upsert_product(form):
+    code = str(form.get("code") or "").strip().upper()
+    description = str(form.get("description") or "").strip()
+    price = _parse_int(form.get("price"))
+    if not code or not description:
+        raise ValueError("Kode dan keterangan produk wajib diisi.")
+    product = get_product_by_code(code)
+    if not product:
+        product = NotaProduct(code=code)
+        db.session.add(product)
+    product.description = description
+    product.price = price
+    db.session.commit()
+    return product
+
+
+def delete_product(product_id):
+    product = NotaProduct.query.get_or_404(product_id)
+    db.session.delete(product)
+    db.session.commit()
 
 
 def list_products_as_dicts():
@@ -67,6 +164,7 @@ def list_notas(search=None):
     q = str(search.get("q") or "").strip()
     status = str(search.get("status") or "").strip()
     brand_id = str(search.get("brand_id") or "").strip()
+    brand_group = str(search.get("brand_group") or "").strip()
 
     if q:
         needle = f"%{q}%"
@@ -83,11 +181,27 @@ def list_notas(search=None):
         query = query.filter(Nota.status == status)
     if brand_id.isdigit():
         query = query.filter(Nota.brand_id == int(brand_id))
-    return query.order_by(Nota.order_date.desc(), Nota.id.desc()).all()
+    notas = query.order_by(Nota.order_date.desc(), Nota.id.desc()).all()
+    if brand_group in invoice_brand_filter_options():
+        notas = [nota for nota in notas if get_invoice_brand_group(nota.brand.name if nota.brand else "") == brand_group]
+    return notas
+
+
+def nota_rows(search=None):
+    return [_nota_row(nota) for nota in list_notas(search)]
+
+
+def report_nota_rows(brand=None):
+    return [_nota_row(nota) for nota in _filtered_notas(brand)]
 
 
 def get_nota(nota_id):
     return Nota.query.get_or_404(nota_id)
+
+
+def delete_nota(nota):
+    db.session.delete(nota)
+    db.session.commit()
 
 
 def get_nota_by_so_id(so_id):
@@ -102,6 +216,146 @@ def get_product_by_code(code):
 
 def totals(nota):
     return {"total": nota.total, "paid": nota.paid, "remaining": nota.remaining}
+
+
+def dashboard_stats(brand=None):
+    notas = _filtered_notas(brand)
+    revenue = sum(nota.total for nota in notas)
+    income = sum(nota.paid for nota in notas)
+    return _row(
+        revenue=revenue,
+        income=income,
+        receivable=revenue - income,
+        invoice_count=len(notas),
+        belum_dp_count=sum(1 for nota in notas if nota.status == "Belum DP"),
+        dp_count=sum(1 for nota in notas if nota.status == "DP"),
+        lunas_count=sum(1 for nota in notas if nota.status == "Lunas"),
+        desain_count=sum(1 for nota in notas if nota.status == "Desain"),
+        produksi_count=sum(1 for nota in notas if nota.status == "Produksi"),
+        selesai_count=sum(1 for nota in notas if nota.status == "Selesai"),
+        diambil_count=sum(1 for nota in notas if nota.status == "Diambil"),
+    )
+
+
+def monthly_revenue(brand=None):
+    buckets = {}
+    for nota in _filtered_notas(brand):
+        key = nota.order_date.strftime("%Y-%m") if nota.order_date else "-"
+        buckets[key] = buckets.get(key, 0) + nota.total
+    return [_row(month=month, total=total) for month, total in sorted(buckets.items())]
+
+
+def yearly_revenue(brand=None):
+    buckets = {}
+    for nota in _filtered_notas(brand):
+        key = nota.order_date.strftime("%Y") if nota.order_date else "-"
+        buckets[key] = buckets.get(key, 0) + nota.total
+    return [_row(year=year, total=total) for year, total in sorted(buckets.items(), reverse=True)]
+
+
+def top_customers(brand=None):
+    rows = {}
+    for nota in _filtered_notas(brand):
+        customer = nota.customer
+        key = customer.id
+        row = rows.setdefault(
+            key,
+            {
+                "name": customer.name,
+                "team_name": nota.team_name,
+                "phone": customer.phone,
+                "brand": nota.brand.name if nota.brand else "-",
+                "invoice_count": 0,
+                "order_count": 0,
+                "total": 0,
+            },
+        )
+        row["invoice_count"] += 1
+        row["order_count"] += 1
+        row["total"] += nota.total
+    sorted_rows = sorted(rows.values(), key=lambda row: (-row["invoice_count"], -row["total"], row["name"]))
+    return [_row(**row) for row in sorted_rows[:10]]
+
+
+def receivables(brand=None, status=None):
+    rows = []
+    for nota in _filtered_notas(brand):
+        if status and nota.status != status:
+            continue
+        row = _nota_row(nota)
+        if row.remaining > 0:
+            rows.append(row)
+    return rows
+
+
+def income_payments(brand=None):
+    query = NotaPayment.query.join(Nota).join(NotaCustomer)
+    if brand:
+        query = query.join(Brand, Nota.brand_id == Brand.id).filter(Brand.name == brand)
+    payments = query.order_by(NotaPayment.payment_date.desc(), NotaPayment.id.desc()).all()
+    return [
+        _row(
+            payment_date=payment.payment_date,
+            amount=payment.amount,
+            description=payment.description,
+            invoice_number=payment.nota.nota_number,
+            brand=payment.nota.brand.name if payment.nota.brand else "-",
+            customer_name=payment.nota.customer.name,
+            team_name=payment.nota.team_name,
+        )
+        for payment in payments
+    ]
+
+
+def income_summary(brand=None):
+    today = date.today()
+    week_start = today - timedelta(days=6)
+    month_key = today.strftime("%Y-%m")
+    year_key = today.strftime("%Y")
+    payments = income_payments(brand)
+    return _row(
+        today=sum(payment.amount for payment in payments if payment.payment_date == today),
+        weekly=sum(payment.amount for payment in payments if payment.payment_date and payment.payment_date >= week_start),
+        monthly=sum(payment.amount for payment in payments if payment.payment_date and payment.payment_date.strftime("%Y-%m") == month_key),
+        yearly=sum(payment.amount for payment in payments if payment.payment_date and payment.payment_date.strftime("%Y") == year_key),
+    )
+
+
+def workbook_response(sheet_name, headers, rows):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = sheet_name
+    sheet.append(headers)
+    for row in rows:
+        sheet.append(row)
+    header_fill = PatternFill("solid", fgColor="C5162E")
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+    for column in sheet.columns:
+        max_length = max(len(str(cell.value or "")) for cell in column)
+        sheet.column_dimensions[column[0].column_letter].width = min(max_length + 3, 45)
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def invoice_export_rows(rows):
+    return [
+        [
+            row.invoice_number,
+            pretty_date(row.order_date),
+            row.brand,
+            row.customer_name,
+            row.team_name,
+            row.total,
+            row.paid,
+            row.remaining,
+            row.status,
+        ]
+        for row in rows
+    ]
 
 
 def item_rows_for_form(nota=None):
@@ -307,6 +561,34 @@ def seed_default_nota_products():
             db.session.add(NotaProduct(code=code, description=description, price=price))
 
 
+def _filtered_notas(brand=None):
+    query = Nota.query.join(Brand)
+    if brand:
+        query = query.filter(Brand.name == brand)
+    return query.order_by(Nota.order_date.desc(), Nota.id.desc()).all()
+
+
+def _nota_row(nota):
+    return _row(
+        id=nota.id,
+        invoice_number=nota.nota_number,
+        nota_number=nota.nota_number,
+        brand=nota.brand.name if nota.brand else "-",
+        order_date=nota.order_date,
+        status=nota.status,
+        customer_name=nota.customer.name,
+        team_name=nota.team_name,
+        phone=nota.customer.phone,
+        total=nota.total,
+        paid=nota.paid,
+        remaining=nota.remaining,
+    )
+
+
+def _row(**kwargs):
+    return SimpleNamespace(**kwargs)
+
+
 def _save_customer(form):
     brand_id = int(form.get("brand_id"))
     customer_id = form.get("customer_id")
@@ -368,3 +650,12 @@ def _parse_so_id(value):
         return None
     sales_order = SalesOrder.query.filter_by(id=int(value), is_deleted=False).first()
     return sales_order.id if sales_order else None
+
+
+def _brand_abbreviation(value):
+    value = "".join(char for char in str(value or "").strip().upper() if char.isalnum())
+    if not value:
+        return "ERP"
+    if value == "EVPRO":
+        return "EVP"
+    return value[:3]

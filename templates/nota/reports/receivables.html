@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Piutang - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Piutang</h1>
+        <p class="text-muted mb-0">Nota dengan sisa pembayaran aktif.</p>
+    </div>
+    <a class="btn btn-rdr" href="{{ url_for('nota.export_receivables', brand=active_brand) }}">Export Excel</a>
+</div>
+<form class="panel mb-4" method="get">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label">Brand</label>
+            <select class="form-select" name="brand">
+                <option value="">Semua Brand</option>
+                {% for brand in brands %}
+                    <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label">Status</label>
+            <select class="form-select" name="status">
+                <option value="">Semua Status</option>
+                {% for status in statuses %}
+                    <option value="{{ status }}" {% if active_status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid"><button class="btn btn-dark">Filter</button></div>
+    </div>
+</form>
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Nomor Nota</th><th>Customer</th><th>Tim</th><th>Brand</th><th class="text-end">Total Nota</th><th class="text-end">Sudah Dibayar</th><th class="text-end">Sisa Piutang</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for invoice in invoices %}
+                <tr>
+                    <td><a href="{{ url_for('nota.detail', nota_id=invoice.id) }}">{{ invoice.invoice_number }}</a></td>
+                    <td>{{ invoice.customer_name }}</td>
+                    <td>{{ invoice.team_name }}</td>
+                    <td>{{ invoice.brand }}</td>
+                    <td class="text-end">{{ invoice.total|rupiah }}</td>
+                    <td class="text-end">{{ invoice.paid|rupiah }}</td>
+                    <td class="text-end">{{ invoice.remaining|rupiah }}</td>
+                    <td><span class="status-pill">{{ invoice.status }}</span></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada piutang.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

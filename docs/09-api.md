@@ -15,6 +15,10 @@ Dokumen ini mencatat endpoint penting yang tersedia dan yang direncanakan. ERP s
 | Method | Endpoint | Status | Keterangan |
 | --- | --- | --- | --- |
 | GET | `/dashboard/` | Active | Dashboard internal. Login required. |
+| GET | `/master-data` | Active | Alias ke Master Data SO. Admin required. |
+| GET | `/laporan` | Active | Alias ke Laporan SO. Admin required. |
+| GET | `/laporan/pdf` | Active | Alias PDF laporan SO. Admin required. |
+| GET | `/setting` | Active | Alias ke Setting SO. Admin required. |
 
 ## Sales Order
 
@@ -31,10 +35,27 @@ Dokumen ini mencatat endpoint penting yang tersedia dan yang direncanakan. ERP s
 | POST | `/sales-order/<sales_order_id>/production-checklist` | Active | Update checklist produksi. |
 | POST | `/sales-orders/<sales_order_id>/approve-admin` | Active | Approval admin. |
 
+## Sales Order Shell
+
+| Method | Endpoint | Status | Keterangan |
+| --- | --- | --- | --- |
+| GET | `/production/` | Active | Daftar produksi SO approved. Admin required. |
+| GET | `/production/<sales_order_id>` | Active | Detail produksi foundation dari ERP_SO. Admin required. |
+| GET/POST | `/master/brands` | Active | Master brand SO. Admin required. |
+| GET/POST | `/master/items` | Active | Master item SO. Admin required. |
+| GET/POST | `/master/materials` | Active | Master material SO. Admin required. |
+| GET/POST | `/master/patterns` | Active | Master pola SO. Admin required. |
+| GET/POST | `/master/instructions` | Active | Master instruksi SO. Admin required. |
+| GET/POST | `/master/users` | Active | Master user. Admin required. |
+| GET | `/reports/` | Active | Laporan produksi SO. Admin required. |
+| GET | `/reports/pdf` | Active | PDF laporan produksi SO. Admin required. |
+| GET/POST | `/settings/` | Active | Setting target point bulanan. Admin required. |
+
 ## Nota
 
 | Method | Endpoint | Status | Keterangan |
 | --- | --- | --- | --- |
+| GET | `/nota/dashboard` | Active | Dashboard keuangan Nota. Admin required. |
 | GET | `/nota/` | Active | Daftar Nota. Admin required. |
 | GET/POST | `/nota/baru` | Active | Create Nota manual atau dari Sales Order melalui query `so_id`. Admin required. |
 | GET | `/nota/<nota_id>` | Active | Detail Nota, termasuk link balik ke Sales Order jika `so_id` terisi. Admin required. |
@@ -42,6 +63,18 @@ Dokumen ini mencatat endpoint penting yang tersedia dan yang direncanakan. ERP s
 | POST | `/nota/<nota_id>/pembayaran` | Active | Tambah pembayaran Nota. Admin required. |
 | POST | `/nota/<nota_id>/status` | Active | Ubah status Nota. Admin required. |
 | GET | `/nota/<nota_id>/print` | Active | Print view Nota. Admin required. |
+| GET | `/nota/<nota_id>/pdf/internal` | Active | PDF Nota internal. Admin required. |
+| GET | `/nota/<nota_id>/pdf/customer` | Active | PDF invoice customer. Admin required. |
+| GET/POST | `/nota/produk` | Active | Database produk Nota. Admin required. |
+| GET | `/nota/produk/delete/<product_id>` | Active | Hapus produk Nota. Admin required. |
+| GET | `/nota/laporan` | Active | Laporan keuangan Nota. Admin required. |
+| GET | `/nota/laporan/customer` | Active | Laporan customer Nota. Admin required. |
+| GET | `/nota/piutang` | Active | Laporan piutang Nota. Admin required. |
+| GET | `/nota/pemasukan` | Active | Laporan pemasukan Nota. Admin required. |
+| GET | `/nota/export/nota` | Active | Export semua Nota ke Excel. Admin required. |
+| GET | `/nota/export/piutang` | Active | Export piutang ke Excel. Admin required. |
+| GET | `/nota/export/omset-bulanan` | Active | Export omset bulanan ke Excel. Admin required. |
+| GET | `/nota/export/customer` | Active | Export customer ke Excel. Admin required. |
 
 ## Customer Portal
 

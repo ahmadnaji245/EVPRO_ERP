@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Pemasukan - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Pemasukan</h1>
+        <p class="text-muted mb-0">Histori pembayaran dari semua nota.</p>
+    </div>
+    <form method="get">
+        <select class="form-select" name="brand" onchange="this.form.submit()">
+            <option value="">Semua Brand</option>
+            {% for brand in brands %}
+                <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3"><div class="metric"><span>Hari Ini</span><strong>{{ summary.today|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Mingguan</span><strong>{{ summary.weekly|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Bulanan</span><strong>{{ summary.monthly|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Tahunan</span><strong>{{ summary.yearly|rupiah }}</strong></div></div>
+</div>
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Tanggal</th><th>Customer</th><th>Brand</th><th class="text-end">Nominal Pembayaran</th><th>Keterangan</th></tr></thead>
+            <tbody>
+            {% for payment in payments %}
+                <tr><td>{{ payment.payment_date|pretty_date }}</td><td>{{ payment.customer_name }}</td><td>{{ payment.brand }}</td><td class="text-end">{{ payment.amount|rupiah }}</td><td>{{ payment.description or '-' }}</td></tr>
+            {% else %}
+                <tr><td colspan="5" class="text-center text-muted py-4">Belum ada pemasukan.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

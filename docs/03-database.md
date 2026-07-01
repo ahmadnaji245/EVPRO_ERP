@@ -51,6 +51,8 @@ Field penting:
 
 Role aktif saat ini: `admin`, `produksi`.
 
+Pada ERP v0.2.2, data user dapat diimport dari database ERP_SO melalui `scripts/import_so_master_data.py`. Password hash ERP_SO kompatibel dengan model `User` EVPRO_ERP karena sama-sama memakai Werkzeug hash.
+
 ### SalesOrder
 
 Core Business Object ERP.
@@ -97,6 +99,12 @@ Field penting:
 
 `so_id` bersifat nullable. Jika Nota dibuat dari Sales Order, `so_id` menyimpan `sales_orders.id`. Jika Nota dibuat manual dari menu Nota, `so_id` boleh kosong. Pada ERP v0.4, `so_id` dibuat unik untuk membatasi satu Sales Order hanya memiliki satu Nota.
 
+`brand_id` pada Nota tetap menyimpan brand order yang dipilih atau diturunkan dari Sales Order. Untuk kebutuhan print invoice, aplikasi memakai mapping invoice brand di service layer, bukan kolom database baru:
+
+- `FF Apparel` -> invoice FF Apparel.
+- `RDR Apparel` -> invoice RDR Apparel.
+- Brand selain `FF Apparel` dan `RDR Apparel` -> invoice Evpro.
+
 ### NotaItem
 
 Menyimpan detail produk pada Nota.
@@ -134,6 +142,15 @@ Field penting:
 - `color`
 - `point_per_size`
 - `status`
+
+Pada ERP v0.2.2, master brand diimport dari ERP_SO. Field `code` dipakai sebagai kode/singkatan brand untuk kebutuhan operasional dan tampilan invoice SO. Contoh:
+
+- `EVP` untuk Evpro.
+- `ARM` untuk Armor.
+- `FFA` untuk FF Apparel.
+- `RDR` untuk RDR Apparel.
+
+Jika ada brand lama EVPRO_ERP yang sudah dipakai transaksi tetapi tidak ada di ERP_SO, brand tersebut tidak dihapus paksa agar foreign key Sales Order/Nota tetap aman.
 
 ### Customer
 

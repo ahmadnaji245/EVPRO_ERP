@@ -1,0 +1,14 @@
+<form method="post" class="input-group mb-3">
+    <input class="form-control" name="name" placeholder="Nama data baru" required>
+    <button class="btn btn-rdr">Tambah</button>
+</form>
+<table class="table">
+    <thead><tr><th>Nama</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+        <tr><td>{{ row.name }}</td><td>{{ row.status }}</td></tr>
+    {% else %}
+        <tr><td colspan="2" class="text-center text-muted">Belum ada data.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>

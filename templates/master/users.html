@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Master User - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Master User</h1>
+        <p class="text-muted mb-0">User staff dengan role admin atau produksi.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('master.index') }}">Kembali</a>
+</div>
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="panel table-panel">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Nama</th><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
+                    <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{ user.name }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.role_label }}</td>
+                            <td>{% if user.is_active %}<span class="badge text-bg-success">Aktif</span>{% else %}<span class="badge text-bg-secondary">Nonaktif</span>{% endif %}</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('master.edit_user', user_id=user.id) }}">Edit</a>
+                                    {% if user.is_active %}
+                                        <form method="post" action="{{ url_for('master.deactivate_user', user_id=user.id) }}">
+                                            <button class="btn btn-sm btn-outline-danger">Nonaktifkan</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="{{ url_for('master.activate_user', user_id=user.id) }}">
+                                            <button class="btn btn-sm btn-outline-success">Aktifkan</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-4">Belum ada user.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        {% set user = editing_user %}
+        <form method="post" class="panel" action="{{ url_for('master.edit_user', user_id=user.id) if user else url_for('master.users') }}">
+            <div class="section-title">{{ 'Edit User' if user else 'Tambah User' }}</div>
+            <div class="row g-3">
+                <div class="col-12"><label class="form-label">Nama</label><input class="form-control" name="name" value="{{ user.name if user else '' }}" required></div>
+                <div class="col-12"><label class="form-label">Username</label><input class="form-control" name="username" value="{{ user.username if user else '' }}" required></div>
+                <div class="col-12">
+                    <label class="form-label">Role</label>
+                    {% set selected_role = user.role_label if user else 'produksi' %}
+                    <select class="form-select" name="role">
+                        {% for role in roles %}
+                            <option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ role }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="is_active">
+                        <option value="1" {% if not user or user.is_active %}selected{% endif %}>Aktif</option>
+                        <option value="0" {% if user and not user.is_active %}selected{% endif %}>Nonaktif</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Password{% if user %} Baru{% endif %}</label>
+                    <input class="form-control" name="password" type="password" {% if not user %}required{% endif %}>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button class="btn btn-rdr">{{ 'Update User' if user else 'Tambah User' }}</button>
+                    {% if user %}<a class="btn btn-outline-dark" href="{{ url_for('master.users') }}">Batal</a>{% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

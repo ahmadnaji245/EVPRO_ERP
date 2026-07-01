@@ -49,6 +49,54 @@ Langkah umum:
 5. Jalankan aplikasi.
 6. Verifikasi login, Sales Order, dan Nota.
 
+## Import Produk Nota Legacy
+
+Produk Nota lama tersimpan di database SQLite `../Nota/database/nota.sqlite3`, tabel `products`.
+Kolom yang dipakai untuk import ke ERP adalah:
+
+- `code` -> `nota_products.code`
+- `description` -> `nota_products.description`
+- `price` -> `nota_products.price`
+
+Database lama tidak memiliki kolom brand, kategori, atau status aktif untuk produk, sehingga kolom tersebut tidak dimigrasikan.
+Import dapat dijalankan ulang karena memakai `code` sebagai unique key: produk baru dibuat, sedangkan produk dengan kode yang sama diperbarui.
+
+```bash
+.venv/bin/python scripts/import_nota_products.py
+```
+
+Jika lokasi database lama berbeda:
+
+```bash
+.venv/bin/python scripts/import_nota_products.py --source-db /path/to/nota.sqlite3
+```
+
+## Import Master Data Sales Order Legacy
+
+Master data Sales Order lama tersimpan di database SQLite `../ERP_SO/instance/erp_so.db`.
+Script import membaca tabel berikut:
+
+- `brands`
+- `master_items`
+- `master_materials`
+- `master_patterns`
+- `master_instructions`
+- `users`
+
+Jalankan:
+
+```bash
+.venv/bin/python scripts/import_so_master_data.py
+```
+
+Jika lokasi database ERP_SO berbeda:
+
+```bash
+.venv/bin/python scripts/import_so_master_data.py --source-db /path/to/erp_so.db
+```
+
+Import memakai strategi aman dan dapat dijalankan ulang. Data master dari ERP_SO dibuat atau diperbarui. Data contoh yang tidak ada di ERP_SO dihapus jika tidak dipakai transaksi. Jika brand/user lama masih direferensikan transaksi, data tersebut tidak dihapus paksa; brand akan dinonaktifkan agar relasi Sales Order/Nota tetap aman.
+
 ## Versioning
 
 Gunakan format nama backup yang jelas:

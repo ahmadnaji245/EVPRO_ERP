@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Nota - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Dashboard Keuangan</h1>
+        <p class="text-muted mb-0">Ringkasan nota, pemasukan, dan piutang multi-brand.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select class="form-select" name="brand" onchange="this.form.submit()">
+                <option value="">Semua Brand</option>
+                {% for brand in brands %}
+                    <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a class="btn btn-rdr" href="{{ url_for('nota.create') }}">Buat Nota</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Omset</span><strong>{{ stats.revenue|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Piutang</span><strong>{{ stats.receivable|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Pemasukan</span><strong>{{ stats.income|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Jumlah Nota</span><strong>{{ stats.invoice_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Belum DP</span><strong>{{ stats.belum_dp_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>DP</span><strong>{{ stats.dp_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Lunas</span><strong>{{ stats.lunas_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Desain</span><strong>{{ stats.desain_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Produksi</span><strong>{{ stats.produksi_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Selesai</span><strong>{{ stats.selesai_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Diambil</span><strong>{{ stats.diambil_count or 0 }}</strong></div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <section class="panel">
+            <h2 class="section-title">Grafik Omset Bulanan</h2>
+            <canvas id="monthlyRevenueChart" height="130"
+                    data-labels='{{ monthly|map(attribute="month")|list|tojson }}'
+                    data-values='{{ monthly|map(attribute="total")|list|tojson }}'></canvas>
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="panel">
+            <h2 class="section-title">Grafik Omset Tahunan</h2>
+            <canvas id="yearlyRevenueChart" height="180"
+                    data-labels='{{ yearly|map(attribute="year")|list|tojson }}'
+                    data-values='{{ yearly|map(attribute="total")|list|tojson }}'></canvas>
+        </section>
+    </div>
+</div>
+{% endblock %}

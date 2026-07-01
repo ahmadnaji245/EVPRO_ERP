@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Setting - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-5">
+        <form method="post" class="panel">
+            <h1 class="page-title mb-3">Setting</h1>
+            <label class="form-label">Target Point Bulanan</label>
+            <input class="form-control mb-3" name="monthly_target" type="number" value="{{ target.value if target else 0 }}">
+            <button class="btn btn-rdr">Simpan</button>
+        </form>
+    </div>
+</div>
+<div class="panel mt-4">
+    <div class="section-title">Detail Poin Setting Bulanan</div>
+    {% if setting_progress.rows %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                <tr>
+                    <th>Nama User/Staff</th>
+                    <th class="text-end">Total Poin Setting Bulan Ini</th>
+                    <th class="text-end">Ranking</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in setting_progress.rows %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td class="text-end">{{ row.total_point|number(1) }}</td>
+                        <td class="text-end">{{ row.rank }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-muted">Belum ada poin setting pada bulan berjalan.</div>
+    {% endif %}
+</div>
+{% endblock %}

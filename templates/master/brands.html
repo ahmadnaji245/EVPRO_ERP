@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Master Brand - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Master Brand</h1>
+        <p class="text-muted mb-0">Logo tersimpan sebagai file fisik di static/uploads/brands.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('master.index') }}">Kembali</a>
+</div>
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="panel table-panel">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Logo</th><th>Kode</th><th>Nama</th><th>Warna</th><th>Point</th><th>Status</th><th>Aksi</th></tr></thead>
+                    <tbody>
+                    {% for brand in brands %}
+                        <tr>
+                            <td style="width: 76px;">
+                                {% if brand.logo_path %}
+                                    <img src="{{ url_for('static', filename=brand.logo_path) }}" alt="Logo {{ brand.name }}" class="img-fluid rounded border" style="max-height: 44px;">
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="brand-badge" style="background: {{ brand.color }}">{{ brand.code }}</span></td>
+                            <td>
+                                <div class="fw-semibold">{{ brand.name }}</div>
+                                {% if brand.notes %}<div class="small text-muted">{{ brand.notes }}</div>{% endif %}
+                            </td>
+                            <td><span class="d-inline-block rounded border" style="width: 28px; height: 28px; background: {{ brand.color }}"></span></td>
+                            <td>{{ brand.point_per_size|number(1) }}</td>
+                            <td>{% if brand.is_active %}<span class="badge text-bg-success">Aktif</span>{% else %}<span class="badge text-bg-secondary">Nonaktif</span>{% endif %}</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('master.edit_brand', brand_id=brand.id) }}">Edit</a>
+                                    {% if brand.is_active %}
+                                        <form method="post" action="{{ url_for('master.deactivate_brand', brand_id=brand.id) }}">
+                                            <button class="btn btn-sm btn-outline-danger">Nonaktifkan</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="{{ url_for('master.activate_brand', brand_id=brand.id) }}">
+                                            <button class="btn btn-sm btn-outline-success">Aktifkan</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">Belum ada brand.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        {% set brand = editing_brand %}
+        <form method="post" enctype="multipart/form-data" class="panel" action="{{ url_for('master.edit_brand', brand_id=brand.id) if brand else url_for('master.brands') }}">
+            <div class="section-title">{{ 'Edit Brand' if brand else 'Tambah Brand' }}</div>
+            <div class="row g-3">
+                <div class="col-md-4"><label class="form-label">Kode</label><input class="form-control" name="code" value="{{ brand.code if brand else '' }}" required></div>
+                <div class="col-md-8"><label class="form-label">Nama</label><input class="form-control" name="name" value="{{ brand.name if brand else '' }}" required></div>
+                <div class="col-md-6"><label class="form-label">Warna</label><input class="form-control form-control-color" name="color" type="color" value="{{ brand.color if brand else '#c5162e' }}"></div>
+                <div class="col-md-6"><label class="form-label">Point Per Size</label><input class="form-control" name="point_per_size" type="number" step="0.1" value="{{ brand.point_per_size if brand else 1 }}"></div>
+                <div class="col-12">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status">
+                        {% set selected_status = brand.status if brand else 'active' %}
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Aktif</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Nonaktif</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Logo</label>
+                    <input class="form-control" name="logo" type="file" accept="image/*">
+                    {% if brand and brand.logo_path %}
+                        <img src="{{ url_for('static', filename=brand.logo_path) }}" alt="Logo {{ brand.name }}" class="img-fluid rounded border mt-2">
+                    {% endif %}
+                </div>
+                <div class="col-12"><label class="form-label">Catatan</label><textarea class="form-control" name="notes" rows="3">{{ brand.notes if brand else '' }}</textarea></div>
+                <div class="col-12 d-flex gap-2">
+                    <button class="btn btn-rdr">{{ 'Update Brand' if brand else 'Simpan Brand' }}</button>
+                    {% if brand %}<a class="btn btn-outline-dark" href="{{ url_for('master.brands') }}">Batal</a>{% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

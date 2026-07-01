@@ -11,6 +11,21 @@
     {% endif %}
 </div>
 <div class="panel table-panel">
+    <form class="row g-2 align-items-center mb-3" method="get" action="{{ url_for('sales_orders.index') }}">
+        <div class="col-12 col-lg">
+            <input
+                class="form-control"
+                type="text"
+                name="q"
+                value="{{ search or '' }}"
+                placeholder="Cari nomor SO, brand, nama tim, status, atau penagihan"
+            >
+        </div>
+        <div class="col-12 col-sm-auto d-flex gap-2">
+            <button class="btn btn-outline-dark" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('sales_orders.index') }}">Reset</a>
+        </div>
+    </form>
     <div class="table-responsive">
         <table class="table table-hover align-middle so-table">
             <thead>
@@ -35,10 +50,27 @@
                     <td>{{ so.total_point|number(1) }}</td>
                     <td>{{ so.production_status_label }}</td>
                     <td>{{ billing_statuses.get(so.id, 'Belum Ada Nota') }}</td>
-                    <td class="text-end"><a class="btn btn-sm btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=so.id) }}">Detail</a></td>
+                    <td class="text-end">
+                        <div class="d-inline-flex flex-wrap justify-content-end gap-2">
+                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=so.id) }}">Detail</a>
+                            {% if current_user.role_label == 'admin' %}
+                                <form method="post" action="{{ url_for('sales_orders.delete', sales_order_id=so.id) }}" onsubmit="return confirm('Apakah Anda yakin ingin menghapus Sales Order ini?')">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Hapus</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
             {% else %}
-                <tr><td colspan="8" class="text-center text-muted py-4">Belum ada Sales Order.</td></tr>
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        {% if search %}
+                            Tidak ada Sales Order yang sesuai filter.
+                        {% else %}
+                            Belum ada Sales Order.
+                        {% endif %}
+                    </td>
+                </tr>
             {% endfor %}
             </tbody>
         </table>

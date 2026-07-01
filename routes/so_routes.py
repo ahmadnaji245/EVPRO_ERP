@@ -37,9 +37,34 @@ def _admin_required():
 @sales_orders_bp.route("/")
 @login_required
 def index():
+    search = request.args.get("q", "").strip()
     sales_orders = list_sales_orders()
     billing_statuses = {order.id: billing_status_for_sales_order(order) for order in sales_orders}
-    return render_template("so/index.html", sales_orders=sales_orders, billing_statuses=billing_statuses)
+
+    if search:
+        search_value = search.casefold()
+
+        def matches_search(order):
+            brand_name = order.brand.name if order.brand else ""
+            brand_code = order.brand.code if order.brand else ""
+            searchable_values = [
+                order.so_number,
+                brand_name,
+                brand_code,
+                order.team_name,
+                order.production_status_label,
+                billing_statuses.get(order.id, "Belum Ada Nota"),
+            ]
+            return any(search_value in str(value or "").casefold() for value in searchable_values)
+
+        sales_orders = [order for order in sales_orders if matches_search(order)]
+
+    return render_template(
+        "so/index.html",
+        sales_orders=sales_orders,
+        billing_statuses=billing_statuses,
+        search=search,
+    )
 
 
 def _form_context(**kwargs):
@@ -137,6 +162,9 @@ def edit(sales_order_id):
 def delete(sales_order_id):
     _admin_required()
     order = get_sales_order(sales_order_id)
+    if get_nota_by_so_id(order.id):
+        flash("SO ini sudah memiliki Nota. Hapus Nota terlebih dahulu sebelum menghapus SO.", "warning")
+        return redirect(url_for("sales_orders.index"))
     delete_sales_order(order)
     flash(f"Sales Order {order.so_number} dihapus.", "success")
     return redirect(url_for("sales_orders.index"))

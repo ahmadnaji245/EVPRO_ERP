@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Laporan Nota - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Laporan</h1>
+        <p class="text-muted mb-0">Ringkasan performa keuangan dan customer.</p>
+    </div>
+    <form method="get" class="d-flex gap-2">
+        <select class="form-select" name="brand" onchange="this.form.submit()">
+            <option value="">Semua Brand</option>
+            {% for brand in brands %}
+                <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_invoices', brand=active_brand) }}">Export Semua Nota ke Excel</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_receivables', brand=active_brand) }}">Export Piutang ke Excel</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_monthly_revenue', brand=active_brand) }}">Export Omset Bulanan ke Excel</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_customers', brand=active_brand) }}">Export Customer ke Excel</a>
+    <a class="btn btn-rdr" href="{{ url_for('nota.customer_report', brand=active_brand) }}">Customer Terbanyak Nota</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="metric"><span>Total Piutang</span><strong>{{ stats.receivable|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Total Pemasukan</span><strong>{{ stats.income|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Omset Total</span><strong>{{ stats.revenue|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Jumlah Nota</span><strong>{{ stats.invoice_count or 0 }}</strong></div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <section class="panel table-panel">
+            <h2 class="section-title">Omset Per Bulan</h2>
+            <table class="table">
+                <thead><tr><th>Bulan</th><th class="text-end">Omset</th></tr></thead>
+                <tbody>
+                {% for row in monthly %}
+                    <tr><td>{{ row.month }}</td><td class="text-end">{{ row.total|rupiah }}</td></tr>
+                {% else %}
+                    <tr><td colspan="2" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+    <div class="col-lg-6">
+        <section class="panel table-panel">
+            <h2 class="section-title">Omset Per Tahun</h2>
+            <table class="table">
+                <thead><tr><th>Tahun</th><th class="text-end">Omset</th></tr></thead>
+                <tbody>
+                {% for row in yearly %}
+                    <tr><td>{{ row.year }}</td><td class="text-end">{{ row.total|rupiah }}</td></tr>
+                {% else %}
+                    <tr><td colspan="2" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+    <div class="col-12">
+        <section class="panel table-panel">
+            <h2 class="section-title">Customer Paling Sering Order</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Customer</th><th class="text-end">Jumlah Nota</th><th class="text-end">Omset</th></tr></thead>
+                    <tbody>
+                    {% for customer in customers %}
+                        <tr><td>{{ customer.name }}</td><td class="text-end">{{ customer.invoice_count }}</td><td class="text-end">{{ customer.total|rupiah }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="3" class="text-center text-muted py-4">Belum ada data customer.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

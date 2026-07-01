@@ -19,10 +19,10 @@
         </div>
         <div class="col-12 col-lg-3">
             <label class="form-label">Brand</label>
-            <select class="form-select" name="brand_id">
+            <select class="form-select" name="brand_group">
                 <option value="">Semua Brand</option>
-                {% for brand in brands %}
-                    <option value="{{ brand.id }}" {% if active_brand_id == brand.id|string %}selected{% endif %}>{{ brand.name }}</option>
+                {% for brand_group in brand_groups %}
+                    <option value="{{ brand_group }}" {% if active_brand_group == brand_group %}selected{% endif %}>{{ brand_group }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -65,7 +65,7 @@
                     <td><a href="{{ url_for('nota.detail', nota_id=nota.id) }}" class="fw-semibold">{{ nota.nota_number }}</a></td>
                     <td>
                         {% if nota.sales_order %}
-                            <a href="{{ url_for('sales_orders.detail', sales_order_id=nota.sales_order.id) }}">{{ nota.sales_order.so_number }}</a>
+                            <a href="{{ url_for('sales_orders.detail', sales_order_id=nota.sales_order.id) }}">{{ format_so_number_for_invoice(nota.sales_order) }}</a>
                         {% else %}
                             <span class="text-muted">Manual</span>
                         {% endif %}
@@ -78,7 +78,14 @@
                     <td class="text-end">{{ nota.paid|rupiah }}</td>
                     <td class="text-end">{{ nota.remaining|rupiah }}</td>
                     <td><span class="status-pill status-{{ nota.status|lower|replace(' ', '-') }}">{{ nota.status }}</span></td>
-                    <td class="text-end"><a class="btn btn-outline-dark btn-sm" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Detail</a></td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-2">
+                            <a class="btn btn-outline-dark btn-sm" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Detail</a>
+                            <form method="post" action="{{ url_for('nota.delete', nota_id=nota.id) }}" onsubmit="return confirm('Apakah Anda yakin ingin menghapus nota ini?')">
+                                <button class="btn btn-outline-danger btn-sm">Hapus</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
             {% else %}
                 <tr><td colspan="11" class="text-center text-muted py-4">Belum ada nota.</td></tr>

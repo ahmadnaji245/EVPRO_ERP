@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="text-muted mb-0">Contoh: {{ examples }}</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('master.index') }}">Kembali</a>
+</div>
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="panel table-panel">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Nama</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr></thead>
+                    <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.sort_order }}</td>
+                            <td>{% if row.is_active %}<span class="badge text-bg-success">Aktif</span>{% else %}<span class="badge text-bg-secondary">Nonaktif</span>{% endif %}</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('master.edit_simple_master', master_key=master_key, row_id=row.id) }}">Edit</a>
+                                    {% if row.is_active %}
+                                        <form method="post" action="{{ url_for('master.deactivate_simple_master', master_key=master_key, row_id=row.id) }}">
+                                            <button class="btn btn-sm btn-outline-danger">Nonaktifkan</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="{{ url_for('master.activate_simple_master', master_key=master_key, row_id=row.id) }}">
+                                            <button class="btn btn-sm btn-outline-success">Aktifkan</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <form method="post" class="panel" action="{{ url_for('master.edit_simple_master', master_key=master_key, row_id=editing_row.id) if editing_row else url_for(endpoint) }}">
+            <div class="section-title">{{ 'Edit ' ~ label if editing_row else 'Tambah ' ~ label }}</div>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Nama</label>
+                    <input class="form-control" name="name" value="{{ editing_row.name if editing_row else '' }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Urutan</label>
+                    <input class="form-control" name="sort_order" type="number" value="{{ editing_row.sort_order if editing_row else 0 }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Status</label>
+                    {% set selected_status = editing_row.status if editing_row else 'active' %}
+                    <select class="form-select" name="status">
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Aktif</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Nonaktif</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button class="btn btn-rdr">{{ 'Update' if editing_row else 'Tambah' }}</button>
+                    {% if editing_row %}<a class="btn btn-outline-dark" href="{{ url_for(endpoint) }}">Batal</a>{% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

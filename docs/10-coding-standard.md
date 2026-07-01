@@ -36,6 +36,8 @@ module_bp = Blueprint("module", __name__, url_prefix="/module")
 
 Semua model baru harus memakai SQLAlchemy. Jangan menambahkan database layer sqlite3 manual.
 
+Script migrasi boleh membaca database legacy SQLite secara read-only, tetapi penulisan ke EVPRO_ERP harus tetap melalui model SQLAlchemy dan service/helper yang tersedia.
+
 ## Services
 
 Service layer digunakan untuk:
@@ -88,3 +90,4 @@ Contoh:
 - Fitur Planned tidak boleh didokumentasikan sebagai Active.
 - Integrasi lintas modul harus mengikuti roadmap.
 - Source project lama hanya dipakai sebagai referensi.
+- Seed data contoh hanya boleh mengisi database kosong. Setelah data legacy diimport, seed tidak boleh membuat ulang brand/master/user contoh yang sudah diganti data asli.

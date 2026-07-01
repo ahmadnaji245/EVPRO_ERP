@@ -35,6 +35,37 @@ Fitur selesai:
 - Production status foundation.
 - Production checklist foundation.
 
+## ERP v0.2.1 - Complete Sales Order Module Migration
+
+Status: Completed.
+
+Fitur selesai:
+
+- Dashboard SO dari ERP_SO.
+- Menu bawah SO: Dashboard, Sales Order, Produksi, Master Data, Laporan, Setting.
+- Halaman Produksi dari ERP_SO.
+- Halaman Master Data untuk brand, item, material, pola, instruksi, dan user.
+- Halaman Laporan dan PDF laporan produksi.
+- Halaman Setting target point bulanan.
+- Alias route lama: `/master-data`, `/laporan`, `/laporan/pdf`, dan `/setting`.
+- Placeholder SO shell dihapus dan diganti fitur asli ERP_SO.
+- Print/PDF SO tetap memakai jalur lama dan tidak diubah.
+
+## ERP v0.2.2 - Import Sales Order Master Data
+
+Status: Completed.
+
+Fitur selesai:
+
+- Script `scripts/import_so_master_data.py` untuk import ulang master data Sales Order dari ERP_SO.
+- Import brand ERP_SO beserta kode/singkatan, logo, warna, point per size, status, dan catatan.
+- Import master item, material, pola, dan instruksi dari ERP_SO.
+- Import user ERP_SO dengan password hash Werkzeug yang kompatibel.
+- Logo brand ERP_SO disalin ke `static/uploads/brands`.
+- Seed data awal dibatasi hanya untuk database kosong agar tidak membuat ulang data contoh setelah import legacy.
+- Format tampilan SO pada modul Nota untuk brand non-FF/RDR memakai `EV-{kode_brand}`.
+- Brand lama yang sudah dipakai transaksi tidak dihapus paksa untuk menjaga foreign key Sales Order/Nota.
+
 ## ERP v0.3 - Invoice / Nota Module
 
 Status: Completed.
@@ -60,6 +91,23 @@ Fitur selesai:
 - Role produksi tidak dapat membuka Nota.
 - `so_id` nullable sebagai persiapan ERP v0.4.
 
+## ERP v0.3.1 - Complete Nota Module Migration
+
+Status: Completed.
+
+Fitur selesai:
+
+- Dashboard keuangan Nota dari project Nota lama.
+- Menu Nota: Dashboard, Nota, Nota Baru, Produk, Laporan, Piutang, Pemasukan.
+- Database produk Nota.
+- Laporan keuangan, customer, piutang, dan pemasukan.
+- Export Excel untuk semua Nota, piutang, omset bulanan, dan customer.
+- PDF Nota internal.
+- PDF invoice customer dengan generator lama.
+- Mapping PDF customer: FF Apparel memakai template FF, RDR Apparel memakai layout Evpro dengan identitas RDR Apparel, brand lain memakai Evpro.
+- Semua route Nota tetap admin-only.
+- Workflow SO ↔ Nota tetap dipertahankan.
+
 ## ERP v0.4 - SO ↔ Nota Integration
 
 Status: Completed.
@@ -76,6 +124,8 @@ Fitur selesai:
 - List/detail Sales Order menampilkan status penagihan sederhana.
 - Access control Nota tetap admin-only; role produksi tidak dapat membuka Nota.
 - Migrasi ringan startup untuk memastikan kolom/index `notas.so_id` tersedia pada database development lama.
+- Fix aturan brand print: Sales Order selalu memakai brand asli, sedangkan Nota memakai mapping invoice brand.
+- Mapping invoice Nota: FF Apparel -> FF Apparel, RDR Apparel -> RDR Apparel, brand selain itu -> Evpro.
 
 ## Next Release
 

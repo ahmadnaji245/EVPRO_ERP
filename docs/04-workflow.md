@@ -34,6 +34,15 @@ Customer mengirim kebutuhan order, desain, ukuran, jumlah, dan instruksi produks
 
 Admin membuat Sales Order sebagai dokumen pusat ERP. Sales Order menyimpan brand, customer/team, desain, player, deadline, instruksi, dan status produksi.
 
+ERP v0.2.1 melengkapi workflow Sales Order dari ERP_SO:
+
+- Dashboard SO menampilkan ringkasan point, status produksi, dan progress setting bulanan.
+- Menu Sales Order menampilkan list/detail/create/edit SO.
+- Produksi menampilkan daftar SO approved.
+- Master Data mengelola brand, item, material, pola, instruksi, dan user.
+- Laporan menampilkan laporan produksi per brand/periode dan PDF laporan.
+- Setting mengelola target point bulanan.
+
 ### Approval
 
 Approval dapat dilakukan oleh admin. Foundation customer approval berbasis access code sudah tersedia, sedangkan Customer Portal penuh masih Planned.
@@ -59,6 +68,24 @@ Shipping belum menjadi modul terpisah. Status ini masih Planned.
 Nota dapat dibuat manual dari menu Nota atau sebagai dokumen turunan dari Sales Order. Pada ERP v0.4, admin dapat membuka detail Sales Order lalu memilih `Buat Nota`; sistem mengisi data customer dan item dasar dari Sales Order jika memungkinkan, lalu menyimpan relasi melalui `so_id`.
 
 Jika Sales Order sudah memiliki Nota, tombol pada detail Sales Order berubah menjadi `Lihat Nota` dan pembuatan Nota ganda dicegah oleh backend.
+
+ERP v0.3.1 melengkapi workflow Nota dari project Nota lama:
+
+- Dashboard Nota menampilkan omset, piutang, pemasukan, status, dan grafik revenue.
+- Produk mengelola database kode produk dan harga.
+- Laporan menampilkan ringkasan keuangan, customer, serta export Excel.
+- Piutang menampilkan Nota dengan sisa pembayaran aktif.
+- Pemasukan menampilkan histori pembayaran.
+- Detail Nota menyediakan PDF internal dan PDF customer.
+
+Aturan brand print:
+
+- Print/PDF Sales Order selalu memakai brand asli Sales Order.
+- Print Nota memakai mapping invoice brand.
+- Nota dari SO `Armor` memakai invoice Evpro.
+- Nota dari SO `FF Apparel` memakai invoice FF Apparel.
+- Nota dari SO `RDR Apparel` memakai layout invoice Evpro dengan identitas RDR Apparel.
+- Nota dari brand lain selain FF Apparel dan RDR Apparel memakai invoice Evpro.
 
 ### Payment
 

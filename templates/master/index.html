@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Master Data - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Master Data</h1>
+        <p class="text-muted mb-0">Data referensi awal untuk Sales Order.</p>
+    </div>
+</div>
+<div class="row g-4">
+    {% set cards = [
+        ('Brand', brands|length ~ ' brand terdaftar.', 'master.brands'),
+        ('Item', items|length ~ ' item terdaftar.', 'master.items'),
+        ('Material', materials|length ~ ' material terdaftar.', 'master.materials'),
+        ('Pola', patterns|length ~ ' pola terdaftar.', 'master.patterns'),
+        ('Instruksi', instructions|length ~ ' instruksi terdaftar.', 'master.instructions'),
+        ('User', users|length ~ ' user terdaftar.', 'master.users')
+    ] %}
+    {% for title, description, endpoint in cards %}
+        <div class="col-md-6 col-xl-4">
+            <div class="panel h-100">
+                <div class="section-title">{{ title }}</div>
+                <p class="text-muted">{{ description }}</p>
+                <a class="btn btn-rdr" href="{{ url_for(endpoint) }}">Kelola</a>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

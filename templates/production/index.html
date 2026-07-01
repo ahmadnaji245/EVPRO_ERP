@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Produksi - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<h1 class="page-title mb-4">Produksi</h1>
+<div class="panel table-panel">
+    <table class="table">
+        <thead><tr><th>No SO</th><th>Tim</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for so in sales_orders %}
+            <tr><td>{{ so.so_number }}</td><td>{{ so.team_name }}</td><td>{{ so.production_status_label }}</td></tr>
+        {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">Belum ada SO approved.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

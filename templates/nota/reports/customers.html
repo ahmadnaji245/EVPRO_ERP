@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Customer Terbanyak Order - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Customer Terbanyak Order</h1>
+        <p class="text-muted mb-0">Daftar customer dengan jumlah order dan omset terbesar.</p>
+    </div>
+    <form method="get">
+        <select class="form-select" name="brand" onchange="this.form.submit()">
+            <option value="">Semua Brand</option>
+            {% for brand in brands %}
+                <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Nama Customer</th><th>Tim</th><th class="text-end">Jumlah Order</th><th class="text-end">Total Omset</th></tr></thead>
+            <tbody>
+            {% for customer in customers %}
+                <tr><td>{{ customer.name }}</td><td>{{ customer.team_name }}</td><td class="text-end">{{ customer.order_count }}</td><td class="text-end">{{ customer.total|rupiah }}</td></tr>
+            {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data customer.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

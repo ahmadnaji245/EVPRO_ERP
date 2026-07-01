@@ -4,8 +4,8 @@
 
 | Modul | Status | Keterangan |
 | --- | --- | --- |
-| Sales Order | Completed | Core module untuk SO, desain, player, approval dasar, print/PDF, revisi, production checklist foundation, dan status penagihan sederhana. |
-| Invoice / Nota | Completed | CRUD Nota, customer Nota, produk Nota, item, pembayaran, status, nomor otomatis, print view, dan integrasi ke Sales Order melalui `so_id`. |
+| Sales Order | Completed | Core module untuk SO, desain, player, approval dasar, print/PDF, revisi, dashboard SO, produksi, master data, laporan, setting, dan status penagihan sederhana. |
+| Invoice / Nota | Completed | CRUD Nota, dashboard keuangan, produk, laporan, piutang, pemasukan, export Excel, PDF customer/internal, dan integrasi ke Sales Order melalui `so_id`. |
 | Production | Planned | Modul produksi penuh belum tersedia. Foundation status/checklist sudah ada di Sales Order. |
 | Inventory | Planned | Stok bahan, stok produk, mutasi, dan kebutuhan produksi belum tersedia. |
 | Finance | Planned | Laporan finance lengkap, piutang, pemasukan, dan integrasi accounting belum tersedia. |
@@ -27,6 +27,14 @@ Fitur selesai:
 - Checklist produksi foundation.
 - Tombol `Buat Nota` / `Lihat Nota` untuk admin.
 - Status penagihan sederhana berdasarkan Nota terkait.
+- Print/PDF memakai brand asli Sales Order, tanpa mapping invoice.
+- Dashboard SO.
+- Produksi.
+- Master Data.
+- Laporan dan PDF laporan produksi.
+- Setting target point bulanan.
+
+ERP v0.2.2 menambahkan script import master data Sales Order dari ERP_SO untuk brand, logo brand, item, material, pola, instruksi, dan user. Kode brand ERP_SO dipakai sebagai singkatan brand; tampilan nomor SO pada modul Nota untuk brand non-FF/RDR memakai format `EV-{kode_brand}`.
 
 ## Invoice / Nota
 
@@ -40,10 +48,16 @@ Fitur selesai:
 - Pembayaran.
 - Status order/pembayaran.
 - Print view.
+- PDF internal.
+- PDF customer.
 - Admin-only access.
 - Create Nota dari Sales Order.
 - Prefill data customer dan item dasar dari Sales Order jika memungkinkan.
 - Pencegahan satu Sales Order memiliki lebih dari satu Nota.
+- Dashboard keuangan.
+- Database produk.
+- Laporan, piutang, pemasukan, dan export Excel.
+- Mapping invoice brand untuk print Nota: FF Apparel -> FF Apparel, RDR Apparel -> layout Evpro dengan identitas RDR Apparel, brand lain -> Evpro.
 
 Belum selesai:
 
@@ -52,15 +66,9 @@ Belum selesai:
 
 ## Production
 
-Status: Planned.
+Status: Foundation Active.
 
-Target:
-
-- Production order dari Sales Order.
-- Progress produksi.
-- QC dan packing.
-- Target produksi.
-- Status per tahap.
+Saat ini tersedia halaman Produksi dari ERP_SO untuk daftar SO approved. Modul Production penuh dengan tracking proses lanjutan tetap direncanakan pada ERP v0.5.
 
 ## Inventory
 

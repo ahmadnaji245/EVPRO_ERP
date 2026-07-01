@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from flask import Blueprint, Flask, redirect, render_template, url_for
+from flask import Blueprint, Flask, abort, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from sqlalchemy import inspect, text
 
@@ -8,10 +8,13 @@ from config import Config
 from database.db import db
 from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, User
 from routes.nota_routes import nota_bp
+from routes.so_shell_routes import master_bp, production_bp, reports_bp, settings_bp
 from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
+from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.nota_service import seed_default_nota_products
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders
+from utils.constants import user_is_admin
 
 
 login_manager = LoginManager()
@@ -31,7 +34,14 @@ def load_user(user_id):
 @dashboard_bp.route("/")
 @login_required
 def index():
-    return render_template("dashboard.html")
+    if not user_is_admin(current_user):
+        abort(403)
+    return render_template(
+        "dashboard.html",
+        stats=dashboard_stats(),
+        monthly=monthly_point_chart(),
+        setting_progress=monthly_setting_point_progress(),
+    )
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -81,6 +91,10 @@ def create_app(config_class=Config):
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(sales_orders_bp)
     app.register_blueprint(sales_orders_approval_bp)
+    app.register_blueprint(production_bp)
+    app.register_blueprint(master_bp)
+    app.register_blueprint(reports_bp)
+    app.register_blueprint(settings_bp)
     app.register_blueprint(nota_bp)
     app.register_blueprint(tracking_bp)
 
@@ -94,6 +108,39 @@ def create_app(config_class=Config):
     def login_alias():
         return login()
 
+    @app.route("/so/")
+    @login_required
+    def sales_order_alias():
+        return redirect(url_for("sales_orders.index", **request.args))
+
+    @app.route("/master-data")
+    @login_required
+    def master_data_alias():
+        if not user_is_admin(current_user):
+            abort(403)
+        return redirect(url_for("master.index"))
+
+    @app.route("/laporan")
+    @login_required
+    def laporan_alias():
+        if not user_is_admin(current_user):
+            abort(403)
+        return redirect(url_for("reports.index", **request.args))
+
+    @app.route("/laporan/pdf")
+    @login_required
+    def laporan_pdf_alias():
+        if not user_is_admin(current_user):
+            abort(403)
+        return redirect(url_for("reports.pdf", **request.args))
+
+    @app.route("/setting")
+    @login_required
+    def setting_alias():
+        if not user_is_admin(current_user):
+            abort(403)
+        return redirect(url_for("settings.index"))
+
     with app.app_context():
         ensure_upload_folders()
         db.create_all()
@@ -104,21 +151,20 @@ def create_app(config_class=Config):
 
 
 def seed_initial_data():
-    if not User.query.filter_by(username="admin").first():
+    has_users = User.query.first() is not None
+    if not has_users and not User.query.filter_by(username="admin").first():
         admin = User(name="Administrator", username="admin", role="admin")
         admin.set_password("admin")
         db.session.add(admin)
 
-    if not User.query.filter_by(username="produksi").first():
+    if not has_users and not User.query.filter_by(username="produksi").first():
         produksi = User(name="Produksi", username="produksi", role="produksi")
         produksi.set_password("produksi")
         db.session.add(produksi)
 
-    if not Brand.query.filter_by(code="EVPRO").first():
+    if Brand.query.first() is None:
         db.session.add(Brand(code="EVPRO", name="Evpro", color="#c5162e", point_per_size=1))
-    if not Brand.query.filter_by(code="RDR").first():
         db.session.add(Brand(code="RDR", name="RDR Apparel", color="#c5162e", point_per_size=1))
-    if not Brand.query.filter_by(code="FF").first():
         db.session.add(Brand(code="FF", name="FF Apparel", color="#20242a", point_per_size=1))
 
     _seed_master(MasterItem, ["Jersey", "Celana"])
@@ -152,6 +198,8 @@ def ensure_v04_schema():
 
 
 def _seed_master(model, names):
+    if model.query.first() is not None:
+        return
     existing = {row.name for row in model.query.all()}
     for index, name in enumerate(names, start=1):
         if name not in existing:

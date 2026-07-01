@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Laporan - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Laporan</h1>
+        <p class="text-muted mb-0">Laporan Sales Order Produksi berdasarkan brand.</p>
+    </div>
+    <a class="btn btn-rdr" href="{{ url_for('laporan_pdf_alias', brand=selected_brand, month=selected_month, year=selected_year) }}" target="_blank" rel="noopener">
+        <i class="bi bi-file-earmark-pdf"></i> Download PDF
+    </a>
+</div>
+<div class="panel mb-4">
+    <form class="row g-3 align-items-end" method="get" action="{{ url_for('laporan_alias') }}">
+        <div class="col-md-4 col-lg-3">
+            <label class="form-label">Brand / Merek</label>
+            <select class="form-select" name="brand">
+                <option value="">Semua Brand</option>
+                {% for brand in brand_options %}
+                    <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label class="form-label">Bulan</label>
+            <select class="form-select" name="month">
+                <option value="">Semua Bulan</option>
+                {% for month_number, month_name in month_options %}
+                    <option value="{{ month_number }}" {% if selected_month == month_number|string %}selected{% endif %}>{{ month_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+            <label class="form-label">Tahun</label>
+            <select class="form-select" name="year">
+                <option value="">Semua Tahun</option>
+                {% for year in year_options %}
+                    <option value="{{ year }}" {% if selected_year == year|string %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-rdr">Terapkan Filter</button>
+        </div>
+    </form>
+</div>
+<div class="row g-3">
+    {% for label, value in [('Total Size', summary.total_size), ('Total Point', summary.total_point), ('Approval Pending', summary.approval_pending), ('Produksi Selesai', summary.production_finish)] %}
+        <div class="col-md-3"><div class="metric"><span>{{ label }}</span><strong>{{ value|number(1) }}</strong></div></div>
+    {% endfor %}
+</div>
+<div class="row g-3 mt-1">
+    {% for label, value in [('Total Order Periode Terpilih', period_summary.total_order), ('Total Point Periode Terpilih', period_summary.total_point), ('Jumlah SO Periode Terpilih', period_summary.sales_order_count), ('Brand Order Terbanyak', period_summary.top_brand)] %}
+        <div class="col-md-6 col-xl-3"><div class="metric"><span>{{ label }}</span><strong>{{ value|number(1) if value is number else value }}</strong></div></div>
+    {% endfor %}
+</div>
+<div class="panel table-panel mt-4">
+    {% if report.groups %}
+        {% for group in report.groups %}
+            <div class="report-brand-group{% if not loop.first %} mt-4{% endif %}">
+                <div class="report-brand-title">{{ group.brand }}</div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle report-table mb-0">
+                        <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Nama Tim</th>
+                            <th>Merek / Brand</th>
+                            <th>Seller</th>
+                            <th class="text-end">Total Order</th>
+                            <th class="text-end">Poin</th>
+                            <th>Status Produksi</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in group.rows %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ row.team_name }}</td>
+                                <td>{{ row.brand }}</td>
+                                <td>{{ row.seller }}</td>
+                                <td class="text-end">{{ row.total_order }}</td>
+                                <td class="text-end">{{ row.point|number(1) }}</td>
+                                <td>{{ row.status }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="report-subtotal-row">
+                            <td colspan="4">Subtotal {{ group.brand }}</td>
+                            <td class="text-end">{{ group.total_order }}</td>
+                            <td class="text-end">{{ group.total_point|number(1) }}</td>
+                            <td></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endfor %}
+        <div class="report-grand-total mt-4">
+            <span>Grand Total Semua Brand</span>
+            <strong>Total Order: {{ report.grand_total_order }} &middot; Total Point: {{ report.grand_total_point|number(1) }}</strong>
+        </div>
+    {% else %}
+        <div class="text-center text-muted py-4">Belum ada data Sales Order.</div>
+    {% endif %}
+</div>
+{% endblock %}

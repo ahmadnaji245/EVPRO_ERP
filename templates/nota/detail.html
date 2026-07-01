@@ -7,12 +7,12 @@
         <p class="text-muted mb-0">{{ nota.customer.name }} - {{ nota.team_name }}</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-dark" href="{{ url_for('nota.index') }}">Kembali</a>
         {% if nota.sales_order %}
             <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=nota.sales_order.id) }}">Lihat Progress SO</a>
         {% endif %}
         <a class="btn btn-outline-dark" href="{{ url_for('nota.edit', nota_id=nota.id) }}">Edit Nota</a>
-        <a class="btn btn-outline-dark" href="#paymentForm">Tambah Pembayaran</a>
-        <a class="btn btn-rdr" target="_blank" href="{{ url_for('nota.print_view', nota_id=nota.id) }}">Print Nota</a>
+        <a class="btn btn-rdr" target="_blank" href="{{ url_for('nota.customer_pdf', nota_id=nota.id) }}">Cetak Invoice</a>
     </div>
 </div>
 
