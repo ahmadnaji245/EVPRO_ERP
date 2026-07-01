@@ -1,0 +1,75 @@
+from datetime import datetime
+
+from database.db import db
+from utils.constants import normalize_production_status
+
+
+class SalesOrder(db.Model):
+    __tablename__ = "sales_orders"
+
+    id = db.Column(db.Integer, primary_key=True)
+    so_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    team_name = db.Column(db.String(150), nullable=False)
+    brand_id = db.Column(db.Integer, db.ForeignKey("brands.id"), nullable=False)
+    seller_name = db.Column(db.String(150))
+    customer_code = db.Column(db.String(50), nullable=False, index=True)
+    access_code = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    material = db.Column(db.String(120))
+    pattern = db.Column(db.String(80))
+    grade = db.Column(db.String(20))
+    production_days = db.Column(db.Integer, nullable=False, default=7)
+    deadline = db.Column(db.Date)
+    instructions = db.Column(db.Text)
+    notes = db.Column(db.Text)
+    approval_status = db.Column(db.String(30), nullable=False, default="pending")
+    approved_by = db.Column(db.String(120))
+    approved_source = db.Column(db.String(30))
+    approved_at = db.Column(db.DateTime)
+    customer_portal_status = db.Column(db.String(50), nullable=False, default="Menunggu Persetujuan Desain")
+    revision_reason_admin = db.Column(db.Text)
+    revision_time = db.Column(db.DateTime)
+    revision_by_admin_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    production_status = db.Column(db.String(40), nullable=False, default="Desain")
+    production_status_updated_at = db.Column(db.DateTime)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    deleted_at = db.Column(db.DateTime)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    brand = db.relationship("Brand", back_populates="sales_orders")
+    created_by = db.relationship("User", back_populates="sales_orders", foreign_keys=[created_by_id])
+    designs = db.relationship("SalesOrderDesign", back_populates="sales_order", cascade="all, delete-orphan")
+    revision_histories = db.relationship("RevisionHistory", back_populates="sales_order", cascade="all, delete-orphan")
+    customer_revisions = db.relationship("CustomerRevisionNote", back_populates="sales_order", cascade="all, delete-orphan")
+    customer_access = db.relationship("CustomerAccess", back_populates="sales_order", uselist=False, cascade="all, delete-orphan")
+
+    @property
+    def approved(self):
+        return self.approval_status == "approved"
+
+    @approved.setter
+    def approved(self, value):
+        self.approval_status = "approved" if value else "pending"
+
+    @property
+    def total_size(self):
+        return sum(design.total_size for design in self.designs)
+
+    @property
+    def total_point(self):
+        return self.total_size * (self.brand.point_per_size if self.brand else 1)
+
+    @property
+    def production_status_label(self):
+        return normalize_production_status(self.production_status)
+
+    @property
+    def is_evpro_brand(self):
+        if not self.brand:
+            return False
+        return str(self.brand.name or "").strip().casefold() == "evpro" or str(self.brand.code or "").strip().casefold() == "evpro"
+
+    @property
+    def portal_status_label(self):
+        return self.customer_portal_status or "Menunggu Persetujuan Desain"

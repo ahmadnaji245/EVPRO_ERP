@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Print {{ sales_order.so_number }} - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-title">Print {{ sales_order.so_number }}</h1>
+        <p class="text-muted mb-0">{{ sales_order.team_name }}</p>
+    </div>
+    <a class="btn btn-rdr" href="{{ url_for('sales_orders.pdf', sales_order_id=sales_order.id) }}">Cetak PDF</a>
+</div>
+{% for design in sales_order.designs %}
+    <div class="panel mb-4">
+        <div class="section-title">Surat Order Produksi - {{ design.design_name }}</div>
+        <p class="mb-0">{{ design.item_name }} · {{ design.total_size }} size</p>
+    </div>
+{% endfor %}
+{% endblock %}

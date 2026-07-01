@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - EVPRO ERP{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <h1>Dashboard</h1>
+  <p>Kerangka awal ERP modular. Sales Order menjadi pusat data operasional.</p>
+</section>
+
+<section class="module-grid">
+  <a class="module-card" href="{{ url_for('sales_orders.index') }}">
+    <h2>Sales Order</h2>
+    <p>Modul inti ERP dan calon penghubung ke modul lain melalui SO ID.</p>
+  </a>
+  {% if current_user.is_admin %}
+    <a class="module-card" href="{{ url_for('nota.index') }}">
+      <h2>Nota</h2>
+      <p>Kelola nota, item produk, pembayaran, status order, dan print view.</p>
+    </a>
+  {% endif %}
+</section>
+{% endblock %}

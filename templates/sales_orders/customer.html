@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Customer Sales Order - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+{% if access_record %}
+    {% set sales_order = access_record.sales_order %}
+    <div class="mb-4">
+        <h1 class="page-title mb-2">Customer Sales Order</h1>
+        <p class="text-muted mb-0">{{ sales_order.so_number }} · {{ sales_order.team_name }}</p>
+    </div>
+    {% for design in sales_order.designs %}
+        <div class="panel mb-4">
+            <div class="section-title">{{ design.design_name }}</div>
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    {% if design.display_top_image_path %}
+                        <img class="img-fluid rounded border" src="{{ url_for('static', filename=design.display_top_image_path) }}" alt="Gambar atasan {{ design.design_name }}">
+                    {% else %}
+                        <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted" style="min-height: 220px;">Belum ada gambar atasan</div>
+                    {% endif %}
+                    {% if design.bottom_image_path %}
+                        <img class="img-fluid rounded border mt-3" src="{{ url_for('static', filename=design.bottom_image_path) }}" alt="Gambar celana {{ design.design_name }}">
+                    {% endif %}
+                    <p class="text-muted mt-3 mb-0" style="white-space: pre-line;">{{ design.display_top_notes or '-' }}</p>
+                    {% if design.bottom_notes %}
+                        <p class="text-muted mt-2 mb-0" style="white-space: pre-line;">{{ design.bottom_notes }}</p>
+                    {% endif %}
+                </div>
+                <div class="col-lg-8">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead><tr><th>No</th><th>Nama</th><th>Nomor</th><th>Size</th><th>Setting</th><th>Cek</th></tr></thead>
+                            <tbody>
+                            {% for player in design.players %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ player.player_name }}</td>
+                                    <td>{{ player.player_number or '-' }}</td>
+                                    <td>{{ player.size }}</td>
+                                    <td><input class="form-check-input" type="checkbox" disabled {% if player.checklist and player.checklist.setting_done %}checked{% endif %}></td>
+                                    <td><input class="form-check-input" type="checkbox" disabled {% if player.checklist and player.checklist.qc_done %}checked{% endif %}></td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="panel">
+        <div class="alert alert-danger mb-0">Kode akses tidak ditemukan atau sudah tidak aktif.</div>
+    </div>
+{% endif %}
+{% endblock %}

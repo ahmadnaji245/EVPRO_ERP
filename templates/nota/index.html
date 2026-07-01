@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Riwayat Nota - EVPRO ERP{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Riwayat Nota</h1>
+        <p class="text-muted mb-0">Cari berdasarkan nomor nota, customer, tim, atau nomor HP.</p>
+    </div>
+    <a class="btn btn-rdr" href="{{ url_for('nota.create') }}">Nota Baru</a>
+</div>
+
+<form class="panel mb-4" method="get">
+    <div class="row g-3 align-items-end">
+        <div class="col-12 col-lg-4">
+            <label class="form-label">Pencarian</label>
+            <input class="form-control" name="q" value="{{ search }}" placeholder="Nomor nota, customer, tim, nomor HP">
+        </div>
+        <div class="col-12 col-lg-3">
+            <label class="form-label">Brand</label>
+            <select class="form-select" name="brand_id">
+                <option value="">Semua Brand</option>
+                {% for brand in brands %}
+                    <option value="{{ brand.id }}" {% if active_brand_id == brand.id|string %}selected{% endif %}>{{ brand.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-3">
+            <label class="form-label">Status</label>
+            <select class="form-select" name="status">
+                <option value="">Semua status</option>
+                {% for status in statuses %}
+                    <option value="{{ status }}" {% if active_status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-2 d-grid">
+            <button class="btn btn-dark">Filter</button>
+        </div>
+    </div>
+</form>
+
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+            <tr>
+                <th>Nomor Nota</th>
+                <th>SO</th>
+                <th>Tanggal</th>
+                <th>Brand</th>
+                <th>Customer</th>
+                <th>Tim</th>
+                <th class="text-end">Total Nota</th>
+                <th class="text-end">Sudah Dibayar</th>
+                <th class="text-end">Sisa Piutang</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for nota in notas %}
+                <tr>
+                    <td><a href="{{ url_for('nota.detail', nota_id=nota.id) }}" class="fw-semibold">{{ nota.nota_number }}</a></td>
+                    <td>
+                        {% if nota.sales_order %}
+                            <a href="{{ url_for('sales_orders.detail', sales_order_id=nota.sales_order.id) }}">{{ nota.sales_order.so_number }}</a>
+                        {% else %}
+                            <span class="text-muted">Manual</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ nota.order_date|pretty_date }}</td>
+                    <td>{{ nota.brand.name }}</td>
+                    <td>{{ nota.customer.name }}</td>
+                    <td>{{ nota.team_name }}</td>
+                    <td class="text-end">{{ nota.total|rupiah }}</td>
+                    <td class="text-end">{{ nota.paid|rupiah }}</td>
+                    <td class="text-end">{{ nota.remaining|rupiah }}</td>
+                    <td><span class="status-pill status-{{ nota.status|lower|replace(' ', '-') }}">{{ nota.status }}</span></td>
+                    <td class="text-end"><a class="btn btn-outline-dark btn-sm" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Detail</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="11" class="text-center text-muted py-4">Belum ada nota.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

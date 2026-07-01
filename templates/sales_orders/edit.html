@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Edit Sales Order - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Edit {{ sales_order.so_number }}</h1>
+        <p class="text-muted mb-0">Edit identitas SO, desain, gambar, instruksi, dan player per desain.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=sales_order.id) }}">Kembali</a>
+</div>
+<form method="post" enctype="multipart/form-data">
+    {% if revision_reason_admin %}
+        <input type="hidden" name="revision_reason_admin" value="{{ revision_reason_admin }}">
+    {% endif %}
+    {% set submit_label = 'Update Sales Order' %}
+    {% include "sales_orders/_form.html" %}
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/sales_order_create.js') }}"></script>
+{% endblock %}

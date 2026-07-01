@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ nota.nota_number }} - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Nota {{ nota.nota_number }}</h1>
+        <p class="text-muted mb-0">{{ nota.customer.name }} - {{ nota.team_name }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if nota.sales_order %}
+            <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=nota.sales_order.id) }}">Lihat Progress SO</a>
+        {% endif %}
+        <a class="btn btn-outline-dark" href="{{ url_for('nota.edit', nota_id=nota.id) }}">Edit Nota</a>
+        <a class="btn btn-outline-dark" href="#paymentForm">Tambah Pembayaran</a>
+        <a class="btn btn-rdr" target="_blank" href="{{ url_for('nota.print_view', nota_id=nota.id) }}">Print Nota</a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <section class="panel mb-4">
+            <h2 class="section-title">Informasi Customer</h2>
+            <div class="row g-3">
+                <div class="col-md-6"><div class="info-label">Customer</div><div class="info-value">{{ nota.customer.name }}</div></div>
+                <div class="col-md-6"><div class="info-label">Nama Tim</div><div class="info-value">{{ nota.team_name }}</div></div>
+                <div class="col-md-6"><div class="info-label">Brand</div><div class="info-value">{{ nota.brand.name }}</div></div>
+                <div class="col-md-6"><div class="info-label">Tanggal Order</div><div class="info-value">{{ nota.order_date|pretty_date }}</div></div>
+                {% if nota.sales_order %}
+                    <div class="col-md-6"><div class="info-label">Sales Order</div><div class="info-value">{{ nota.sales_order.so_number }}</div></div>
+                {% endif %}
+                <div class="col-md-6"><div class="info-label">Status</div><div class="info-value">
+                    <span class="status-pill status-{{ nota.status|lower|replace(' ', '-') }}">{{ nota.status }}</span></div></div>
+                <div class="col-md-6"><div class="info-label">No. HP</div><div class="info-value">{{ nota.customer.phone or '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Alamat</div><div class="info-value">{{ nota.customer.address or '-' }}</div></div>
+            </div>
+        </section>
+
+        <section class="panel table-panel mb-4">
+            <h2 class="section-title">Daftar Item</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Kode</th><th>Keterangan</th><th class="text-end">Harga</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th></tr></thead>
+                    <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td class="fw-semibold">{{ item.product_code }}</td>
+                            <td>{{ item.description }}</td>
+                            <td class="text-end">{{ item.price|rupiah }}</td>
+                            <td class="text-end">{{ item.quantity }}</td>
+                            <td class="text-end">{{ item.subtotal|rupiah }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot><tr><th colspan="4" class="text-end">Total Nota</th><th class="text-end">{{ totals.total|rupiah }}</th></tr></tfoot>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel table-panel">
+            <h2 class="section-title">Riwayat Pembayaran</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Tanggal</th><th>Keterangan</th><th class="text-end">Nominal</th></tr></thead>
+                    <tbody>
+                    {% for payment in payments %}
+                        <tr><td>{{ payment.payment_date|pretty_date }}</td><td>{{ payment.description or '-' }}</td><td class="text-end">{{ payment.amount|rupiah }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="3" class="text-center text-muted py-4">Belum ada pembayaran.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-4">
+        <section class="panel mb-4" id="paymentForm">
+            <h2 class="section-title">Ringkasan</h2>
+            <div class="summary-row"><span>Total Nota</span><strong>{{ totals.total|rupiah }}</strong></div>
+            <div class="summary-row"><span>Sudah Dibayar</span><strong>{{ totals.paid|rupiah }}</strong></div>
+            <div class="summary-row highlight"><span>Sisa Piutang</span><strong>{{ totals.remaining|rupiah }}</strong></div>
+        </section>
+
+        <section class="panel mb-4">
+            <h2 class="section-title">Tambah Pembayaran</h2>
+            <form method="post" action="{{ url_for('nota.payment', nota_id=nota.id) }}" class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Tanggal</label>
+                    <input type="date" class="form-control" name="payment_date" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Nominal</label>
+                    <input type="number" min="1" class="form-control" name="amount" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Keterangan</label>
+                    <input class="form-control" name="description" placeholder="DP1, DP2, Pelunasan">
+                </div>
+                <div class="col-12 d-grid"><button class="btn btn-rdr">Tambah Pembayaran</button></div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2 class="section-title">Ubah Status Order</h2>
+            <form method="post" action="{{ url_for('nota.status', nota_id=nota.id) }}" class="d-flex gap-2">
+                <select class="form-select" name="status">
+                    {% for status in statuses %}
+                        <option value="{{ status }}" {% if nota.status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-dark">Simpan</button>
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}

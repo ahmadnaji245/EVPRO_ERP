@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block title %}{{ sales_order.so_number }} - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">{{ sales_order.so_number }}</h1>
+        <p class="text-muted mb-0">{{ sales_order.team_name }} · {{ sales_order.brand.name }}</p>
+        <div class="mt-2">
+            {% if sales_order.approved %}
+                <span class="badge text-bg-success">Approved by {{ 'Customer' if sales_order.approved_source == 'customer' else 'Admin' }}</span>
+                <span class="text-muted ms-2">Tanggal: {{ sales_order.approved_at|pretty_datetime if sales_order.approved_at else '-' }}</span>
+            {% else %}
+                <span class="badge text-bg-secondary">Belum Approved</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 so-page-actions">
+        <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.index') }}">Kembali</a>
+        <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.pdf', sales_order_id=sales_order.id) }}" target="_blank" rel="noopener">Cetak PDF</a>
+        {% if current_user.role_label == 'admin' %}
+            {% if linked_nota %}
+                <a class="btn btn-outline-dark" href="{{ url_for('nota.detail', nota_id=linked_nota.id) }}">Lihat Nota</a>
+            {% else %}
+                <a class="btn btn-outline-dark" href="{{ url_for('nota.create', so_id=sales_order.id) }}">Buat Nota</a>
+            {% endif %}
+            {% if sales_order.approved %}
+                <span class="btn btn-success disabled" aria-disabled="true">Approved by {{ 'Customer' if sales_order.approved_source == 'customer' else 'Admin' }}</span>
+            {% else %}
+                <form method="post" action="{{ url_for('sales_orders_approval.approve_admin', sales_order_id=sales_order.id) }}">
+                    <button class="btn btn-success">Approve Admin</button>
+                </form>
+            {% endif %}
+            <button
+                class="btn btn-outline-dark"
+                type="button"
+                data-copy-tracking
+                data-tracking-url="{{ url_for('tracking.detail', access_code=sales_order.access_code, _external=True) }}">
+                Copy Customer Portal Link
+            </button>
+            <a
+                class="btn btn-rdr"
+                href="{{ url_for('sales_orders.edit', sales_order_id=sales_order.id) }}"
+                {% if sales_order.approved_source == 'customer' and sales_order.approved %}data-customer-approved-edit{% endif %}>
+                Edit
+            </a>
+            <form method="post" action="{{ url_for('sales_orders.delete', sales_order_id=sales_order.id) }}" onsubmit="return confirm('Hapus Sales Order ini?')">
+                <button class="btn btn-outline-danger">Hapus</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="panel h-100 so-summary">
+            <div class="section-title">Ringkasan SO</div>
+            <dl class="row mb-0">
+                <dt class="col-5">Brand</dt><dd class="col-7">{{ sales_order.brand.code }}</dd>
+                {% if sales_order.is_evpro_brand and sales_order.seller_name %}
+                    <dt class="col-5">Seller</dt><dd class="col-7">{{ sales_order.seller_name }}</dd>
+                {% endif %}
+                <dt class="col-5">Customer</dt><dd class="col-7">{{ sales_order.customer_access.customer_name if sales_order.customer_access else '-' }}</dd>
+                <dt class="col-5">Kode Akses</dt><dd class="col-7">{{ sales_order.access_code }}</dd>
+                <dt class="col-5">Tanggal Masuk</dt><dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
+                <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
+                <dt class="col-5">Penagihan</dt><dd class="col-7">{{ billing_status }}</dd>
+                <dt class="col-5">Total Size</dt><dd class="col-7">{{ sales_order.total_size }}</dd>
+                <dt class="col-5">Total Point</dt><dd class="col-7">{{ sales_order.total_point|number(1) }}</dd>
+            </dl>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="panel h-100 so-summary">
+            <div class="section-title">Info Produksi</div>
+            <div class="row g-3">
+                <div class="col-md-4"><div class="text-muted small">Material</div><strong>{{ sales_order.material or '-' }}</strong></div>
+                <div class="col-md-4"><div class="text-muted small">Pattern/Pola</div><strong>{{ sales_order.pattern or '-' }}</strong></div>
+                <div class="col-md-4"><div class="text-muted small">Grade</div><strong>{{ sales_order.grade or '-' }}</strong></div>
+                <div class="col-12"><div class="text-muted small">Instruksi Khusus</div><div style="white-space: pre-line;">{{ sales_order.instructions or '-' }}</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel mb-4">
+    <div class="section-title">Persetujuan Desain Customer</div>
+    <dl class="row mb-0 so-summary">
+        <dt class="col-md-3">Status Persetujuan Desain</dt><dd class="col-md-9">{{ sales_order.portal_status_label }}</dd>
+        <dt class="col-md-3">Approved By</dt><dd class="col-md-9">{{ sales_order.approved_by or '-' }}</dd>
+        <dt class="col-md-3">Approved Source</dt><dd class="col-md-9">{{ sales_order.approved_source or '-' }}</dd>
+        <dt class="col-md-3">Approved At</dt><dd class="col-md-9">{{ sales_order.approved_at|pretty_datetime if sales_order.approved_at else '-' }}</dd>
+    </dl>
+    <div class="fw-semibold mt-4 mb-2">Riwayat Revisi Customer</div>
+    {% if sales_order.customer_revisions %}
+        <div class="d-grid gap-2">
+            {% for revision in sales_order.customer_revisions|sort(attribute='created_at', reverse=true) %}
+                <div class="border rounded p-3 bg-light">
+                    <div class="small text-muted mb-2">{{ revision.created_at|pretty_datetime }} · {{ revision.customer_access_code }}</div>
+                    <div style="white-space: pre-line;">{{ revision.note }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-muted">Belum ada revisi customer.</div>
+    {% endif %}
+</div>
+
+<div class="panel mb-4">
+    <div class="section-title">Status Produksi</div>
+    {% set current_status = sales_order.production_status_label %}
+    {% set current_status_index = production_statuses.index(current_status) if current_status in production_statuses else 0 %}
+    <div class="production-stepper mb-4">
+        {% for status in production_statuses %}
+            {% set step_index = loop.index0 %}
+            {% if step_index < current_status_index %}
+                {% set step_state = 'done' %}
+            {% elif step_index == current_status_index %}
+                {% set step_state = 'active' %}
+            {% else %}
+                {% set step_state = 'upcoming' %}
+            {% endif %}
+            <div class="production-step production-step-{{ step_state }}">
+                <div class="production-step-marker">{{ loop.index }}</div>
+                <div class="production-step-label">{{ status }}</div>
+            </div>
+        {% endfor %}
+    </div>
+    <form method="post" action="{{ url_for('sales_orders.update_status', sales_order_id=sales_order.id) }}" class="row g-3 align-items-end">
+        <div class="col-md-5 col-lg-4">
+            <label class="form-label">Status Produksi</label>
+            <select class="form-select" name="production_status">
+                {% for status in production_statuses %}
+                    <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-rdr">Simpan Status</button>
+        </div>
+    </form>
+</div>
+
+<form method="post" action="{{ url_for('sales_orders.update_production_checklist', sales_order_id=sales_order.id) }}">
+    {% for design in sales_order.designs %}
+        {% set recap = design.size_recap %}
+        <div class="panel mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                <div>
+                    <div class="section-title mb-1">{{ design.design_name }}</div>
+                    <p class="text-muted mb-0">{{ design.item_name }} · {{ design.total_size }} size</p>
+                </div>
+                <span class="badge text-bg-light border">{{ sales_order.production_status_label }}</span>
+            </div>
+<div class="row g-4">
+
+    <!-- KOLOM ATASAN -->
+    <div class="col-lg-6">
+
+        <div class="fw-semibold mb-2">
+            Gambar Atasan
+        </div>
+
+        {% if design.display_top_image_path %}
+            <img
+                src="{{ url_for('static', filename=design.display_top_image_path) }}"
+                class="img-fluid rounded border w-100 so-media-preview">
+        {% else %}
+            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">
+                Belum ada gambar atasan
+            </div>
+        {% endif %}
+
+        <div class="fw-semibold mt-3 mb-2">
+            Catatan Atasan
+        </div>
+
+        <div class="border rounded p-3 bg-light so-notes-box">
+            {{ design.display_top_notes or '-' }}
+        </div>
+
+    </div>
+
+    <!-- KOLOM CELANA -->
+    <div class="col-lg-6">
+
+        <div class="fw-semibold mb-2">
+            Gambar Celana
+        </div>
+
+        {% if design.bottom_image_path %}
+            <img
+                src="{{ url_for('static', filename=design.bottom_image_path) }}"
+                class="img-fluid rounded border w-100 so-media-preview">
+        {% else %}
+            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">
+                Belum ada gambar celana
+            </div>
+        {% endif %}
+
+        <div class="fw-semibold mt-3 mb-2">
+            Catatan Celana
+        </div>
+
+        <div class="border rounded p-3 bg-light so-notes-box">
+            {{ design.bottom_notes or '-' }}
+        </div>
+
+    </div>
+
+</div>
+            
+{% if recap.groups or recap.long_sleeve %}
+    <div class="mt-4">
+        <div class="fw-semibold mb-2">Rekap Size</div>
+
+        <div class="row g-4">
+
+            {% for group_name in ['Kids', 'Women', 'Reguler'] %}
+                {% set rows = recap.groups.get(group_name, []) %}
+
+                {% if rows %}
+                    <div class="col-md-4">
+                        <div class="card border h-100">
+                            <div class="card-header bg-light fw-semibold text-center">
+                                {{ group_name }}
+                            </div>
+
+                            <div class="card-body p-0">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Size</th>
+                                            <th class="text-center" style="width: 80px;">Qty</th>
+                                            <th class="text-center" style="width: 90px;">Setting</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {% for row in rows %}
+                                            <tr>
+                                                <td>{{ row.size }}</td>
+                                                <td class="text-center fw-semibold">{{ row.qty }}</td>
+                                                <td class="text-center">
+                                                    <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %}>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            {% if recap.long_sleeve %}
+                <div class="col-md-4">
+                    <div class="card border">
+                        <div class="card-header bg-light fw-semibold text-center">
+                            Lengan Panjang
+                        </div>
+
+                        <div class="card-body p-0">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Size</th>
+                                        <th class="text-center" style="width: 80px;">Qty</th>
+                                        <th class="text-center" style="width: 90px;">Setting</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for row in recap.long_sleeve %}
+                                        <tr>
+                                            <td>{{ row.size }}</td>
+                                            <td class="text-center fw-semibold">{{ row.qty }}</td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %}>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+{% endif %}
+            <div class="table-responsive mt-4">
+                <table class="table align-middle so-table">
+                    <thead>
+                    <tr>
+                        <th>NO</th>
+                        <th>NAMA</th>
+                        <th>NP</th>
+                        <th>SIZE</th>
+                        <th>KETERANGAN</th>
+                        <th class="text-center">Setting</th>
+                        <th class="text-center">Cek</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for player in design.players %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ player.player_name }}</td>
+                            <td>{{ player.player_number or '-' }}</td>
+                            <td>{{ player.size }}</td>
+                            <td>{{ player.notes or '-' }}</td>
+                            <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="setting_done" value="{{ player.id }}" {% if player.checklist and player.checklist.setting_done %}checked{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="qc_done" value="{{ player.id }}" {% if player.checklist and player.checklist.qc_done %}checked{% endif %}>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">Belum ada player.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endfor %}
+    <div class="d-flex justify-content-end mb-4">
+        <button class="btn btn-rdr">Simpan Checklist Produksi</button>
+    </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-copy-tracking]").forEach((button) => {
+    button.addEventListener("click", async () => {
+        const trackingUrl = button.dataset.trackingUrl;
+        try {
+            await navigator.clipboard.writeText(trackingUrl);
+            button.textContent = "Link Tersalin";
+        } catch (error) {
+            const fallbackInput = document.createElement("input");
+            fallbackInput.value = trackingUrl;
+            document.body.appendChild(fallbackInput);
+            fallbackInput.select();
+            document.execCommand("copy");
+            fallbackInput.remove();
+            button.textContent = "Link Tersalin";
+        }
+        window.setTimeout(() => {
+            button.textContent = "Copy Customer Portal Link";
+        }, 1800);
+    });
+});
+document.querySelectorAll("[data-customer-approved-edit]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+        const message = "Sales Order ini sudah disetujui customer.\n\nMengubah data akan membatalkan persetujuan customer.";
+        if (!window.confirm(message)) {
+            event.preventDefault();
+            return;
+        }
+        const reason = window.prompt("Tuliskan alasan perubahan untuk customer:");
+        if (!reason || !reason.trim()) {
+            event.preventDefault();
+            return;
+        }
+        event.preventDefault();
+        const targetUrl = new URL(link.href, window.location.origin);
+        targetUrl.searchParams.set("revision_reason_admin", reason.trim());
+        window.location.href = targetUrl.toString();
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% set selected_brand_id = form.get('brand_id', nota.brand_id if nota else (brands[0].id if brands else '')) %}
+{% block title %}{{ 'Edit Nota' if nota else 'Nota Baru' }} - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">{{ 'Edit Nota' if nota else 'Nota Baru' }}</h1>
+        <p class="text-muted mb-0">Pilih kode produk, isi qty, lalu sistem menghitung subtotal dan total otomatis.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.index') }}">Riwayat Nota</a>
+</div>
+
+{% set linked_so = source_so if source_so is defined and source_so else (nota.sales_order if nota and nota.sales_order else none) %}
+{% if linked_so %}
+    <div class="alert alert-info">
+        Nota ini dibuat dari Sales Order <strong>{{ linked_so.so_number }}</strong>.
+    </div>
+{% endif %}
+
+<form method="post" class="panel" id="notaForm"
+      data-products='{{ products|tojson }}'
+      data-customers='{{ customers|tojson }}'>
+    <input type="hidden" name="customer_id" id="customerId" value="{{ form.get('customer_id', nota.customer_id if nota else '') }}">
+    <input type="hidden" name="so_id" value="{{ form.get('so_id', nota.so_id if nota else '') }}">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label">Brand</label>
+            <select class="form-select" name="brand_id" required>
+                {% for brand in brands %}
+                    <option value="{{ brand.id }}" {% if selected_brand_id|string == brand.id|string %}selected{% endif %}>{{ brand.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Tanggal Order</label>
+            <input type="date" class="form-control" name="order_date" value="{{ form.get('order_date', nota.order_date if nota else today) }}" required>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Status Order</label>
+            {% set selected_status = form.get('status', nota.status if nota else 'Belum DP') %}
+            <select class="form-select" name="status" required>
+                {% for status in statuses %}
+                    <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Nomor Nota</label>
+            <input class="form-control" value="{{ nota.nota_number if nota else 'Otomatis saat disimpan' }}" disabled>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Nama Customer</label>
+            <input class="form-control" name="customer_name" id="customerName" list="customerList"
+                   value="{{ form.get('customer_name', nota.customer.name if nota else '') }}" required>
+            <datalist id="customerList">
+                {% for customer in customers %}
+                    <option value="{{ customer.name }}" data-id="{{ customer.id }}">{{ customer.name }} - {{ customer.phone or '-' }}</option>
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Nama Tim</label>
+            <input class="form-control" name="team_name" id="teamName" value="{{ form.get('team_name', nota.team_name if nota else '') }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">No. HP</label>
+            <input class="form-control" name="phone" id="phone" value="{{ form.get('phone', nota.customer.phone if nota else '') }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Alamat</label>
+            <input class="form-control" name="address" id="address" value="{{ form.get('address', nota.customer.address if nota else '') }}">
+        </div>
+        <div class="col-12">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <label class="form-label mb-0">Detail Produk</label>
+                <button type="button" class="btn btn-outline-dark btn-sm" id="addNotaItemRow">Tambah Baris</button>
+            </div>
+            <div class="table-responsive item-table-wrap">
+                <table class="table align-middle item-table" id="notaItemsTable">
+                    <thead>
+                    <tr>
+                        <th style="width: 40px"></th>
+                        <th>Kode Produk</th>
+                        <th class="qty-col">Qty</th>
+                        <th>Keterangan</th>
+                        <th class="money-col text-end">Harga Satuan</th>
+                        <th class="money-col text-end">Subtotal</th>
+                        <th class="action-col"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% set rows = item_rows if item_rows else [{'product_code': '', 'quantity': ''}] %}
+                    {% for item in rows %}
+                        <tr class="item-row">
+                            <td class="drag-handle"><i class="bi bi-grip-vertical"></i></td>
+                            <td>
+                                <input class="form-control product-code" name="product_code[]" list="productCodeList"
+                                       value="{{ item.product_code if item.product_code is defined else '' }}" required>
+                            </td>
+                            <td><input type="number" min="1" class="form-control quantity" name="quantity[]" value="{{ item.quantity if item.quantity is defined else '' }}" required></td>
+                            <td><input class="form-control description" value="{{ item.description if item.description is defined else '' }}" readonly></td>
+                            <td><input class="form-control text-end price" value="{{ item.price if item.price is defined else '' }}" readonly></td>
+                            <td><input class="form-control text-end subtotal" value="{{ item.subtotal if item.subtotal is defined else '' }}" readonly></td>
+                            <td><button type="button" class="btn btn-outline-danger btn-sm remove-row">Hapus</button></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <datalist id="productCodeList">
+                    {% for product in products %}
+                        <option value="{{ product.code }}">{{ product.description }}</option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <div class="invoice-total-box">
+                    <span>Total Nota</span>
+                    <strong id="notaTotal">Rp0</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <label class="form-label">Catatan</label>
+            <textarea class="form-control" name="notes" rows="3">{{ form.get('notes', nota.notes if nota else '') }}</textarea>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('nota.index') }}">Batal</a>
+            <button class="btn btn-rdr">Simpan Nota</button>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/nota_form.js') }}"></script>
+{% endblock %}
