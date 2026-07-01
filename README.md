@@ -56,16 +56,21 @@ Roadmap pengembangan tersedia di [docs/roadmap.md](docs/roadmap.md).
 
 Ringkasan milestone:
 
-- ERP v0.1 ✅: Framework ERP
-- ERP v0.2 ✅: Sales Order Module
-- ERP v0.3 ✅: Invoice / Nota Module
-- ERP v0.4 ⏳: SO ↔ Nota Integration - planned next
-- ERP v0.5 ⏳: Production Module
-- ERP v0.6 ⏳: Role & Permission
-- ERP v0.7 ⏳: Customer Portal
-- ERP v0.8 ⏳: CRM
-- ERP v0.9 ⏳: AI Integration
-- ERP v1.0 ⏳: Stable Internal Release
+## Release Roadmap
+
+- ERP v0.1 ✅ Framework ERP
+- ERP v0.2 ✅ Sales Order Module
+- ERP v0.2.1 ✅ Complete Sales Order Module Migration
+- ERP v0.2.2 ✅ Import Sales Order Master Data
+- ERP v0.3 ✅ Invoice / Nota Module
+- ERP v0.3.1 ✅ Complete Nota Module Migration
+- ERP v0.4 ✅ SO ↔ Nota Integration Stable Development
+- ERP v0.5 ⏳ Production Module
+- ERP v0.6 ⏳ Role & Permission
+- ERP v0.7 ⏳ Customer Portal
+- ERP v0.8 ⏳ CRM
+- ERP v0.9 ⏳ AI Integration
+- ERP v1.0 ⏳ Stable Internal Release
 
 ## Milestone 1 Scaffold
 
