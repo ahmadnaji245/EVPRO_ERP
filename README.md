@@ -1,112 +1,128 @@
-# EVPRO ERP
+# EVPRO TEXTILE ERP
 
-Integrated ERP System for Garment & Custom Jersey Industry.
+**Integrated ERP System for Custom Apparel Manufacturing**
 
-EVPRO ERP adalah repository utama untuk active development ERP modular EVPRO. Repository ini menjadi tempat integrasi bertahap dari modul Sales Order, Nota, Production, Inventory, Customer Portal, CRM, dan AI Business Assistant.
+EVPRO ERP adalah sistem ERP internal untuk perusahaan custom apparel yang mengintegrasikan seluruh proses bisnis mulai dari Sales Order, Produksi, Nota, hingga Serah Terima. Sistem ini dirancang untuk membantu operasional produksi garment berjalan lebih terstruktur, terdokumentasi, dan terhubung antar divisi.
 
-Repository lama `ERP_SO` dan `Nota` tetap diperlakukan sebagai stable source project / reference. Keduanya menjadi acuan perilaku modul lama, sedangkan pengembangan aktif dan integrasi dilakukan di repository EVPRO ERP ini.
+## Current Status
 
-## Project Vision
+| Item | Status |
+| --- | --- |
+| Current Version | ERP v0.5 Stable |
+| Release Date | July 2026 |
+| Repository Status | Main ERP Repository |
 
-EVPRO ERP is an integrated web-based ERP platform developed specifically for garment and custom jersey manufacturing.
+## Completed Features
 
-The system is modular and designed to grow over time.
+### ✅ ERP v0.1 Framework
 
-Sales Order adalah primary business object. Semua modul operasional akan dihubungkan kembali ke Sales Order menggunakan `SO_ID`, sehingga proses order, nota, produksi, pembayaran, customer portal, CRM, dan insight bisnis tetap berpusat pada satu dokumen utama.
+- [x] Login
+- [x] Dashboard
+- [x] Project Structure
 
-Completed modules:
+### ✅ ERP v0.2 Sales Order
 
-- Framework ERP
-- Sales Order Module
-- Invoice / Nota Module
+- [x] Surat Order
+- [x] Approval Customer
+- [x] PDF SO
+- [x] Customer Database
 
-Next module:
+### ✅ ERP v0.3 Nota
 
-- SO ↔ Nota Integration
+- [x] Invoice
+- [x] Pembayaran Bertahap
+- [x] Piutang
+- [x] Produk
 
-Long-term direction:
+### ✅ ERP v0.4 Integrasi
 
-- Production
-- Inventory (Planned)
-- Customer Portal (Planned)
-- CRM (Planned)
-- AI Business Assistant (Planned)
+- [x] Integrasi SO ↔ Nota
+- [x] Dashboard
+- [x] Laporan
 
-## ERP Architecture
+### ✅ ERP v0.5 Production Management
 
-Sales Order (SO) is the primary business object.
+- [x] Production Dashboard
+- [x] Vendor Assignment
+- [x] Printing
+- [x] Jahit
+- [x] QC
+- [x] Packing
+- [x] Finish
+- [x] Vendor Production List
+- [x] Vendor PDF Report
+- [x] Vendor JPG Export
+- [x] QC Portal
+- [x] Dynamic Item
+- [x] Dynamic QC
+- [x] Serah Terima
+- [x] Automatic Nota Status
+- [x] Handover Report
+- [x] Monthly Filter
 
-Every operational module must be linked to a Sales Order through `SO_ID`.
-
-Integration direction:
+## Workflow
 
 ```text
-Sales Order
-    -> Invoice / Nota
-    -> Production
-    -> Inventory
-    -> Customer Portal
-    -> CRM
-    -> AI Business Assistant
+Surat Order
+↓
+Approval Customer
+↓
+Setting
+↓
+Printing
+↓
+Jahit
+↓
+QC
+↓
+Packing
+↓
+Finish
+↓
+Serah Terima
+↓
+Nota Lunas
 ```
 
 ## Roadmap
 
-Roadmap pengembangan tersedia di [docs/roadmap.md](docs/roadmap.md).
+- [x] v0.1 Framework
+- [x] v0.2 Sales Order
+- [x] v0.3 Nota
+- [x] v0.4 Integration
+- [x] v0.5 Production Management
+- [ ] v0.6 Role & Permission
+- [ ] v0.7 Customer Portal
+- [ ] v0.8 CRM
+- [ ] v0.9 AI Integration
+- [ ] v1.0 Stable Release
 
-Ringkasan milestone:
+## Tech Stack
 
-## Release Roadmap
+| Layer | Technology |
+| --- | --- |
+| Backend | Python, Flask |
+| Database | SQLite |
+| Frontend | Bootstrap 5, Jinja2 |
+| PDF Export | ReportLab |
+| Version Control | Git, GitHub |
 
-- ERP v0.1 ✅ Framework ERP
-- ERP v0.2 ✅ Sales Order Module
-- ERP v0.2.1 ✅ Complete Sales Order Module Migration
-- ERP v0.2.2 ✅ Import Sales Order Master Data
-- ERP v0.3 ✅ Invoice / Nota Module
-- ERP v0.3.1 ✅ Complete Nota Module Migration
-- ERP v0.4 ✅ SO ↔ Nota Integration Stable Development
-- ERP v0.5 ⏳ Production Module
-- ERP v0.6 ⏳ Role & Permission
-- ERP v0.7 ⏳ Customer Portal
-- ERP v0.8 ⏳ CRM
-- ERP v0.9 ⏳ AI Integration
-- ERP v1.0 ⏳ Stable Internal Release
+## Module Overview
 
-## Milestone 1 Scaffold
+| Module | Description |
+| --- | --- |
+| Sales Order | Membuat, mengelola, dan mencetak Surat Order produksi. |
+| Production Management | Mengatur alur produksi dari assignment vendor sampai finish. |
+| Nota | Mengelola invoice, pembayaran bertahap, piutang, dan status nota. |
+| Serah Terima | Mencatat barang yang belum dan sudah diambil, termasuk laporan PDF/JPG. |
+| Reports | Menyediakan laporan operasional untuk monitoring internal. |
 
-Struktur awal project:
+## Development Notes
+
+Repository ini adalah source utama pengembangan EVPRO ERP setelah rilis ERP v0.5 Stable.
 
 ```text
-ERP/
-├── app.py
-├── config.py
-├── database/
-├── models/
-├── routes/
-│   ├── so_routes.py
-│   └── nota_routes.py
-├── templates/
-│   ├── so/
-│   └── nota/
-├── static/
-├── docs/
-└── README.md
+EVPRO ERP v0.5 Stable
+Release: July 2026
+Focus: Production Management, Vendor Report, QC, Handover, and SO-Nota integration
 ```
-
-## Menjalankan Aplikasi
-
-```bash
-python app.py
-```
-
-Default URL:
-
-- `http://127.0.0.1:5003/login`
-- `http://127.0.0.1:5003/dashboard`
-
-Default development login:
-
-- Admin: `admin` / `admin`
-- Produksi: `produksi` / `produksi`
-
-Role `admin` dapat membuka Sales Order dan Nota. Role `produksi` hanya untuk akses operasional yang diizinkan dan tidak dapat membuka modul Nota internal.

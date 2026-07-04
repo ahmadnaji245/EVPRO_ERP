@@ -23,6 +23,9 @@ class MasterBase:
 class MasterItem(MasterBase, db.Model):
     __tablename__ = "master_items"
 
+    perlu_upload_gambar = db.Column(db.Boolean, nullable=False, default=True)
+    perlu_qc = db.Column(db.Boolean, nullable=False, default=True)
+
 
 class MasterMaterial(MasterBase, db.Model):
     __tablename__ = "master_materials"

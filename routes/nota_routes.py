@@ -7,6 +7,7 @@ from flask_login import current_user, login_required
 from services.nota_service import (
     NOTA_STATUSES,
     add_payment,
+    calculate_invoice_status,
     create_nota,
     dashboard_stats,
     delete_nota,
@@ -36,7 +37,6 @@ from services.nota_service import (
     top_customers,
     totals,
     update_nota,
-    update_status,
     upsert_product,
     validate_nota_form,
     workbook_response,
@@ -100,6 +100,7 @@ def index():
         notas=list_notas(search),
         statuses=NOTA_STATUSES,
         brand_groups=invoice_brand_filter_options(),
+        calculate_invoice_status=calculate_invoice_status,
         format_so_number_for_invoice=format_so_number_for_invoice,
         search=search["q"],
         active_status=search["status"],
@@ -297,7 +298,7 @@ def detail(nota_id):
         items=sorted(nota.items, key=lambda item: item.sort_order),
         payments=sorted(nota.payments, key=lambda payment: (payment.payment_date, payment.id)),
         totals=totals(nota),
-        statuses=NOTA_STATUSES,
+        invoice_status=calculate_invoice_status(nota),
     )
 
 
@@ -332,20 +333,6 @@ def payment(nota_id):
     return redirect(url_for("nota.detail", nota_id=nota.id))
 
 
-@nota_bp.route("/<int:nota_id>/status", methods=["POST"])
-@login_required
-def status(nota_id):
-    _admin_required()
-    nota = get_nota(nota_id)
-    try:
-        update_status(nota, request.form.get("status"))
-    except ValueError as exc:
-        flash(str(exc), "danger")
-    else:
-        flash("Status order berhasil diubah.", "success")
-    return redirect(url_for("nota.detail", nota_id=nota.id))
-
-
 @nota_bp.route("/<int:nota_id>/print")
 @login_required
 def print_view(nota_id):
@@ -359,6 +346,7 @@ def print_view(nota_id):
         items=sorted(nota.items, key=lambda item: item.sort_order),
         payments=sorted(nota.payments, key=lambda payment: (payment.payment_date, payment.id)),
         totals=totals(nota),
+        invoice_status=calculate_invoice_status(nota),
     )
 
 
@@ -422,7 +410,7 @@ def _pdf_invoice(nota, mapped_brand=False):
         "team_name": nota.team_name,
         "phone": nota.customer.phone,
         "address": nota.customer.address,
-        "status": nota.status,
+        "status": calculate_invoice_status(nota),
         "notes": nota.notes,
     }
 

@@ -4,7 +4,7 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
         <h1 class="page-title">Laporan</h1>
-        <p class="text-muted mb-0">Laporan Sales Order Produksi berdasarkan brand.</p>
+        <p class="text-muted mb-0">Laporan Surat Order Produksi berdasarkan brand.</p>
     </div>
     <a class="btn btn-rdr" href="{{ url_for('laporan_pdf_alias', brand=selected_brand, month=selected_month, year=selected_year) }}" target="_blank" rel="noopener">
         <i class="bi bi-file-earmark-pdf"></i> Download PDF
@@ -100,7 +100,7 @@
             <strong>Total Order: {{ report.grand_total_order }} &middot; Total Point: {{ report.grand_total_point|number(1) }}</strong>
         </div>
     {% else %}
-        <div class="text-center text-muted py-4">Belum ada data Sales Order.</div>
+        <div class="text-center text-muted py-4">Belum ada data Surat Order.</div>
     {% endif %}
 </div>
 {% endblock %}

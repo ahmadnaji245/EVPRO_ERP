@@ -18,3 +18,4 @@ class SalesOrderPlayer(db.Model):
 
     design = db.relationship("SalesOrderDesign", back_populates="players")
     checklist = db.relationship("ProductionChecklist", back_populates="player", uselist=False, cascade="all, delete-orphan")
+    qc_checklist = db.relationship("QcChecklist", back_populates="player", uselist=False, cascade="all, delete-orphan")

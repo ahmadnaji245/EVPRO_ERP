@@ -5,7 +5,7 @@
 ```text
 Customer
     ↓
-Sales Order
+Surat Order
     ↓
 Approval
     ↓
@@ -30,15 +30,15 @@ Repeat Order
 
 Customer mengirim kebutuhan order, desain, ukuran, jumlah, dan instruksi produksi.
 
-### Sales Order
+### Surat Order
 
-Admin membuat Sales Order sebagai dokumen pusat ERP. Sales Order menyimpan brand, customer/team, desain, player, deadline, instruksi, dan status produksi.
+Admin membuat Surat Order sebagai dokumen pusat ERP. Secara internal route/model masih memakai nama `sales_order`, tetapi label operasional ditampilkan sebagai Surat Order. Surat Order menyimpan brand, customer/team, desain, player, deadline customer, instruksi, dan status produksi.
 
-ERP v0.2.1 melengkapi workflow Sales Order dari ERP_SO:
+ERP v0.2.1 melengkapi workflow Surat Order dari ERP_SO:
 
 - Dashboard SO menampilkan ringkasan point, status produksi, dan progress setting bulanan.
-- Menu Sales Order menampilkan list/detail/create/edit SO.
-- Produksi menampilkan daftar SO approved.
+- Menu Surat Order menampilkan list/detail/create/edit SO.
+- Produksi menampilkan dashboard Production Management untuk SO approved.
 - Master Data mengelola brand, item, material, pola, instruksi, dan user.
 - Laporan menampilkan laporan produksi per brand/periode dan PDF laporan.
 - Setting mengelola target point bulanan.
@@ -47,17 +47,30 @@ ERP v0.2.1 melengkapi workflow Sales Order dari ERP_SO:
 
 Approval dapat dilakukan oleh admin. Foundation customer approval berbasis access code sudah tersedia, sedangkan Customer Portal penuh masih Planned.
 
-### Production
+### Production Management
 
-Sales Order menjadi dasar proses produksi. Saat ini status produksi dan checklist tersedia sebagai foundation. Modul Production penuh direncanakan pada ERP v0.5.
+Surat Order menjadi dasar proses produksi. ERP v0.5 mengaktifkan Production Management pada halaman Produksi tanpa membuat portal/login vendor.
+
+Alur Production Management:
+
+- Admin/production controller membuka halaman Produksi.
+- SO approved masuk ke antrian produksi.
+- Admin assign vendor produksi ke `Mas Amar` atau `Mas Syukron`.
+- Admin menentukan deadline vendor yang terpisah dari deadline customer/SO.
+- Admin atau produksi memperbarui status produksi: Menunggu Assign, Dikirim ke Vendor, Sedang Diproduksi, Barang Masuk, QC, Packing, Selesai.
+- Barang masuk gudang dicatat dari halaman Produksi.
+- QC/checklist internal tetap memakai checklist produksi yang melekat pada Surat Order.
+- Vendor eksternal tidak login ERP dan hanya menerima print/PDF Surat Order yang sudah ada.
+
+Prioritas otomatis memakai deadline vendor jika tersedia. Jika belum ada deadline vendor, sistem memakai deadline customer/SO.
 
 ### QC
 
-QC berada dalam alur produksi. Checklist QC tersedia sebagai foundation pada Sales Order.
+QC berada dalam alur produksi. Checklist QC tersedia pada Surat Order dan dibuka dari halaman Production Management.
 
 ### Packing
 
-Packing adalah tahap akhir sebelum pengiriman. Tracking packing penuh direncanakan pada modul Production.
+Packing adalah tahap akhir sebelum pengiriman dan menjadi salah satu status pada Production Management.
 
 ### Shipping
 
@@ -65,9 +78,9 @@ Shipping belum menjadi modul terpisah. Status ini masih Planned.
 
 ### Invoice / Nota
 
-Nota dapat dibuat manual dari menu Nota atau sebagai dokumen turunan dari Sales Order. Pada ERP v0.4, admin dapat membuka detail Sales Order lalu memilih `Buat Nota`; sistem mengisi data customer dan item dasar dari Sales Order jika memungkinkan, lalu menyimpan relasi melalui `so_id`.
+Nota dapat dibuat manual dari menu Nota atau sebagai dokumen turunan dari Surat Order. Pada ERP v0.4, admin dapat membuka detail Surat Order lalu memilih `Buat Nota`; sistem mengisi data customer dan item dasar dari Surat Order jika memungkinkan, lalu menyimpan relasi melalui `so_id`.
 
-Jika Sales Order sudah memiliki Nota, tombol pada detail Sales Order berubah menjadi `Lihat Nota` dan pembuatan Nota ganda dicegah oleh backend.
+Jika Surat Order sudah memiliki Nota, tombol pada detail Surat Order berubah menjadi `Lihat Nota` dan pembuatan Nota ganda dicegah oleh backend.
 
 ERP v0.3.1 melengkapi workflow Nota dari project Nota lama:
 
@@ -80,7 +93,7 @@ ERP v0.3.1 melengkapi workflow Nota dari project Nota lama:
 
 Aturan brand print:
 
-- Print/PDF Sales Order selalu memakai brand asli Sales Order.
+- Print/PDF Surat Order selalu memakai brand asli Surat Order.
 - Print Nota memakai mapping invoice brand.
 - Nota dari SO `Armor` memakai invoice Evpro.
 - Nota dari SO `FF Apparel` memakai invoice FF Apparel.
@@ -91,7 +104,7 @@ Aturan brand print:
 
 Pembayaran dicatat pada Nota melalui `NotaPayment`. Status pembayaran/order dapat diubah oleh admin.
 
-Status penagihan sederhana ditampilkan pada Sales Order:
+Status penagihan sederhana ditampilkan pada Surat Order:
 
 - `Belum Ada Nota`
 - `Nota Dibuat`
@@ -107,7 +120,7 @@ Repeat order dan follow-up customer akan masuk ke CRM pada ERP v0.8.
 Customer Portal direncanakan sebagai akses eksternal terbatas.
 
 ```text
-Admin membuat Sales Order
+Admin membuat Surat Order
     ↓
 Sistem membuat secure token / access code
     ↓

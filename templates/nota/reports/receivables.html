@@ -45,7 +45,7 @@
                     <td class="text-end">{{ invoice.total|rupiah }}</td>
                     <td class="text-end">{{ invoice.paid|rupiah }}</td>
                     <td class="text-end">{{ invoice.remaining|rupiah }}</td>
-                    <td><span class="status-pill">{{ invoice.status }}</span></td>
+                    <td><span class="status-pill status-{{ invoice.status|lower|replace(' ', '-') }}">{{ invoice.status }}</span></td>
                 </tr>
             {% else %}
                 <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada piutang.</td></tr>

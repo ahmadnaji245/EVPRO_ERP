@@ -25,9 +25,14 @@ Status: Active.
 Hak akses:
 
 - Dashboard internal.
-- Sales Order.
-- Create/edit/delete Sales Order.
+- Surat Order.
+- Create/edit/delete Surat Order.
 - Approval admin.
+- Production Management.
+- Assign vendor produksi.
+- Set deadline vendor.
+- Catat barang masuk gudang.
+- Update status produksi dan checklist.
 - Nota.
 - Create/edit Nota.
 - Tambah pembayaran.
@@ -41,14 +46,16 @@ Status: Active.
 
 Hak akses:
 
-- Sales Order.
-- Dashboard dasar.
+- Surat Order.
+- Halaman Produksi / Production Management.
 - Update production status/checklist sesuai kebutuhan operasional.
+- Cetak PDF Surat Order untuk kebutuhan produksi/vendor.
 
 Batasan:
 
 - Produksi tidak boleh membuka route Nota.
-- Produksi tidak boleh create/edit/delete Sales Order admin-only.
+- Produksi tidak boleh create/edit/delete Surat Order admin-only.
+- Produksi tidak boleh assign vendor atau set deadline vendor jika tidak diberi role admin.
 
 ### Customer
 
@@ -67,9 +74,12 @@ Customer hanya boleh membuka approval page menggunakan secure token.
 | Modul / Aksi | Owner | Admin | Produksi | Customer |
 | --- | --- | --- | --- | --- |
 | Dashboard internal | Planned | Yes | Limited | No |
-| Sales Order list/detail | Planned | Yes | Yes | No |
-| Create/edit Sales Order | Planned | Yes | No | No |
+| Surat Order list/detail | Planned | Yes | Yes | No |
+| Create/edit Surat Order | Planned | Yes | No | No |
 | Nota | Planned | Yes | No | No |
+| Production Management | Planned | Yes | Yes | No |
+| Assign vendor/deadline vendor | Planned | Yes | No | No |
+| Barang masuk gudang | Planned | Yes | Yes | No |
 | Production checklist | Planned | Yes | Yes | No |
 | Customer approval page | Planned | Limited | No | Token only |
 | Role management | Planned | Planned | No | No |

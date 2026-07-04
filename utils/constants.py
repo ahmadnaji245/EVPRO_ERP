@@ -1,21 +1,43 @@
 APP_NAME = "EVPRO TEXTILE ERP"
-APP_TAGLINE = "Sales Order Management System"
+APP_TAGLINE = "Surat Order Management System"
 
 APPROVAL_STATUSES = ["pending", "approved", "cancelled"]
 CUSTOMER_PORTAL_STATUSES = [
-    "Draft",
-    "Menunggu Persetujuan Desain",
-    "Revisi Customer",
-    "Desain Disetujui",
-    "Produksi",
-    "Selesai",
+    "Approval Customer",
+    "Setting",
+    "Printing",
+    "Jahit",
+    "QC",
+    "Packing",
+    "Finish",
 ]
-PRODUCTION_STATUSES = ["Desain", "Setting", "Printing", "Jahit", "QC", "Packing", "Selesai"]
+PRODUCTION_VENDORS = ["Mas Amar", "Mas Syukron"]
+PRODUCTION_STATUSES = [
+    "Approval Customer",
+    "Setting",
+    "Printing",
+    "Jahit",
+    "QC",
+    "Packing",
+    "Finish",
+]
 LEGACY_PRODUCTION_STATUS_MAP = {
+    "Desain": "Approval Customer",
+    "Menunggu Persetujuan Desain": "Approval Customer",
+    "Revisi Customer": "Approval Customer",
+    "Desain Disetujui": "Setting",
+    "Produksi": "Jahit",
+    "Menunggu Assign": "Approval Customer",
+    "Dikirim ke Vendor": "Jahit",
+    "Sedang Diproduksi": "Printing",
+    "Potong": "Printing",
+    "Finishing": "Packing",
+    "Barang Masuk": "QC",
     "Menunggu Setting": "Setting",
     "Menunggu QC": "QC",
     "Menunggu Finish": "Packing",
-    "Finish": "Selesai",
+    "Selesai": "Finish",
+    "Terkirim dari Vendor": "QC",
 }
 USER_ROLES = ["admin", "produksi"]
 USER_ROLE_ALIASES = {

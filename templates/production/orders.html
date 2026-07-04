@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}List Produksi Vendor - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">List Produksi Vendor</h1>
+        <p class="text-muted mb-0">Ringkasan beban kerja vendor jahit dan prioritas produksi berdasarkan deadline.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-dark" href="{{ url_for('production.index') }}">Kembali ke Produksi</a>
+        <a class="btn btn-rdr" href="{{ url_for('production.vendors_pdf') }}" target="_blank" rel="noopener">Cetak PDF</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    {% for vendor in vendor_rows %}
+        <div class="col-lg-6">
+            <div class="panel production-vendor-panel">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div class="section-title mb-0">{{ vendor.name }}</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('production.vendor_print', vendor_name=vendor.name) }}" target="_blank" rel="noopener">
+                            Cetak PDF
+                        </a>
+                        <a class="btn btn-sm btn-rdr" href="{{ url_for('production.vendor_print_jpg', vendor_name=vendor.name) }}" target="_blank" rel="noopener">
+                            Cetak JPG
+                        </a>
+                    </div>
+                </div>
+                <div class="production-vendor-grid">
+                    <div>
+                        <span>Total SO aktif</span>
+                        <strong>{{ vendor.total_active }}</strong>
+                    </div>
+                    <div>
+                        <span>Deadline hari ini</span>
+                        <strong>{{ vendor.deadline_today }}</strong>
+                    </div>
+                    <div>
+                        <span>Terlambat</span>
+                        <strong>{{ vendor.late }}</strong>
+                    </div>
+                    <div>
+                        <span>QC / kurang / reject</span>
+                        <strong>{{ vendor.qc_issue }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle production-table">
+            <thead>
+            <tr>
+                <th>Nomor SO</th>
+                <th>Tanggal Masuk Produksi</th>
+                <th>Nama Tim</th>
+                <th>Brand</th>
+                <th>Vendor Jahit</th>
+                <th>Setting Oleh</th>
+                <th>Status Produksi</th>
+                <th>Deadline Customer</th>
+                <th>Deadline Vendor</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td class="fw-semibold">{{ row.so_number }}</td>
+                    <td>{{ row.production_in_at|pretty_date if row.production_in_at else '-' }}</td>
+                    <td>{{ row.team_name }}</td>
+                    <td>{{ row.brand }}</td>
+                    <td>{{ row.vendor }}</td>
+                    <td>{{ row.setting_by }}</td>
+                    <td><span class="badge {{ status_badge_class(row.status) }}">{{ row.status }}</span></td>
+                    <td>{{ row.deadline_customer|pretty_date if row.deadline_customer else '-' }}</td>
+                    <td>{{ row.deadline_vendor|pretty_date if row.deadline_vendor else '-' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-4">Belum ada order produksi.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

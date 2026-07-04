@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}QC Checklist {{ sales_order.so_number }} - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">QC / Checklist</h1>
+        <p class="text-muted mb-0">{{ sales_order.so_number }} · {{ sales_order.team_name }}</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('production.index') }}">Kembali ke Produksi</a>
+</div>
+
+<div class="panel mb-4">
+    <div class="section-title">Ringkasan Surat Order</div>
+    <dl class="row mb-0 so-summary">
+        <dt class="col-md-2">Nomor SO</dt><dd class="col-md-4">{{ sales_order.so_number }}</dd>
+        <dt class="col-md-2">Nama Tim</dt><dd class="col-md-4">{{ sales_order.team_name }}</dd>
+        <dt class="col-md-2">Brand</dt><dd class="col-md-4">{{ sales_order.brand.code if sales_order.brand else '-' }}</dd>
+        <dt class="col-md-2">Vendor Produksi</dt><dd class="col-md-4">{{ sales_order.production_vendor or '-' }}</dd>
+        <dt class="col-md-2">Deadline Vendor</dt><dd class="col-md-4">{{ sales_order.production_vendor_deadline|pretty_date if sales_order.production_vendor_deadline else '-' }}</dd>
+        <dt class="col-md-2">Keterangan</dt><dd class="col-md-4">{{ sales_order.shortage_note or '-' }}</dd>
+        <dt class="col-md-2">Keterangan QC</dt><dd class="col-md-4">{{ sales_order.qc_note or '-' }}</dd>
+    </dl>
+</div>
+
+<form method="post" action="{{ url_for('production.qc_checklist', sales_order_id=sales_order.id) }}">
+    <div class="panel table-panel">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle qc-checklist-table">
+                <thead>
+                <tr>
+                    <th>NO</th>
+                    <th>ITEM</th>
+                    <th>NAMA</th>
+                    <th>NP</th>
+                    <th>SIZE</th>
+                    <th>KETERANGAN</th>
+                    {% for component in qc_components %}
+                        <th class="text-center">
+                            <label class="d-inline-flex align-items-center justify-content-center gap-2 mb-0">
+                                <input class="form-check-input m-0" type="checkbox" data-qc-check-all="qc_{{ component|lower }}">
+                                <span>QC {{ component }}</span>
+                            </label>
+                        </th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in qc_rows %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ row.item|join(' + ') }}</td>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.number or '-' }}</td>
+                        <td>{{ row.size }}</td>
+                        <td>{{ row.notes|join(', ') if row.notes else '-' }}</td>
+                        {% for component in qc_components %}
+                            {% set check = row.checks.get(component) %}
+                            <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="qc_{{ component|lower }}" value="{{ check.player_id if check else '' }}" {% if check and check.checked %}checked{% endif %} {% if not check or not check.player_id %}disabled{% endif %}>
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% else %}
+                    <tr><td colspan="{{ 6 + qc_components|length }}" class="text-center text-muted py-4">Belum ada data player.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            <label class="form-label fw-semibold" for="qc-note">Keterangan QC</label>
+            <textarea
+                class="form-control"
+                id="qc-note"
+                name="qc_note"
+                rows="3">{{ form.get('qc_note', sales_order.qc_note or '') }}</textarea>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end mt-3">
+        <button class="btn btn-rdr">Simpan QC</button>
+    </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-qc-check-all]").forEach((toggle) => {
+    const targetName = toggle.dataset.qcCheckAll;
+    const syncHeaderState = () => {
+        const boxes = Array.from(document.querySelectorAll(`input[name="${targetName}"]:not(:disabled)`));
+        toggle.checked = boxes.length > 0 && boxes.every((box) => box.checked);
+        toggle.indeterminate = boxes.some((box) => box.checked) && !toggle.checked;
+    };
+
+    toggle.addEventListener("change", () => {
+        document.querySelectorAll(`input[name="${targetName}"]:not(:disabled)`).forEach((box) => {
+            box.checked = toggle.checked;
+        });
+        toggle.indeterminate = false;
+    });
+
+    document.querySelectorAll(`input[name="${targetName}"]:not(:disabled)`).forEach((box) => {
+        box.addEventListener("change", syncHeaderState);
+    });
+
+    syncHeaderState();
+});
+</script>
+{% endblock %}

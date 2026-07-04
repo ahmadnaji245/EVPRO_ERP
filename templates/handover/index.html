@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Serah Terima - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Serah Terima</h1>
+        <p class="text-muted mb-0">Follow up barang produksi selesai, pelunasan nota, dan pencatatan pengambilan.</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="metric small-metric"><span>Barang Belum Diambil</span><strong>{{ summary.pending_count }}</strong></div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric small-metric"><span>Sudah Diambil Bulan Ini</span><strong>{{ summary.picked_this_month }}</strong></div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric small-metric"><span>Sisa Tagihan Belum Diambil</span><strong>{{ summary.pending_remaining|rupiah }}</strong></div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'belum' %}active{% endif %}" href="{{ url_for('handover.index', tab='belum') }}">Belum Diambil</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if active_tab == 'sudah' %}active{% endif %}" href="{{ url_for('handover.index', tab='sudah') }}">Sudah Diambil</a>
+    </li>
+</ul>
+
+{% if active_tab == 'belum' %}
+    <div class="panel table-panel">
+        <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+            <a class="btn btn-rdr" target="_blank" href="{{ url_for('handover.pending_pdf') }}">Cetak PDF</a>
+            <a class="btn btn-outline-dark" target="_blank" href="{{ url_for('handover.pending_jpg') }}">Cetak JPG</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                <tr>
+                    <th>Nomor SO</th>
+                    <th>Nama Tim</th>
+                    <th>Brand</th>
+                    <th>Tanggal Finish Produksi</th>
+                    <th class="text-end">Total Nota</th>
+                    <th class="text-end">Sudah Dibayar / DP</th>
+                    <th class="text-end">Sisa Tagihan</th>
+                    <th>Status Nota</th>
+                    <th>Aksi</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in pending_rows %}
+                    {% set order = row.order %}
+                    {% set nota = row.nota.nota %}
+                    <tr>
+                        <td class="fw-semibold">{{ order.so_number }}</td>
+                        <td>{{ order.team_name }}</td>
+                        <td>{{ order.brand.code if order.brand else '-' }}</td>
+                        <td>{{ row.finish_at|pretty_date if row.finish_at else '-' }}</td>
+                        <td class="text-end">{{ row.nota.total|rupiah }}</td>
+                        <td class="text-end">{{ row.nota.paid|rupiah }}</td>
+                        <td class="text-end fw-semibold {% if row.nota.remaining > 0 %}text-danger{% endif %}">{{ row.nota.remaining|rupiah }}</td>
+                        <td>
+                            {% if nota %}
+                                <span class="badge {% if row.nota.status == 'Lunas' %}text-bg-success{% elif row.nota.status == 'DP' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ row.nota.status }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=order.id) }}">Detail SO</a>
+                                {% if nota %}
+                                    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Lihat / Update Nota</a>
+                                {% else %}
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('nota.create', so_id=order.id) }}">Buat Nota</a>
+                                {% endif %}
+                                <a class="btn btn-sm btn-rdr" href="{{ url_for('handover.pickup', sales_order_id=order.id) }}">Tandai Diambil</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="9" class="text-center text-muted py-4">Belum ada barang selesai yang menunggu pengambilan.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <form class="panel mb-3" method="get" action="{{ url_for('handover.index') }}">
+        <input type="hidden" name="tab" value="sudah">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="bulan">Bulan</label>
+                <select class="form-select" id="bulan" name="bulan">
+                    <option value="all" {% if selected_month is none %}selected{% endif %}>Semua Bulan</option>
+                    {% for month in month_options %}
+                        <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month_label(month, selected_year).split(' ')[0] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="tahun">Tahun</label>
+                <select class="form-select" id="tahun" name="tahun">
+                    <option value="all" {% if selected_year is none %}selected{% endif %}>Semua Tahun</option>
+                    {% for year in year_options %}
+                        <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                    <button class="btn btn-rdr" type="submit">Terapkan Filter</button>
+                    <a class="btn btn-outline-dark" target="_blank" href="{{ url_for('handover.picked_pdf', bulan=selected_month if selected_month is not none else 'all', tahun=selected_year if selected_year is not none else 'all') }}">Cetak PDF</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="metric small-metric"><span>Total Barang Diambil</span><strong>{{ picked_summary.total_picked }} SO</strong></div>
+        </div>
+        <div class="col-md-4">
+            <div class="metric small-metric"><span>Total Nilai Nota</span><strong>{{ picked_summary.total_nota|rupiah }}</strong></div>
+        </div>
+        <div class="col-md-4">
+            <div class="metric small-metric"><span>Total Pelunasan</span><strong>{{ picked_summary.total_paid|rupiah }}</strong></div>
+        </div>
+    </div>
+
+    <div class="panel table-panel">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                <tr>
+                    <th>Nomor SO</th>
+                    <th>Tanggal Pengambilan</th>
+                    <th>Diambil Oleh</th>
+                    <th>Nama Tim</th>
+                    <th>Brand</th>
+                    <th>Status Nota</th>
+                    <th>Catatan</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in picked_rows %}
+                    {% set order = row.order %}
+                    <tr>
+                        <td class="fw-semibold">{{ order.so_number }}</td>
+                        <td>{{ row.pickup_date|pretty_date }}</td>
+                        <td>{{ row.picked_by }}</td>
+                        <td>{{ order.team_name }}</td>
+                        <td>{{ order.brand.code if order.brand else '-' }}</td>
+                        <td><span class="badge {% if row.nota.status == 'Lunas' %}text-bg-success{% elif row.nota.status == 'DP' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ row.nota.status }}</span></td>
+                        <td>{{ row.note }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Belum ada barang yang ditandai sudah diambil pada periode ini.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

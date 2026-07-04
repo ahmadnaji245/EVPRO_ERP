@@ -1,17 +1,130 @@
 {% extends "base.html" %}
-{% block title %}Produksi - EVPRO TEXTILE ERP{% endblock %}
+{% block title %}Production Management - EVPRO TEXTILE ERP{% endblock %}
 {% block content %}
-<h1 class="page-title mb-4">Produksi</h1>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Production Management</h1>
+        <p class="text-muted mb-0">Dashboard produksi Surat Order untuk pembagian vendor, deadline vendor, barang masuk, dan QC internal.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('production.vendors') }}">List Produksi Vendor</a>
+</div>
+
+<div class="row g-3 mb-4">
+    {% for label, value, tone in [
+        ('Approval Customer', summary.waiting_assign, 'secondary'),
+        ('Proses Produksi', summary.in_progress, 'primary'),
+        ('Deadline Hari Ini', summary.deadline_today, 'warning'),
+        ('QC / Packing', summary.warehouse_qc, 'info'),
+        ('Finish', summary.done, 'success'),
+        ('Terlambat', summary.late, 'danger')
+    ] %}
+        <div class="col-md-6 col-xl-2">
+            <div class="metric production-metric production-metric-{{ tone }}">
+                <span>{{ label }}</span>
+                <strong>{{ value }}</strong>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
 <div class="panel table-panel">
-    <table class="table">
-        <thead><tr><th>No SO</th><th>Tim</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for so in sales_orders %}
-            <tr><td>{{ so.so_number }}</td><td>{{ so.team_name }}</td><td>{{ so.production_status_label }}</td></tr>
-        {% else %}
-            <tr><td colspan="3" class="text-center text-muted py-4">Belum ada SO approved.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <form class="row g-2 align-items-center mb-3" method="get" action="{{ url_for('production.index') }}">
+        <div class="col-12 col-lg">
+            <input
+                class="form-control"
+                type="text"
+                name="q"
+                value="{{ search or '' }}"
+                placeholder="Cari nomor SO, tim, brand, vendor, status, atau prioritas"
+            >
+        </div>
+        <div class="col-12 col-sm-auto d-flex gap-2">
+            <button class="btn btn-outline-dark" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('production.index') }}">Reset</a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle production-table">
+            <thead>
+            <tr>
+                <th>No SO / Surat Order</th>
+                <th>Nama Tim</th>
+                <th>Brand</th>
+                <th>Deadline Customer</th>
+                <th>Vendor Produksi</th>
+                <th>Deadline Vendor</th>
+                <th>Status Produksi</th>
+                <th>Prioritas</th>
+                <th>Aksi</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for so in sales_orders %}
+                {% set row_status = production_status(so) %}
+                {% set row_priority = production_priority(so) %}
+                <tr>
+                    <td class="fw-semibold">{{ so.so_number }}</td>
+                    <td>{{ so.team_name }}</td>
+                    <td>{{ so.brand.code if so.brand else '-' }}</td>
+                    <td>{{ so.deadline|pretty_date if so.deadline else '-' }}</td>
+                    <td>
+                        {% if current_user.is_admin %}
+                            <form method="post" action="{{ url_for('production.assign_vendor', sales_order_id=so.id) }}" class="production-inline-form">
+                                <input type="hidden" name="q" value="{{ search or '' }}">
+                                <select class="form-select form-select-sm" name="production_vendor">
+                                    <option value="">Pilih vendor</option>
+                                    {% for vendor in vendors %}
+                                        <option value="{{ vendor }}" {% if so.production_vendor == vendor %}selected{% endif %}>{{ vendor }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-sm btn-outline-dark" type="submit">Assign</button>
+                            </form>
+                        {% else %}
+                            {{ so.production_vendor or '-' }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if current_user.is_admin %}
+                            <form method="post" action="{{ url_for('production.set_deadline', sales_order_id=so.id) }}" class="production-inline-form">
+                                <input type="hidden" name="q" value="{{ search or '' }}">
+                                <input class="form-control form-control-sm" type="date" name="production_vendor_deadline" value="{{ so.production_vendor_deadline.isoformat() if so.production_vendor_deadline else '' }}">
+                                <button class="btn btn-sm btn-outline-dark" type="submit">Set</button>
+                            </form>
+                        {% else %}
+                            {{ so.production_vendor_deadline|pretty_date if so.production_vendor_deadline else '-' }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {{ status_badge_class(row_status) }}">{{ row_status }}</span>
+                    </td>
+                    <td>
+                        <span class="priority-badge priority-{{ row_priority|lower }}">{{ row_priority }}</span>
+                    </td>
+                    <td>
+                        <div class="production-actions">
+                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('production.qc_checklist', sales_order_id=so.id) }}">QC</a>
+                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=so.id) }}">Checklist</a>
+                            <form method="post" action="{{ url_for('production.finish', sales_order_id=so.id) }}">
+                                <input type="hidden" name="q" value="{{ search or '' }}">
+                                <button class="btn btn-sm btn-outline-success" type="submit" {% if not can_finish_order(so) %}disabled{% endif %}>Finish</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        {% if search %}
+                            Tidak ada Surat Order produksi yang sesuai filter.
+                        {% else %}
+                            Belum ada Surat Order approved untuk produksi.
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

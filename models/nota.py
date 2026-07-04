@@ -67,7 +67,7 @@ class Nota(db.Model):
 
     @property
     def remaining(self):
-        return self.total - self.paid
+        return max(self.total - self.paid, 0)
 
 
 class NotaItem(db.Model):

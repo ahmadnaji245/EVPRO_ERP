@@ -5,6 +5,7 @@ from models.master_data import MasterInstruction, MasterItem, MasterMaterial, Ma
 from models.nota import Nota, NotaCustomer, NotaItem, NotaPayment, NotaProduct
 from models.production_checklist import ProductionChecklist
 from models.production_size_checklist import ProductionSizeChecklist
+from models.qc_checklist import QcChecklist
 from models.revision_history import RevisionHistory
 from models.sales_order import SalesOrder
 from models.sales_order_design import SalesOrderDesign
@@ -28,6 +29,7 @@ __all__ = [
     "NotaProduct",
     "ProductionChecklist",
     "ProductionSizeChecklist",
+    "QcChecklist",
     "RevisionHistory",
     "SalesOrder",
     "SalesOrderDesign",

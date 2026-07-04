@@ -70,7 +70,7 @@ def report_summary(brand_name=None, month=None, year=None):
         "total_size": total_size,
         "total_point": total_point,
         "approval_pending": sum(1 for order in orders if order.approval_status == "pending"),
-        "production_finish": sum(1 for order in orders if normalize_production_status(order.production_status) == "Selesai"),
+        "production_finish": sum(1 for order in orders if normalize_production_status(order.production_status) == "Finish"),
     }
 
 

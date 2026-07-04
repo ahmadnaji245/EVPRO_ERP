@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Sales Order | Completed | Core module untuk SO, desain, player, approval dasar, print/PDF, revisi, dashboard SO, produksi, master data, laporan, setting, dan status penagihan sederhana. |
 | Invoice / Nota | Completed | CRUD Nota, dashboard keuangan, produk, laporan, piutang, pemasukan, export Excel, PDF customer/internal, dan integrasi ke Sales Order melalui `so_id`. |
-| Production | Planned | Modul produksi penuh belum tersedia. Foundation status/checklist sudah ada di Sales Order. |
+| Production Management | Completed | Dashboard produksi, assign vendor Mas Amar/Mas Syukron, deadline vendor, status produksi, barang masuk gudang, QC/checklist internal, dan prioritas otomatis. |
 | Inventory | Planned | Stok bahan, stok produk, mutasi, dan kebutuhan produksi belum tersedia. |
 | Finance | Planned | Laporan finance lengkap, piutang, pemasukan, dan integrasi accounting belum tersedia. |
 | CRM | Planned | Customer database umum, follow-up, segmentasi, dan repeat order belum tersedia. |
@@ -64,11 +64,26 @@ Belum selesai:
 - PDF lama brand-specific.
 - Laporan finance lengkap.
 
-## Production
+## Production Management
 
-Status: Foundation Active.
+Status: Active.
 
-Saat ini tersedia halaman Produksi dari ERP_SO untuk daftar SO approved. Modul Production penuh dengan tracking proses lanjutan tetap direncanakan pada ERP v0.5.
+ERP v0.5 mengubah halaman Produksi menjadi dashboard Production Management untuk SO approved.
+
+Fitur selesai:
+
+- Ringkasan produksi: Menunggu Assign, Sedang Diproduksi, Deadline Hari Ini, Barang Masuk / QC, Selesai, Terlambat.
+- Ringkasan vendor untuk Mas Amar dan Mas Syukron.
+- Assign vendor produksi.
+- Deadline vendor terpisah dari deadline customer/SO.
+- Update status produksi sederhana.
+- Catat Barang Masuk Gudang.
+- Link ke QC/checklist internal yang sudah ada pada Sales Order.
+- Cetak PDF Surat Order memakai PDF SO existing tanpa mengubah layout.
+- Prioritas otomatis: Urgent, Tinggi, Normal.
+- Filter ketik untuk nomor SO, tim, brand, vendor, status, atau prioritas.
+
+Vendor eksternal tidak memiliki login ERP. Vendor hanya menerima print/PDF Surat Order yang sudah ada.
 
 ## Inventory
 

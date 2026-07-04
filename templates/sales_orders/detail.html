@@ -119,19 +119,7 @@
             </div>
         {% endfor %}
     </div>
-    <form method="post" action="{{ url_for('sales_orders.update_status', sales_order_id=sales_order.id) }}" class="row g-3 align-items-end">
-        <div class="col-md-5 col-lg-4">
-            <label class="form-label">Status Produksi</label>
-            <select class="form-select" name="production_status">
-                {% for status in production_statuses %}
-                    <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>{{ status }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-auto">
-            <button class="btn btn-rdr">Simpan Status</button>
-        </div>
-    </form>
+    <span class="badge text-bg-light border">{{ current_status }}</span>
 </div>
 
 <form method="post" action="{{ url_for('sales_orders.update_production_checklist', sales_order_id=sales_order.id) }}">
@@ -294,7 +282,12 @@
                         <th>SIZE</th>
                         <th>KETERANGAN</th>
                         <th class="text-center">Setting</th>
-                        <th class="text-center">Cek</th>
+                        <th class="text-center">
+                            <div class="d-inline-flex align-items-center gap-2">
+                                <span>Cek</span>
+                                <input class="form-check-input m-0" type="checkbox" aria-label="Centang semua CEK" data-checklist-cek-master>
+                            </div>
+                        </th>
                     </tr>
                     </thead>
                     <tbody>
@@ -309,7 +302,7 @@
                                 <input class="form-check-input" type="checkbox" name="setting_done" value="{{ player.id }}" {% if player.checklist and player.checklist.setting_done %}checked{% endif %}>
                             </td>
                             <td class="text-center">
-                                <input class="form-check-input" type="checkbox" name="qc_done" value="{{ player.id }}" {% if player.checklist and player.checklist.qc_done %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" name="qc_done" value="{{ player.id }}" data-checklist-cek-item {% if player.checklist and player.checklist.qc_done %}checked{% endif %}>
                             </td>
                         </tr>
                     {% else %}
@@ -364,6 +357,31 @@ document.querySelectorAll("[data-customer-approved-edit]").forEach((link) => {
         targetUrl.searchParams.set("revision_reason_admin", reason.trim());
         window.location.href = targetUrl.toString();
     });
+});
+document.querySelectorAll("[data-checklist-cek-master]").forEach((master) => {
+    const table = master.closest("table");
+    const items = Array.from(table.querySelectorAll("[data-checklist-cek-item]"));
+    const enabledItems = () => items.filter((item) => !item.disabled);
+    const syncMaster = () => {
+        const activeItems = enabledItems();
+        const checkedCount = activeItems.filter((item) => item.checked).length;
+        master.disabled = activeItems.length === 0;
+        master.checked = activeItems.length > 0 && checkedCount === activeItems.length;
+        master.indeterminate = checkedCount > 0 && checkedCount < activeItems.length;
+    };
+
+    master.addEventListener("change", () => {
+        enabledItems().forEach((item) => {
+            item.checked = master.checked;
+        });
+        syncMaster();
+    });
+
+    items.forEach((item) => {
+        item.addEventListener("change", syncMaster);
+    });
+
+    syncMaster();
 });
 </script>
 {% endblock %}

@@ -25,12 +25,24 @@ class SalesOrder(db.Model):
     approved_by = db.Column(db.String(120))
     approved_source = db.Column(db.String(30))
     approved_at = db.Column(db.DateTime)
-    customer_portal_status = db.Column(db.String(50), nullable=False, default="Menunggu Persetujuan Desain")
+    customer_portal_status = db.Column(db.String(50), nullable=False, default="Approval Customer")
     revision_reason_admin = db.Column(db.Text)
     revision_time = db.Column(db.DateTime)
     revision_by_admin_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    production_status = db.Column(db.String(40), nullable=False, default="Desain")
+    production_status = db.Column(db.String(40), nullable=False, default="Approval Customer")
     production_status_updated_at = db.Column(db.DateTime)
+    setting_by_name = db.Column(db.String(120))
+    production_vendor = db.Column(db.String(80), index=True)
+    production_vendor_deadline = db.Column(db.Date)
+    production_assigned_at = db.Column(db.DateTime)
+    warehouse_received_at = db.Column(db.DateTime)
+    shortage_note = db.Column(db.Text)
+    qc_note = db.Column(db.Text)
+    tanggal_finish_produksi = db.Column(db.DateTime)
+    tanggal_pengambilan = db.Column(db.Date)
+    diambil_oleh = db.Column(db.String(150))
+    catatan_pengambilan = db.Column(db.Text)
+    serah_terima_admin_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
     deleted_at = db.Column(db.DateTime)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
@@ -39,10 +51,12 @@ class SalesOrder(db.Model):
 
     brand = db.relationship("Brand", back_populates="sales_orders")
     created_by = db.relationship("User", back_populates="sales_orders", foreign_keys=[created_by_id])
+    serah_terima_admin = db.relationship("User", foreign_keys=[serah_terima_admin_id])
     designs = db.relationship("SalesOrderDesign", back_populates="sales_order", cascade="all, delete-orphan")
     revision_histories = db.relationship("RevisionHistory", back_populates="sales_order", cascade="all, delete-orphan")
     customer_revisions = db.relationship("CustomerRevisionNote", back_populates="sales_order", cascade="all, delete-orphan")
     customer_access = db.relationship("CustomerAccess", back_populates="sales_order", uselist=False, cascade="all, delete-orphan")
+    qc_checklists = db.relationship("QcChecklist", back_populates="sales_order", cascade="all, delete-orphan")
 
     @property
     def approved(self):
@@ -72,4 +86,4 @@ class SalesOrder(db.Model):
 
     @property
     def portal_status_label(self):
-        return self.customer_portal_status or "Menunggu Persetujuan Desain"
+        return normalize_production_status(self.customer_portal_status or self.production_status or "Approval Customer")

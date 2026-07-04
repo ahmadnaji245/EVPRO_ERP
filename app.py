@@ -7,11 +7,13 @@ from sqlalchemy import inspect, text
 from config import Config
 from database.db import db
 from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, User
+from routes.handover_routes import handover_bp
 from routes.nota_routes import nota_bp
 from routes.so_shell_routes import master_bp, production_bp, reports_bp, settings_bp
 from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
 from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.nota_service import seed_default_nota_products
+from services.production_service import seed_production_sample_data
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders
 from utils.constants import user_is_admin
@@ -92,6 +94,7 @@ def create_app(config_class=Config):
     app.register_blueprint(sales_orders_bp)
     app.register_blueprint(sales_orders_approval_bp)
     app.register_blueprint(production_bp)
+    app.register_blueprint(handover_bp)
     app.register_blueprint(master_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(settings_bp)
@@ -141,10 +144,17 @@ def create_app(config_class=Config):
             abort(403)
         return redirect(url_for("settings.index"))
 
+    @app.route("/dev/seed-production-sample")
+    def dev_seed_production_sample():
+        return seed_production_sample_data()
+
     with app.app_context():
         ensure_upload_folders()
         db.create_all()
         ensure_v04_schema()
+        ensure_v05_schema()
+        ensure_qc_schema()
+        ensure_handover_schema()
         seed_initial_data()
 
     return app
@@ -167,7 +177,7 @@ def seed_initial_data():
         db.session.add(Brand(code="RDR", name="RDR Apparel", color="#c5162e", point_per_size=1))
         db.session.add(Brand(code="FF", name="FF Apparel", color="#20242a", point_per_size=1))
 
-    _seed_master(MasterItem, ["Jersey", "Celana"])
+    _seed_master_items()
     _seed_master(MasterMaterial, ["Milano", "Dryfit"])
     _seed_master(MasterPattern, ["Reguler", "Raglan"])
     _seed_master(MasterInstruction, ["Default"])
@@ -195,6 +205,131 @@ def ensure_v04_schema():
         else:
             db.session.execute(text("CREATE UNIQUE INDEX ix_notas_so_id_unique ON notas (so_id)"))
         db.session.commit()
+
+
+def ensure_v05_schema():
+    inspector = inspect(db.engine)
+    if "sales_orders" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("sales_orders")}
+    schema_changes = {
+        "production_vendor": "ALTER TABLE sales_orders ADD COLUMN production_vendor VARCHAR(80)",
+        "production_vendor_deadline": "ALTER TABLE sales_orders ADD COLUMN production_vendor_deadline DATE",
+        "production_assigned_at": "ALTER TABLE sales_orders ADD COLUMN production_assigned_at DATETIME",
+        "warehouse_received_at": "ALTER TABLE sales_orders ADD COLUMN warehouse_received_at DATETIME",
+        "setting_by_name": "ALTER TABLE sales_orders ADD COLUMN setting_by_name VARCHAR(120)",
+    }
+    for column_name, statement in schema_changes.items():
+        if column_name not in columns:
+            db.session.execute(text(statement))
+    db.session.commit()
+
+
+def ensure_qc_schema():
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+    if "sales_orders" in tables:
+        columns = {column["name"] for column in inspector.get_columns("sales_orders")}
+        if "shortage_note" not in columns:
+            db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN shortage_note TEXT"))
+            db.session.commit()
+        if "qc_note" not in columns:
+            db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN qc_note TEXT"))
+            db.session.commit()
+
+    if "qc_checklists" not in tables:
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE qc_checklists (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    sales_order_id INTEGER NOT NULL,
+                    sales_order_player_id INTEGER NOT NULL,
+                    qc_jersey BOOLEAN NOT NULL DEFAULT 0,
+                    cek_jersey BOOLEAN NOT NULL DEFAULT 0,
+                    qc_celana BOOLEAN NOT NULL DEFAULT 0,
+                    cek_celana BOOLEAN NOT NULL DEFAULT 0,
+                    qc_data TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(sales_order_id) REFERENCES sales_orders (id),
+                    FOREIGN KEY(sales_order_player_id) REFERENCES sales_order_players (id),
+                    UNIQUE (sales_order_player_id)
+                )
+                """
+            )
+        )
+        db.session.execute(text("CREATE INDEX ix_qc_checklists_sales_order_id ON qc_checklists (sales_order_id)"))
+        db.session.execute(text("CREATE INDEX ix_qc_checklists_sales_order_player_id ON qc_checklists (sales_order_player_id)"))
+        db.session.commit()
+    else:
+        qc_columns = {column["name"] for column in inspector.get_columns("qc_checklists")}
+        if "qc_data" not in qc_columns:
+            db.session.execute(text("ALTER TABLE qc_checklists ADD COLUMN qc_data TEXT"))
+            db.session.commit()
+
+    if "master_items" in tables:
+        item_columns = {column["name"] for column in inspector.get_columns("master_items")}
+        item_changes = {
+            "perlu_upload_gambar": "ALTER TABLE master_items ADD COLUMN perlu_upload_gambar BOOLEAN NOT NULL DEFAULT 1",
+            "perlu_qc": "ALTER TABLE master_items ADD COLUMN perlu_qc BOOLEAN NOT NULL DEFAULT 1",
+        }
+        for column_name, statement in item_changes.items():
+            if column_name not in item_columns:
+                db.session.execute(text(statement))
+        db.session.commit()
+
+
+def ensure_handover_schema():
+    inspector = inspect(db.engine)
+    if "sales_orders" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("sales_orders")}
+    schema_changes = {
+        "tanggal_finish_produksi": "ALTER TABLE sales_orders ADD COLUMN tanggal_finish_produksi DATETIME",
+        "tanggal_pengambilan": "ALTER TABLE sales_orders ADD COLUMN tanggal_pengambilan DATE",
+        "diambil_oleh": "ALTER TABLE sales_orders ADD COLUMN diambil_oleh VARCHAR(150)",
+        "catatan_pengambilan": "ALTER TABLE sales_orders ADD COLUMN catatan_pengambilan TEXT",
+        "serah_terima_admin_id": "ALTER TABLE sales_orders ADD COLUMN serah_terima_admin_id INTEGER",
+    }
+    for column_name, statement in schema_changes.items():
+        if column_name not in columns:
+            db.session.execute(text(statement))
+    db.session.commit()
+
+    refreshed_columns = {column["name"] for column in inspect(db.engine).get_columns("sales_orders")}
+    if "tanggal_finish_produksi" in refreshed_columns:
+        db.session.execute(
+            text(
+                """
+                UPDATE sales_orders
+                SET tanggal_finish_produksi = COALESCE(production_status_updated_at, updated_at, created_at)
+                WHERE production_status IN ('Finish', 'Selesai')
+                  AND tanggal_finish_produksi IS NULL
+                """
+            )
+        )
+        db.session.commit()
+
+
+def _seed_master_items():
+    defaults = ["Jersey", "Celana", "Jersey + Celana", "Jaket", "Training"]
+    existing = {row.name for row in MasterItem.query.all()}
+    next_order = (db.session.query(db.func.max(MasterItem.sort_order)).scalar() or 0) + 1
+    for name in defaults:
+        if name not in existing:
+            db.session.add(
+                MasterItem(
+                    name=name,
+                    status="active",
+                    sort_order=next_order,
+                    perlu_upload_gambar=True,
+                    perlu_qc=True,
+                )
+            )
+            next_order += 1
 
 
 def _seed_master(model, names):

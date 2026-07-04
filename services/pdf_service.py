@@ -1,11 +1,12 @@
 from io import BytesIO
 from pathlib import Path
+from datetime import datetime
 from xml.sax.saxutils import escape
 
 from flask import current_app
 from reportlab import rl_config
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -595,6 +596,207 @@ def build_production_report_pdf(report, title="Laporan Sales Order Produksi"):
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+
+def build_vendor_production_table_pdf(vendor, rows, quantity_columns, printed_at, deadline_class):
+    buffer = BytesIO()
+    title = f"DAFTAR PRODUKSI VENDOR - {str(vendor or '').upper()}"
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=8 * mm,
+        bottomMargin=8 * mm,
+        title=title,
+    )
+    styles = _styles()
+    story = [
+        Paragraph(title, styles["SOTitle"]),
+        Paragraph(f"Tanggal cetak: {printed_at.strftime('%d/%m/%Y %H:%M')}", styles["SOSubtitle"]),
+        Spacer(1, 5 * mm),
+    ]
+
+    if not rows:
+        story.append(_safe_paragraph("Belum ada order aktif untuk vendor ini.", styles["SOTextBold"]))
+    else:
+        story.append(_vendor_production_table(rows, quantity_columns, styles, deadline_class))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+def build_order_production_list_pdf(rows):
+    buffer = BytesIO()
+    title = "LIST ORDER PRODUKSI"
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=8 * mm,
+        bottomMargin=8 * mm,
+        title=title,
+    )
+    styles = _styles()
+    story = [
+        Paragraph(title, styles["SOTitle"]),
+        Paragraph(f"Tanggal cetak: {datetime.utcnow().strftime('%d/%m/%Y %H:%M')}", styles["SOSubtitle"]),
+        Spacer(1, 5 * mm),
+    ]
+
+    if not rows:
+        story.append(_safe_paragraph("Belum ada order produksi.", styles["SOTextBold"]))
+    else:
+        story.append(_order_production_list_table(rows, styles))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+def _order_production_list_table(rows, styles):
+    header = [
+        "No",
+        "Tanggal Masuk Produksi",
+        "Nama Tim",
+        "Brand",
+        "Vendor Jahit",
+        "Setting Oleh",
+        "Status Produksi",
+        "Deadline Customer",
+        "Deadline Vendor",
+    ]
+    data = [header]
+    for index, row in enumerate(rows, start=1):
+        data.append(
+            [
+                str(index),
+                row["production_in_at"].strftime("%d/%m/%Y") if row["production_in_at"] else "-",
+                _safe_paragraph(row["team_name"], styles["SOText"]),
+                row["brand"],
+                row["vendor"],
+                _safe_paragraph(row["setting_by"], styles["SOText"]),
+                row["status"],
+                row["deadline_customer"].strftime("%d/%m/%Y") if row["deadline_customer"] else "-",
+                row["deadline_vendor"].strftime("%d/%m/%Y") if row["deadline_vendor"] else "-",
+            ]
+        )
+    table = Table(
+        data,
+        colWidths=[8 * mm, 25 * mm, 35 * mm, 14 * mm, 23 * mm, 25 * mm, 23 * mm, 24 * mm, 24 * mm],
+        repeatRows=1,
+        hAlign="LEFT",
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#111827")),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+                ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
+                ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (1, 0), (1, -1), "CENTER"),
+                ("ALIGN", (3, 0), (4, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    return table
+
+
+def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
+    header = ["NO", "NAMA TEAM", "STATUS", "MERK"]
+    header.extend([_vendor_qty_label(component) for component in quantity_columns])
+    header.extend(["TANGGAL MASUK", "DEADLINE JAHIT", "KETERANGAN"])
+
+    data = [header]
+    for index, row in enumerate(rows, start=1):
+        line = [
+            str(index),
+            _safe_paragraph(row["team_name"], styles["SOText"]),
+            _safe_paragraph(row["status"], styles["SOText"]),
+            row["brand"],
+        ]
+        line.extend([str(row["qty"].get(component, 0)) for component in quantity_columns])
+        line.extend(
+            [
+                row["assigned_at"].strftime("%d/%m/%Y") if row["assigned_at"] else "-",
+                row["deadline"].strftime("%d/%m/%Y") if row["deadline"] else "-",
+                _safe_paragraph(row["shortage_note"] or "-", styles["SOText"]),
+            ]
+        )
+        data.append(line)
+
+    qty_width = 13 * mm
+    col_widths = [8 * mm, 34 * mm, 22 * mm, 14 * mm]
+    col_widths.extend([qty_width] * len(quantity_columns))
+    col_widths.extend([22 * mm, 22 * mm, 46 * mm])
+    table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+
+    table_style = [
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#111827")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7.2),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("ALIGN", (3, 0), (3, -1), "CENTER"),
+        ("ALIGN", (4, 0), (3 + len(quantity_columns), -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+
+    deadline_col = len(header) - 2
+    for row_index, row in enumerate(rows, start=1):
+        css_class = deadline_class(row["deadline"])
+        if css_class == "deadline-late":
+            table_style.extend(
+                [
+                    ("BACKGROUND", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#dc2626")),
+                    ("TEXTCOLOR", (deadline_col, row_index), (deadline_col, row_index), colors.white),
+                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), "Times-Bold"),
+                ]
+            )
+        elif css_class == "deadline-h1":
+            table_style.extend(
+                [
+                    ("BACKGROUND", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#f97316")),
+                    ("TEXTCOLOR", (deadline_col, row_index), (deadline_col, row_index), colors.white),
+                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), "Times-Bold"),
+                ]
+            )
+        elif css_class == "deadline-h2":
+            table_style.extend(
+                [
+                    ("BACKGROUND", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#fde047")),
+                    ("TEXTCOLOR", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#111827")),
+                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), "Times-Bold"),
+                ]
+            )
+
+    table.setStyle(TableStyle(table_style))
+    return table
+
+
+def _vendor_qty_label(component):
+    value = str(component or "").strip()
+    if value.casefold() == "celana":
+        return "QTY CLN"
+    if value.casefold() == "jersey":
+        return "QTY JRSY"
+    return f"QTY {value.upper()}"
 
 
 def build_placeholder_pdf(title):

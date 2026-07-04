@@ -127,6 +127,31 @@ Fitur selesai:
 - Fix aturan brand print: Sales Order selalu memakai brand asli, sedangkan Nota memakai mapping invoice brand.
 - Mapping invoice Nota: FF Apparel -> FF Apparel, RDR Apparel -> RDR Apparel, brand selain itu -> Evpro.
 
+## ERP v0.5 - Production Management
+
+Status: Completed.
+
+Fitur selesai:
+
+- Label tampilan menu Sales Order diubah menjadi Surat Order tanpa rename route/model/database internal.
+- Menu atas menjadi Dashboard, Surat Order, Nota, Logout untuk admin.
+- Menu bawah modul Surat Order menjadi Dashboard, Surat Order, Produksi, Master Data, Laporan, Setting.
+- Halaman Produksi direvisi menjadi dashboard Production Management.
+- Ringkasan produksi: Menunggu Assign, Sedang Diproduksi, Deadline Hari Ini, Barang Masuk / QC, Selesai, Terlambat.
+- Ringkasan vendor untuk Mas Amar dan Mas Syukron.
+- Assign vendor produksi dari SO approved.
+- Deadline vendor terpisah dari deadline customer/SO.
+- Status produksi sederhana: Menunggu Assign, Dikirim ke Vendor, Sedang Diproduksi, Barang Masuk, QC, Packing, Selesai.
+- Mapping aman dari status produksi lama ke status baru.
+- Catat Barang Masuk Gudang dari halaman Produksi.
+- QC/checklist tetap memakai checklist produksi existing pada detail Surat Order.
+- Cetak PDF Surat Order tetap memakai generator PDF SO existing tanpa perubahan layout.
+- Prioritas otomatis berdasarkan deadline vendor atau deadline customer.
+- Filter ketik untuk nomor SO, tim, brand, vendor, status, atau prioritas.
+- Akses halaman Produksi dibuka untuk admin dan role produksi.
+- Role produksi tetap tidak bisa mengakses Nota.
+- Modul Nota, PDF Nota, integrasi SO ↔ Nota, dan output PDF SO tidak diubah.
+
 ## Next Release
 
-ERP v0.5 akan fokus pada Production Module lanjutan.
+ERP v0.6 akan fokus pada Role & Permission granular.

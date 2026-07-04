@@ -2,7 +2,7 @@
 <div class="row g-4">
     <div class="col-12">
         <div class="panel">
-            <div class="section-title">Identitas Sales Order</div>
+            <div class="section-title">Identitas Surat Order</div>
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label">Nama Tim</label>
@@ -108,15 +108,19 @@
                         <div class="col-md-6">
                             <label class="form-label">Item</label>
                             {% set selected_item = design.item_name if design else '' %}
-                            <select class="form-select" name="item_name[]">
+                            <select class="form-select" name="item_name[]" data-item-select>
                                 <option value="">Pilih item</option>
                                 {% for item in items %}
-                                    <option value="{{ item.name }}" {% if selected_item == item.name %}selected{% endif %}>{{ item.name }}</option>
+                                    <option
+                                        value="{{ item.name }}"
+                                        data-upload="{{ '1' if item.perlu_upload_gambar else '0' }}"
+                                        data-components="{{ item.name }}"
+                                        {% if selected_item == item.name %}selected{% endif %}>{{ item.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Upload Gambar Atasan</label>
+                        <div class="col-md-6" data-upload-primary-wrap>
+                            <label class="form-label" data-upload-primary-label>Upload Gambar Item</label>
                             <input class="form-control" name="top_image[]" type="file" accept="image/*">
                             {% if design and design.display_top_image_path %}
                                 <div class="mt-2">
@@ -124,8 +128,8 @@
                                 </div>
                             {% endif %}
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Upload Gambar Celana</label>
+                        <div class="col-md-6" data-upload-secondary-wrap>
+                            <label class="form-label" data-upload-secondary-label>Upload Gambar Item 2</label>
                             <input class="form-control" name="bottom_image[]" type="file" accept="image/*">
                             {% if design and design.bottom_image_path %}
                                 <div class="mt-2">
@@ -182,19 +186,19 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Item</label>
-                        <select class="form-select" name="item_name[]">
+                        <select class="form-select" name="item_name[]" data-item-select>
                             <option value="">Pilih item</option>
                             {% for item in items %}
-                                <option value="{{ item.name }}">{{ item.name }}</option>
+                                <option value="{{ item.name }}" data-upload="{{ '1' if item.perlu_upload_gambar else '0' }}" data-components="{{ item.name }}">{{ item.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Upload Gambar Atasan</label>
+                    <div class="col-md-6" data-upload-primary-wrap>
+                        <label class="form-label" data-upload-primary-label>Upload Gambar Item</label>
                         <input class="form-control" name="top_image[]" type="file" accept="image/*">
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Upload Gambar Celana</label>
+                    <div class="col-md-6" data-upload-secondary-wrap>
+                        <label class="form-label" data-upload-secondary-label>Upload Gambar Item 2</label>
                         <input class="form-control" name="bottom_image[]" type="file" accept="image/*">
                     </div>
                     <div class="col-md-6">
@@ -237,3 +241,40 @@
         </div>
     </div>
 </div>
+<script>
+(() => {
+    const componentsFor = (value) => String(value || "").split("+").map((part) => part.trim()).filter(Boolean);
+
+    const syncUploadFields = (section) => {
+        const select = section.querySelector("[data-item-select]");
+        if (!select) return;
+        const option = select.selectedOptions[0];
+        const needsUpload = option?.dataset.upload !== "0";
+        const components = componentsFor(option?.dataset.components || select.value);
+        const primaryWrap = section.querySelector("[data-upload-primary-wrap]");
+        const secondaryWrap = section.querySelector("[data-upload-secondary-wrap]");
+        const primaryLabel = section.querySelector("[data-upload-primary-label]");
+        const secondaryLabel = section.querySelector("[data-upload-secondary-label]");
+
+        if (primaryWrap) primaryWrap.classList.toggle("d-none", !needsUpload);
+        if (secondaryWrap) secondaryWrap.classList.toggle("d-none", !needsUpload || components.length < 2);
+        if (primaryLabel) primaryLabel.textContent = `Upload Gambar ${components[0] || "Item"}`;
+        if (secondaryLabel) secondaryLabel.textContent = `Upload Gambar ${components[1] || "Item 2"}`;
+    };
+
+    const syncAllUploadFields = () => {
+        document.querySelectorAll("[data-design-section]").forEach(syncUploadFields);
+    };
+
+    document.addEventListener("change", (event) => {
+        if (event.target.matches("[data-item-select]")) {
+            const section = event.target.closest("[data-design-section]");
+            if (section) syncUploadFields(section);
+        }
+    });
+
+    window.syncSalesOrderItemUploadFields = syncAllUploadFields;
+
+    syncAllUploadFields();
+})();
+</script>
