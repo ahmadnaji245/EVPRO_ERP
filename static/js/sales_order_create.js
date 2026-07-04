@@ -52,6 +52,7 @@
     const clone = designTemplate.content.firstElementChild.cloneNode(true);
     designList.appendChild(clone);
     refreshDesignTitles();
+    window.syncSalesOrderItemUploadFields?.();
   });
 
   designList?.addEventListener("click", (event) => {

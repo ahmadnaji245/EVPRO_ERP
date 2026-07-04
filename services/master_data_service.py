@@ -33,6 +33,7 @@ def create_row(model, form):
         status=form.get("status") or "active",
         sort_order=int(form.get("sort_order") or 0),
     )
+    _apply_item_options(row, form)
     db.session.add(row)
     db.session.commit()
     return row
@@ -42,6 +43,7 @@ def update_row(row, form):
     row.name = form.get("name", "").strip()
     row.status = form.get("status") or "active"
     row.sort_order = int(form.get("sort_order") or 0)
+    _apply_item_options(row, form)
     db.session.commit()
     return row
 
@@ -55,3 +57,10 @@ def set_row_active(row, is_active):
     row.is_active = is_active
     db.session.commit()
     return row
+
+
+def _apply_item_options(row, form):
+    if not hasattr(row, "perlu_upload_gambar"):
+        return
+    row.perlu_upload_gambar = form.get("perlu_upload_gambar", "0") == "1"
+    row.perlu_qc = form.get("perlu_qc", "0") == "1"

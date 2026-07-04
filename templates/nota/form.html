@@ -36,15 +36,6 @@
             <input type="date" class="form-control" name="order_date" value="{{ form.get('order_date', nota.order_date if nota else today) }}" required>
         </div>
         <div class="col-md-3">
-            <label class="form-label">Status Order</label>
-            {% set selected_status = form.get('status', nota.status if nota else 'Belum DP') %}
-            <select class="form-select" name="status" required>
-                {% for status in statuses %}
-                    <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
             <label class="form-label">Nomor Nota</label>
             <input class="form-control" value="{{ nota.nota_number if nota else 'Otomatis saat disimpan' }}" disabled>
         </div>

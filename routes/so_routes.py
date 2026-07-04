@@ -18,11 +18,11 @@ from services.sales_order_service import (
     ensure_player_checklist,
     get_sales_order,
     list_sales_orders,
-    update_production_status,
+    set_production_stage,
     update_sales_order,
     validate_sales_order_form,
 )
-from utils.constants import user_is_admin
+from utils.constants import user_is_admin, user_is_produksi
 
 
 sales_orders_bp = Blueprint("sales_orders", __name__, url_prefix="/sales-order")
@@ -31,6 +31,11 @@ sales_orders_approval_bp = Blueprint("sales_orders_approval", __name__, url_pref
 
 def _admin_required():
     if not user_is_admin(current_user):
+        abort(403)
+
+
+def _production_or_admin_required():
+    if not (user_is_admin(current_user) or user_is_produksi(current_user)):
         abort(403)
 
 
@@ -94,7 +99,7 @@ def create():
                 flash(error, "danger")
             return render_template("so/create.html", **_form_context(form=request.form))
         order = create_sales_order(request.form, current_user, request.files)
-        flash(f"Sales Order {order.so_number} berhasil dibuat.", "success")
+        flash(f"Surat Order {order.so_number} berhasil dibuat.", "success")
         return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
     return render_template("so/create.html", **_form_context(form={}))
 
@@ -102,6 +107,7 @@ def create():
 @sales_orders_bp.route("/<int:sales_order_id>")
 @login_required
 def detail(sales_order_id):
+    _production_or_admin_required()
     sales_order = get_sales_order(sales_order_id)
     return render_template(
         "so/detail.html",
@@ -122,10 +128,11 @@ def approve_admin(sales_order_id):
         order.approved_by = "Admin"
         order.approved_source = "admin"
         order.approved_at = datetime.utcnow()
+        set_production_stage(order, "Setting")
         record_history(
             order,
             actor_name="Admin",
-            action="Approve Sales Order by Admin",
+            action="Approve Surat Order by Admin",
             field_name="approval_status",
             old_value="pending",
             new_value="approved",
@@ -152,7 +159,7 @@ def edit(sales_order_id):
                 flash(error, "danger")
             return render_template("so/edit.html", **_form_context(sales_order=order, form=request.form, revision_reason_admin=revision_reason_admin))
         update_sales_order(order, request.form, request.files, current_user)
-        flash(f"Sales Order {order.so_number} berhasil diperbarui.", "success")
+        flash(f"Surat Order {order.so_number} berhasil diperbarui.", "success")
         return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
     return render_template("so/edit.html", **_form_context(sales_order=order, form={}, revision_reason_admin=revision_reason_admin))
 
@@ -166,7 +173,7 @@ def delete(sales_order_id):
         flash("SO ini sudah memiliki Nota. Hapus Nota terlebih dahulu sebelum menghapus SO.", "warning")
         return redirect(url_for("sales_orders.index"))
     delete_sales_order(order)
-    flash(f"Sales Order {order.so_number} dihapus.", "success")
+    flash(f"Surat Order {order.so_number} dihapus.", "success")
     return redirect(url_for("sales_orders.index"))
 
 
@@ -180,7 +187,7 @@ def print_view(sales_order_id):
 @sales_orders_bp.route("/<int:sales_order_id>/pdf")
 @login_required
 def pdf(sales_order_id):
-    _admin_required()
+    _production_or_admin_required()
     order = get_sales_order(sales_order_id)
     pdf_buffer = build_sales_order_pdf(order)
     filename = f"{order.so_number.replace('/', '-')}.pdf"
@@ -194,22 +201,10 @@ def pdf(sales_order_id):
     return response
 
 
-@sales_orders_bp.route("/<int:sales_order_id>/production-status", methods=["POST"])
-@login_required
-def update_status(sales_order_id):
-    order = get_sales_order(sales_order_id)
-    try:
-        update_production_status(order, request.form.get("production_status"))
-    except ValueError as exc:
-        flash(str(exc), "danger")
-    else:
-        flash("Status produksi diperbarui.", "success")
-    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
-
-
 @sales_orders_bp.route("/<int:sales_order_id>/production-checklist", methods=["POST"])
 @login_required
 def update_production_checklist(sales_order_id):
+    _production_or_admin_required()
     order = get_sales_order(sales_order_id)
     player_ids = [player.id for design in order.designs for player in design.players]
     requested_setting = set(request.form.getlist("setting_done"))
@@ -281,6 +276,40 @@ def update_production_checklist(sales_order_id):
                 checklist.setting_user_id = current_user.id if setting_done else None
                 checklist.setting_at = now if setting_done else None
 
+    if _setting_checklist_complete(order) and _production_stage_index(order.production_status_label) < _production_stage_index("Printing"):
+        order.setting_by_name = current_user_name
+        set_production_stage(order, "Printing")
+
+    if _final_packing_checklist_complete(order):
+        set_production_stage(order, "Finish")
+
     db.session.commit()
     flash("Checklist produksi diperbarui.", "success")
     return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+def _setting_checklist_complete(order):
+    players = [player for design in order.designs for player in design.players]
+    if not players or not all(player.checklist and player.checklist.setting_done for player in players):
+        return False
+    for design in order.designs:
+        rows = []
+        recap = design.size_recap
+        for group_rows in recap["groups"].values():
+            rows.extend(group_rows)
+        rows.extend(recap["long_sleeve"])
+        if any(not design.size_setting_done(row["size"]) for row in rows):
+            return False
+    return True
+
+
+def _final_packing_checklist_complete(order):
+    players = [player for design in order.designs for player in design.players]
+    return bool(players) and all(player.checklist and player.checklist.qc_done for player in players)
+
+
+def _production_stage_index(status):
+    try:
+        return PRODUCTION_STATUSES.index(status)
+    except ValueError:
+        return 0

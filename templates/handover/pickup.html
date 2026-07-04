@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Tandai Diambil - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Tandai Diambil</h1>
+        <p class="text-muted mb-0">{{ order.so_number }} - {{ order.team_name }}</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('handover.index') }}">Kembali ke Serah Terima</a>
+</div>
+
+<div class="panel">
+    <dl class="row mb-4">
+        <dt class="col-md-3">Nomor SO</dt><dd class="col-md-9">{{ order.so_number }}</dd>
+        <dt class="col-md-3">Nama Tim</dt><dd class="col-md-9">{{ order.team_name }}</dd>
+        <dt class="col-md-3">Brand</dt><dd class="col-md-9">{{ order.brand.code if order.brand else '-' }}</dd>
+        <dt class="col-md-3">Tanggal Finish Produksi</dt><dd class="col-md-9">{{ order.tanggal_finish_produksi|pretty_date if order.tanggal_finish_produksi else '-' }}</dd>
+    </dl>
+
+    <form method="post" class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Tanggal Pengambilan</label>
+            <input class="form-control" type="date" name="tanggal_pengambilan" value="{{ form.get('tanggal_pengambilan', default_date) }}" required>
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">Diambil Oleh</label>
+            <input class="form-control" name="diambil_oleh" value="{{ form.get('diambil_oleh', '') }}" placeholder="Ahmad, Ketua Tim, Kurir JNE, Budi" required>
+        </div>
+        <div class="col-12">
+            <label class="form-label">Catatan</label>
+            <textarea class="form-control" name="catatan_pengambilan" rows="4">{{ form.get('catatan_pengambilan', '') }}</textarea>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('handover.index') }}">Batal</a>
+            <button class="btn btn-rdr">Simpan Pengambilan</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

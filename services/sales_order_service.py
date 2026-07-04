@@ -301,10 +301,11 @@ def validate_sales_order_form(form):
 
 
 def create_sales_order(form, user, files=None):
-    order = SalesOrder(created_by_id=user.id if user else None, access_code="-")
+    order = SalesOrder(created_by_id=user.id if user else None, access_code="-", production_status="Approval Customer")
     brand = _fill_sales_order(order, form)
     order.so_number = generate_so_number(brand.code)
     order.access_code = generate_access_code(brand.code)
+    order.customer_portal_status = "Approval Customer"
     _sync_designs(order, form, files)
     order.customer_access = CustomerAccess(
         access_code=order.access_code,
@@ -326,7 +327,9 @@ def update_sales_order(order, form, files=None, user=None):
         order.approved_by = None
         order.approved_source = None
         order.approved_at = None
-        order.customer_portal_status = "Menunggu Persetujuan Desain"
+        order.customer_portal_status = "Approval Customer"
+        order.production_status = "Approval Customer"
+        order.production_status_updated_at = datetime.utcnow()
         actor_name = user.name if user else "System"
         record_history(
             order,
@@ -348,7 +351,7 @@ def update_sales_order(order, form, files=None, user=None):
             action="Desain diperbarui oleh admin setelah approval customer",
             field_name="customer_portal_status",
             old_value="Desain Disetujui",
-            new_value="Menunggu Persetujuan Desain",
+            new_value="Approval Customer",
             user=user,
             notes=reason,
         )
@@ -366,6 +369,15 @@ def update_production_status(order, production_status):
     order.production_status = production_status
     order.production_status_updated_at = datetime.utcnow()
     db.session.commit()
+    return order
+
+
+def set_production_stage(order, status):
+    order.production_status = normalize_production_status(status)
+    order.customer_portal_status = order.production_status
+    order.production_status_updated_at = datetime.utcnow()
+    if order.production_status == "Finish" and not order.tanggal_finish_produksi:
+        order.tanggal_finish_produksi = order.production_status_updated_at
     return order
 
 

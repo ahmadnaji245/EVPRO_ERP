@@ -13,11 +13,26 @@
         <div class="panel table-panel">
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>Nama</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr></thead>
+                    <thead>
+                    <tr>
+                        <th>Nama</th>
+                        {% if master_key == 'items' %}
+                            <th>Upload Gambar</th>
+                            <th>QC</th>
+                        {% endif %}
+                        <th>Urutan</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                    </thead>
                     <tbody>
                     {% for row in rows %}
                         <tr>
                             <td>{{ row.name }}</td>
+                            {% if master_key == 'items' %}
+                                <td>{% if row.perlu_upload_gambar %}<span class="badge text-bg-success">Ya</span>{% else %}<span class="badge text-bg-secondary">Tidak</span>{% endif %}</td>
+                                <td>{% if row.perlu_qc %}<span class="badge text-bg-success">Ya</span>{% else %}<span class="badge text-bg-secondary">Tidak</span>{% endif %}</td>
+                            {% endif %}
                             <td>{{ row.sort_order }}</td>
                             <td>{% if row.is_active %}<span class="badge text-bg-success">Aktif</span>{% else %}<span class="badge text-bg-secondary">Nonaktif</span>{% endif %}</td>
                             <td>
@@ -25,7 +40,7 @@
                                     <a class="btn btn-sm btn-outline-dark" href="{{ url_for('master.edit_simple_master', master_key=master_key, row_id=row.id) }}">Edit</a>
                                     {% if row.is_active %}
                                         <form method="post" action="{{ url_for('master.deactivate_simple_master', master_key=master_key, row_id=row.id) }}">
-                                            <button class="btn btn-sm btn-outline-danger">Nonaktifkan</button>
+                                            <button class="btn btn-sm btn-outline-danger">{{ 'Hapus' if master_key == 'items' else 'Nonaktifkan' }}</button>
                                         </form>
                                     {% else %}
                                         <form method="post" action="{{ url_for('master.activate_simple_master', master_key=master_key, row_id=row.id) }}">
@@ -36,7 +51,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                        <tr><td colspan="{{ 6 if master_key == 'items' else 4 }}" class="text-center text-muted py-4">Belum ada data.</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
@@ -63,6 +78,24 @@
                         <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Nonaktif</option>
                     </select>
                 </div>
+                {% if master_key == 'items' %}
+                    <div class="col-md-6">
+                        <label class="form-label">Perlu Upload Gambar</label>
+                        {% set upload_value = '1' if (editing_row.perlu_upload_gambar if editing_row else true) else '0' %}
+                        <select class="form-select" name="perlu_upload_gambar">
+                            <option value="1" {% if upload_value == '1' %}selected{% endif %}>Ya</option>
+                            <option value="0" {% if upload_value == '0' %}selected{% endif %}>Tidak</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Perlu QC</label>
+                        {% set qc_value = '1' if (editing_row.perlu_qc if editing_row else true) else '0' %}
+                        <select class="form-select" name="perlu_qc">
+                            <option value="1" {% if qc_value == '1' %}selected{% endif %}>Ya</option>
+                            <option value="0" {% if qc_value == '0' %}selected{% endif %}>Tidak</option>
+                        </select>
+                    </div>
+                {% endif %}
                 <div class="col-12 d-flex gap-2">
                     <button class="btn btn-rdr">{{ 'Update' if editing_row else 'Tambah' }}</button>
                     {% if editing_row %}<a class="btn btn-outline-dark" href="{{ url_for(endpoint) }}">Batal</a>{% endif %}

@@ -29,7 +29,7 @@
                     <div class="col-md-6"><div class="info-label">Sales Order</div><div class="info-value">{{ nota.sales_order.so_number }}</div></div>
                 {% endif %}
                 <div class="col-md-6"><div class="info-label">Status</div><div class="info-value">
-                    <span class="status-pill status-{{ nota.status|lower|replace(' ', '-') }}">{{ nota.status }}</span></div></div>
+                    <span class="status-pill status-{{ invoice_status|lower|replace(' ', '-') }}">{{ invoice_status }}</span></div></div>
                 <div class="col-md-6"><div class="info-label">No. HP</div><div class="info-value">{{ nota.customer.phone or '-' }}</div></div>
                 <div class="col-md-6"><div class="info-label">Alamat</div><div class="info-value">{{ nota.customer.address or '-' }}</div></div>
             </div>
@@ -96,18 +96,6 @@
                     <input class="form-control" name="description" placeholder="DP1, DP2, Pelunasan">
                 </div>
                 <div class="col-12 d-grid"><button class="btn btn-rdr">Tambah Pembayaran</button></div>
-            </form>
-        </section>
-
-        <section class="panel">
-            <h2 class="section-title">Ubah Status Order</h2>
-            <form method="post" action="{{ url_for('nota.status', nota_id=nota.id) }}" class="d-flex gap-2">
-                <select class="form-select" name="status">
-                    {% for status in statuses %}
-                        <option value="{{ status }}" {% if nota.status == status %}selected{% endif %}>{{ status }}</option>
-                    {% endfor %}
-                </select>
-                <button class="btn btn-dark">Simpan</button>
             </form>
         </section>
     </div>

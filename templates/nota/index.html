@@ -61,6 +61,7 @@
             </thead>
             <tbody>
             {% for nota in notas %}
+                {% set invoice_status = calculate_invoice_status(nota) %}
                 <tr>
                     <td><a href="{{ url_for('nota.detail', nota_id=nota.id) }}" class="fw-semibold">{{ nota.nota_number }}</a></td>
                     <td>
@@ -77,7 +78,7 @@
                     <td class="text-end">{{ nota.total|rupiah }}</td>
                     <td class="text-end">{{ nota.paid|rupiah }}</td>
                     <td class="text-end">{{ nota.remaining|rupiah }}</td>
-                    <td><span class="status-pill status-{{ nota.status|lower|replace(' ', '-') }}">{{ nota.status }}</span></td>
+                    <td><span class="status-pill status-{{ invoice_status|lower|replace(' ', '-') }}">{{ invoice_status }}</span></td>
                     <td class="text-end">
                         <div class="d-inline-flex gap-2">
                             <a class="btn btn-outline-dark btn-sm" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Detail</a>

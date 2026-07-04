@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
@@ -8,8 +10,30 @@ from models.user import User
 from services.brand_service import create_brand, get_brand, list_brands, set_brand_active, update_brand
 from services.dashboard_service import monthly_setting_point_progress
 from services.master_data_service import create_row, get_row, list_rows, set_row_active, update_row, validate_master_form
-from services.pdf_service import build_production_report_pdf
-from services.production_service import list_production_orders
+from services.pdf_service import build_order_production_list_pdf, build_production_report_pdf, build_vendor_production_table_pdf
+from services.pdf_render_service import render_first_pdf_page_to_jpg
+from models.sales_order import SalesOrder
+from services.production_service import (
+    PRODUCTION_STATUSES,
+    PRODUCTION_VENDORS,
+    assign_vendor,
+    can_finish_order,
+    finish_production,
+    list_production_orders,
+    list_vendor_production_rows,
+    production_priority,
+    production_status,
+    production_summary,
+    prepare_qc_checklists,
+    qc_checklist_rows,
+    qc_checklist_rows_from_form,
+    save_qc_checklist,
+    set_vendor_deadline,
+    validate_vendor,
+    vendor_print_rows,
+    vendor_print_quantity_columns,
+    vendor_summary,
+)
 from services.report_service import (
     MONTH_OPTIONS,
     brand_filter_options,
@@ -20,7 +44,7 @@ from services.report_service import (
     year_filter_options,
 )
 from services.validation_service import validate_brand_form
-from utils.constants import USER_ROLES, normalize_user_role, user_is_admin
+from utils.constants import USER_ROLES, normalize_user_role, user_is_admin, user_is_produksi
 
 
 production_bp = Blueprint("production", __name__, url_prefix="/production")
@@ -66,18 +90,218 @@ def _admin_required():
         abort(403)
 
 
+def _production_access_required():
+    if not (user_is_admin(current_user) or user_is_produksi(current_user)):
+        abort(403)
+
+
+def _get_production_order(sales_order_id):
+    return SalesOrder.query.filter_by(id=sales_order_id, is_deleted=False, approval_status="approved").first_or_404()
+
+
 @production_bp.route("/", endpoint="index")
 @login_required
 def production_index():
-    _admin_required()
-    return render_template("production/index.html", sales_orders=list_production_orders())
+    _production_access_required()
+    search = request.args.get("q", "").strip()
+    sales_orders = list_production_orders(search)
+    return render_template(
+        "production/index.html",
+        sales_orders=sales_orders,
+        search=search,
+        vendors=PRODUCTION_VENDORS,
+        summary=production_summary(sales_orders),
+        production_status=production_status,
+        production_priority=production_priority,
+        status_badge_class=_status_badge_class,
+        can_finish_order=can_finish_order,
+    )
+
+
+@production_bp.route("/vendors", endpoint="vendors")
+@login_required
+def production_vendors():
+    _production_access_required()
+    rows = list_vendor_production_rows()
+    return render_template(
+        "production/orders.html",
+        rows=rows,
+        vendor_rows=vendor_summary(list_production_orders()),
+        status_badge_class=_status_badge_class,
+    )
+
+
+@production_bp.route("/orders", endpoint="orders")
+@login_required
+def production_orders():
+    _production_access_required()
+    return redirect(url_for("production.vendors"))
+
+
+@production_bp.route("/vendors/pdf", endpoint="vendors_pdf")
+@login_required
+def production_vendors_pdf():
+    _production_access_required()
+    rows = list_vendor_production_rows(active_only=True)
+    pdf_buffer = build_order_production_list_pdf(rows)
+    filename = "list-produksi-vendor.pdf"
+    response = send_file(pdf_buffer, mimetype="application/pdf", as_attachment=False, download_name=filename)
+    response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
+
+
+@production_bp.route("/orders/pdf", endpoint="orders_pdf")
+@login_required
+def production_orders_pdf():
+    _production_access_required()
+    return redirect(url_for("production.vendors_pdf"))
 
 
 @production_bp.route("/<int:sales_order_id>", endpoint="detail")
 @login_required
 def production_detail(sales_order_id):
+    _production_access_required()
+    order = _get_production_order(sales_order_id)
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+@production_bp.route("/<int:sales_order_id>/assign-vendor", methods=["POST"], endpoint="assign_vendor")
+@login_required
+def production_assign_vendor(sales_order_id):
     _admin_required()
-    return render_template("production/detail.html", sales_order_id=sales_order_id)
+    order = _get_production_order(sales_order_id)
+    try:
+        assign_vendor(order, request.form.get("production_vendor"))
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash(f"{order.so_number} berhasil di-assign ke {order.production_vendor}.", "success")
+    return redirect(url_for("production.index", q=request.form.get("q", "")))
+
+
+@production_bp.route("/<int:sales_order_id>/deadline-vendor", methods=["POST"], endpoint="set_deadline")
+@login_required
+def production_set_deadline(sales_order_id):
+    _admin_required()
+    order = _get_production_order(sales_order_id)
+    try:
+        set_vendor_deadline(order, request.form.get("production_vendor_deadline"))
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash(f"Deadline vendor {order.so_number} diperbarui.", "success")
+    return redirect(url_for("production.index", q=request.form.get("q", "")))
+
+
+@production_bp.route("/<int:sales_order_id>/finish", methods=["POST"], endpoint="finish")
+@login_required
+def production_finish(sales_order_id):
+    _production_access_required()
+    order = _get_production_order(sales_order_id)
+    try:
+        finish_production(order)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash(f"Produksi {order.so_number} selesai.", "success")
+    return redirect(url_for("production.index", q=request.form.get("q", "")))
+
+
+@production_bp.route("/<int:sales_order_id>/qc-checklist", methods=["GET", "POST"], endpoint="qc_checklist")
+@login_required
+def production_qc_checklist(sales_order_id):
+    _production_access_required()
+    order = _get_production_order(sales_order_id)
+    if request.method == "POST":
+        try:
+            save_qc_checklist(order, request.form)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            qc_rows, qc_components = qc_checklist_rows_from_form(order, request.form)
+            return render_template("production/qc_checklist.html", sales_order=order, qc_rows=qc_rows, qc_components=qc_components, form=request.form)
+        flash("Checklist QC berhasil disimpan.", "success")
+        return redirect(url_for("production.qc_checklist", sales_order_id=order.id))
+    prepare_qc_checklists(order)
+    qc_rows, qc_components = qc_checklist_rows(order)
+    return render_template("production/qc_checklist.html", sales_order=order, qc_rows=qc_rows, qc_components=qc_components, form={})
+
+
+@production_bp.route("/vendor/<path:vendor_name>/print", endpoint="vendor_print")
+@login_required
+def production_vendor_print(vendor_name):
+    _production_access_required()
+    try:
+        vendor = validate_vendor(vendor_name)
+    except ValueError:
+        abort(404)
+    pdf_buffer = _build_vendor_print_pdf(vendor)
+    filename = f"daftar-produksi-vendor-{vendor.casefold().replace(' ', '-')}.pdf"
+    response = send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=filename,
+    )
+    response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
+
+
+@production_bp.route("/vendor/<path:vendor_name>/print.jpg", endpoint="vendor_print_jpg")
+@login_required
+def production_vendor_print_jpg(vendor_name):
+    _production_access_required()
+    try:
+        vendor = validate_vendor(vendor_name)
+    except ValueError:
+        abort(404)
+    pdf_buffer = _build_vendor_print_pdf(vendor)
+    jpg_buffer = render_first_pdf_page_to_jpg(pdf_buffer)
+    filename = f"vendor_{vendor.casefold().replace(' ', '_')}_{datetime.utcnow().date().isoformat()}.jpg"
+    return send_file(
+        jpg_buffer,
+        mimetype="image/jpeg",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+def _build_vendor_print_pdf(vendor):
+    today = datetime.utcnow().date()
+    rows = vendor_print_rows(vendor)
+    quantity_columns = vendor_print_quantity_columns(rows)
+    return build_vendor_production_table_pdf(
+        vendor=vendor,
+        rows=rows,
+        quantity_columns=quantity_columns,
+        printed_at=datetime.utcnow(),
+        deadline_class=lambda deadline: _vendor_deadline_class(deadline, today),
+    )
+
+
+def _vendor_deadline_class(deadline, today):
+    if not deadline:
+        return ""
+    days_left = (deadline - today).days
+    if days_left < 0:
+        return "deadline-late"
+    if days_left == 1:
+        return "deadline-h1"
+    if days_left == 2:
+        return "deadline-h2"
+    return ""
+
+
+def _status_badge_class(status):
+    classes = {
+        "Approval Customer": "text-bg-danger",
+        "Setting": "text-bg-warning",
+        "Printing": "text-bg-info",
+        "Jahit": "text-bg-primary",
+        "QC": "text-bg-secondary",
+        "Packing": "text-bg-success",
+        "Finish": "text-bg-success",
+    }
+    return classes.get(status, "text-bg-light")
 
 
 @master_bp.before_request

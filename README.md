@@ -1,107 +1,108 @@
 # EVPRO ERP
 
-Integrated ERP System for Garment & Custom Jersey Industry.
+EVPRO ERP adalah sistem ERP modular untuk operasional garment dan custom jersey.
 
-EVPRO ERP adalah repository utama untuk active development ERP modular EVPRO. Repository ini menjadi tempat integrasi bertahap dari modul Sales Order, Nota, Production, Inventory, Customer Portal, CRM, dan AI Business Assistant.
+## Status Project
 
-Repository lama `ERP_SO` dan `Nota` tetap diperlakukan sebagai stable source project / reference. Keduanya menjadi acuan perilaku modul lama, sedangkan pengembangan aktif dan integrasi dilakukan di repository EVPRO ERP ini.
+Repository ini adalah repository utama pengembangan EVPRO ERP.
 
-## Project Vision
+Repository lama:
+- `ERP_SO` = source of truth modul Sales Order
+- `ERP-Nota` = source of truth modul Nota
 
-EVPRO ERP is an integrated web-based ERP platform developed specifically for garment and custom jersey manufacturing.
+Semua pengembangan baru dilakukan di repository ini.
 
-The system is modular and designed to grow over time.
+## Core Architecture
 
-Sales Order adalah primary business object. Semua modul operasional akan dihubungkan kembali ke Sales Order menggunakan `SO_ID`, sehingga proses order, nota, produksi, pembayaran, customer portal, CRM, dan insight bisnis tetap berpusat pada satu dokumen utama.
+Sales Order adalah pusat utama ERP.
 
-Completed modules:
+Setiap modul operasional akan dihubungkan melalui `SO_ID`.
 
-- Framework ERP
-- Sales Order Module
-- Invoice / Nota Module
+Contoh alur:
 
-Next module:
+Customer → Sales Order → Approval → Produksi → Nota → Payment
 
-- SO ↔ Nota Integration
+## Release Roadmap
 
-Long-term direction:
+- ERP v0.1 ✅ Framework ERP
+- ERP v0.2 ✅ Sales Order Module
+- ERP v0.2.1 ✅ Complete Sales Order Module Migration
+- ERP v0.2.2 ✅ Import Sales Order Master Data
+- ERP v0.3 ✅ Invoice / Nota Module
+- ERP v0.3.1 ✅ Complete Nota Module Migration
+- ERP v0.4 ✅ SO ↔ Nota Integration Stable Development
+- ERP v0.5 ✅ Production Management
+- ERP v0.6 ⏳ Role & Permission
+- ERP v0.7 ⏳ Customer Portal
+- ERP v0.8 ⏳ CRM
+- ERP v0.9 ⏳ AI Integration
+- ERP v1.0 ⏳ Stable Internal Release
 
-- Production
-- Inventory (Planned)
-- Customer Portal (Planned)
-- CRM (Planned)
-- AI Business Assistant (Planned)
+## Current Focus
 
-## ERP Architecture
+Status saat ini:
 
-Sales Order (SO) is the primary business object.
+EVPRO ERP sudah memiliki modul utama:
+- Sales Order
+- Nota / Invoice
+- Integrasi SO ↔ Nota
+- Master Data Sales Order
+- Master Data Nota
+- Role dasar admin dan produksi
 
-Every operational module must be linked to a Sales Order through `SO_ID`.
+Pengembangan berikutnya:
 
-Integration direction:
+ERP v0.6 — Role & Permission
 
-```text
-Sales Order
-    -> Invoice / Nota
-    -> Production
-    -> Inventory
-    -> Customer Portal
-    -> CRM
-    -> AI Business Assistant
-```
+## Brand Logic
 
-## Roadmap
+### Sales Order
 
-Roadmap pengembangan tersedia di [docs/roadmap.md](docs/roadmap.md).
+Sales Order selalu menggunakan brand asli.
 
-Ringkasan milestone:
+Contoh:
+- Armor tetap Armor
+- RDR tetap RDR
+- FF tetap FF
+- Evpro tetap Evpro
 
-- ERP v0.1 ✅: Framework ERP
-- ERP v0.2 ✅: Sales Order Module
-- ERP v0.3 ✅: Invoice / Nota Module
-- ERP v0.4 ⏳: SO ↔ Nota Integration - planned next
-- ERP v0.5 ⏳: Production Module
-- ERP v0.6 ⏳: Role & Permission
-- ERP v0.7 ⏳: Customer Portal
-- ERP v0.8 ⏳: CRM
-- ERP v0.9 ⏳: AI Integration
-- ERP v1.0 ⏳: Stable Internal Release
+### Nota
 
-## Milestone 1 Scaffold
+Nota menggunakan aturan invoice brand:
 
-Struktur awal project:
+- FF Apparel memakai template Nota FF
+- RDR Apparel memakai template Nota Evpro dengan identitas/logo RDR
+- Semua brand selain FF dan RDR masuk ke group EVPRO
 
-```text
-ERP/
-├── app.py
-├── config.py
-├── database/
-├── models/
-├── routes/
-│   ├── so_routes.py
-│   └── nota_routes.py
-├── templates/
-│   ├── so/
-│   └── nota/
-├── static/
-├── docs/
-└── README.md
-```
+Contoh:
+- Armor di Nota ditampilkan sebagai sub-brand EVPRO
+- Format tampilan dapat menggunakan `EV-{SINGKATAN}`
 
-## Menjalankan Aplikasi
+## Access Control
 
-```bash
-python app.py
-```
+- Admin dapat mengakses Sales Order dan Nota
+- Produksi tidak boleh mengakses Nota
+- Customer tidak masuk dashboard ERP
+- Customer nantinya hanya mengakses approval/progress melalui secure token
 
-Default URL:
+## ERP v0.5 — Production Management
 
-- `http://127.0.0.1:5003/login`
-- `http://127.0.0.1:5003/dashboard`
+ERP v0.5 sudah difokuskan pada Production Management.
 
-Default development login:
+Target:
+- Dashboard produksi
+- Antrian produksi dari SO
+- Status produksi
+- Tracking pekerjaan
+- Integrasi dengan SO dan Nota
 
-- Admin: `admin` / `admin`
-- Produksi: `produksi` / `produksi`
+Status ERP v0.5:
+- Dashboard Production Management aktif di halaman Produksi.
+- Vendor produksi tersedia: Mas Amar dan Mas Syukron.
+- Deadline vendor terpisah dari deadline customer/SO.
+- Status produksi baru tersedia dari Menunggu Assign sampai Selesai.
+- Barang masuk gudang dan QC/checklist internal tetap terhubung ke Surat Order.
 
-Role `admin` dapat membuka Sales Order dan Nota. Role `produksi` hanya untuk akses operasional yang diizinkan dan tidak dapat membuka modul Nota internal.
+## Next Milestone
+
+ERP v0.6 akan difokuskan pada Role & Permission granular.

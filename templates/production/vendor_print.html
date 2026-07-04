@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Daftar Produksi Vendor - {{ vendor|upper }}</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 12mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .print-actions {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin: 16px 0;
+        }
+
+        .btn {
+            background: #ffffff;
+            border: 1px solid #374151;
+            border-radius: 4px;
+            color: #111827;
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 9px 12px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: #1f2937;
+            color: #ffffff;
+        }
+
+        .sheet {
+            width: 100%;
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0;
+            margin: 0 0 6px;
+            text-align: center;
+        }
+
+        .meta {
+            color: #4b5563;
+            font-size: 12px;
+            margin: 0 0 14px;
+            text-align: center;
+        }
+
+        table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border: 1px solid #111827;
+            padding: 7px 8px;
+            vertical-align: middle;
+            word-break: break-word;
+        }
+
+        th {
+            background: #334155;
+            color: #ffffff;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        td {
+            height: 34px;
+        }
+
+        .col-no {
+            text-align: center;
+            width: 42px;
+        }
+
+        .col-team {
+            width: 220px;
+        }
+
+        .col-status {
+            width: 145px;
+        }
+
+        .col-brand {
+            text-align: center;
+            width: 80px;
+        }
+
+        .col-qty {
+            text-align: center;
+            width: 76px;
+        }
+
+        .col-date {
+            text-align: center;
+            width: 130px;
+        }
+
+        .col-note {
+            width: 190px;
+        }
+
+        .deadline-late {
+            background: #dc2626;
+            color: #ffffff;
+            font-weight: 800;
+        }
+
+        .deadline-h1 {
+            background: #c2410c;
+            color: #ffffff;
+            font-weight: 800;
+        }
+
+        .deadline-h2 {
+            background: #fed7aa;
+            color: #111827;
+            font-weight: 800;
+        }
+
+        .empty-state {
+            border: 1px solid #111827;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 28px;
+            text-align: center;
+        }
+
+        @media print {
+            .print-actions {
+                display: none;
+            }
+
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-actions">
+        <button class="btn btn-primary" type="button" onclick="window.print()">Print</button>
+        <a class="btn" href="{{ url_for('production.index') }}">Kembali ke Produksi</a>
+    </div>
+
+    <main class="sheet">
+        <h1 class="title">DAFTAR PRODUKSI VENDOR - {{ vendor|upper }}</h1>
+        <p class="meta">Tanggal cetak: {{ printed_at|pretty_datetime }}</p>
+
+        {% if rows %}
+            <table>
+                <thead>
+                <tr>
+                    <th class="col-no">NO</th>
+                    <th class="col-team">NAMA TEAM</th>
+                    <th class="col-status">STATUS</th>
+                    <th class="col-brand">MERK</th>
+                    {% for component in quantity_columns %}
+                        {% set label = 'CLN' if component|lower == 'celana' else ('JRSY' if component|lower == 'jersey' else component|upper) %}
+                        <th class="col-qty">QTY {{ label }}</th>
+                    {% endfor %}
+                    <th class="col-date">TANGGAL MASUK</th>
+                    <th class="col-date">DEADLINE JAHIT</th>
+                    <th class="col-note">KETERANGAN</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td class="col-no">{{ loop.index }}</td>
+                        <td class="col-team">{{ row.team_name }}</td>
+                        <td class="col-status">{{ row.status }}</td>
+                        <td class="col-brand">{{ row.brand }}</td>
+                        {% for component in quantity_columns %}
+                            <td class="col-qty">{{ row.qty.get(component, 0) }}</td>
+                        {% endfor %}
+                        <td class="col-date">{{ row.assigned_at|pretty_date if row.assigned_at else '-' }}</td>
+                        <td class="col-date {{ deadline_class(row.deadline) }}">{{ row.deadline|pretty_date if row.deadline else '-' }}</td>
+                        <td class="col-note">{{ row.shortage_note or '-' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty-state">Belum ada order aktif untuk vendor ini.</div>
+        {% endif %}
+    </main>
+</body>
+</html>

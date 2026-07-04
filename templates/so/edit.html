@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Edit Sales Order - EVPRO TEXTILE ERP{% endblock %}
+{% block title %}Edit Surat Order - EVPRO TEXTILE ERP{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
@@ -12,7 +12,7 @@
     {% if revision_reason_admin %}
         <input type="hidden" name="revision_reason_admin" value="{{ revision_reason_admin }}">
     {% endif %}
-    {% set submit_label = 'Update Sales Order' %}
+    {% set submit_label = 'Update Surat Order' %}
     {% include "so/_form.html" %}
 </form>
 {% endblock %}

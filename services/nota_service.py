@@ -16,10 +16,6 @@ NOTA_STATUSES = (
     "Belum DP",
     "DP",
     "Lunas",
-    "Desain",
-    "Produksi",
-    "Selesai",
-    "Diambil",
 )
 
 DEFAULT_NOTA_PRODUCTS = [
@@ -177,13 +173,13 @@ def list_notas(search=None):
                 SalesOrder.so_number.ilike(needle),
             )
         )
-    if status:
-        query = query.filter(Nota.status == status)
     if brand_id.isdigit():
         query = query.filter(Nota.brand_id == int(brand_id))
     notas = query.order_by(Nota.order_date.desc(), Nota.id.desc()).all()
     if brand_group in invoice_brand_filter_options():
         notas = [nota for nota in notas if get_invoice_brand_group(nota.brand.name if nota.brand else "") == brand_group]
+    if status:
+        notas = [nota for nota in notas if calculate_invoice_status(nota) == status]
     return notas
 
 
@@ -218,6 +214,25 @@ def totals(nota):
     return {"total": nota.total, "paid": nota.paid, "remaining": nota.remaining}
 
 
+def calculate_invoice_status(nota):
+    total = int(nota.total or 0)
+    paid = int(nota.paid or 0)
+    remaining = max(total - paid, 0)
+    if paid <= 0:
+        return "Belum DP"
+    if paid >= total or remaining <= 0:
+        return "Lunas"
+    return "DP"
+
+
+def invoice_status_badge_class(status):
+    return {
+        "Belum DP": "status-belum-dp",
+        "DP": "status-dp",
+        "Lunas": "status-lunas",
+    }.get(status, "status-belum-dp")
+
+
 def dashboard_stats(brand=None):
     notas = _filtered_notas(brand)
     revenue = sum(nota.total for nota in notas)
@@ -227,13 +242,13 @@ def dashboard_stats(brand=None):
         income=income,
         receivable=revenue - income,
         invoice_count=len(notas),
-        belum_dp_count=sum(1 for nota in notas if nota.status == "Belum DP"),
-        dp_count=sum(1 for nota in notas if nota.status == "DP"),
-        lunas_count=sum(1 for nota in notas if nota.status == "Lunas"),
-        desain_count=sum(1 for nota in notas if nota.status == "Desain"),
-        produksi_count=sum(1 for nota in notas if nota.status == "Produksi"),
-        selesai_count=sum(1 for nota in notas if nota.status == "Selesai"),
-        diambil_count=sum(1 for nota in notas if nota.status == "Diambil"),
+        belum_dp_count=sum(1 for nota in notas if calculate_invoice_status(nota) == "Belum DP"),
+        dp_count=sum(1 for nota in notas if calculate_invoice_status(nota) == "DP"),
+        lunas_count=sum(1 for nota in notas if calculate_invoice_status(nota) == "Lunas"),
+        desain_count=0,
+        produksi_count=0,
+        selesai_count=0,
+        diambil_count=0,
     )
 
 
@@ -280,7 +295,7 @@ def top_customers(brand=None):
 def receivables(brand=None, status=None):
     rows = []
     for nota in _filtered_notas(brand):
-        if status and nota.status != status:
+        if status and calculate_invoice_status(nota) != status:
             continue
         row = _nota_row(nota)
         if row.remaining > 0:
@@ -416,9 +431,10 @@ def billing_status_for_sales_order(sales_order):
     nota = get_nota_by_so_id(sales_order.id)
     if not nota:
         return "Belum Ada Nota"
-    if nota.status == "Lunas" or (nota.total > 0 and nota.remaining <= 0):
+    status = calculate_invoice_status(nota)
+    if status == "Lunas":
         return "Lunas"
-    if nota.status == "DP" or nota.paid > 0:
+    if status == "DP":
         return "DP"
     return "Nota Dibuat"
 
@@ -465,8 +481,6 @@ def validate_nota_form(form):
         errors.append("Tanggal order wajib diisi.")
     elif not _parse_date(form.get("order_date")):
         errors.append("Tanggal order tidak valid.")
-    if str(form.get("status") or "").strip() not in NOTA_STATUSES:
-        errors.append("Status order tidak valid.")
     if not str(form.get("customer_name") or "").strip():
         errors.append("Nama customer wajib diisi.")
     if not str(form.get("team_name") or "").strip():
@@ -492,7 +506,7 @@ def create_nota(form, user=None):
         order_date=order_date,
         customer=customer,
         team_name=str(form.get("team_name") or "").strip(),
-        status=str(form.get("status") or "Belum DP").strip(),
+        status="Belum DP",
         notes=str(form.get("notes") or "").strip() or None,
         so_id=so_id,
         created_by_id=user.id if user else None,
@@ -512,7 +526,6 @@ def update_nota(nota, form):
     nota.order_date = _parse_date(form.get("order_date"))
     nota.customer = customer
     nota.team_name = str(form.get("team_name") or "").strip()
-    nota.status = str(form.get("status") or "").strip()
     nota.notes = str(form.get("notes") or "").strip() or None
     so_id = _parse_so_id(form.get("so_id"))
     if so_id and so_id != nota.so_id:
@@ -543,13 +556,6 @@ def add_payment(nota, form):
     db.session.commit()
 
 
-def update_status(nota, status):
-    if status not in NOTA_STATUSES:
-        raise ValueError("Status order tidak valid.")
-    nota.status = status
-    db.session.commit()
-
-
 def seed_default_nota_products():
     existing = {product.code.upper(): product for product in NotaProduct.query.all()}
     for code, description, price in DEFAULT_NOTA_PRODUCTS:
@@ -569,13 +575,15 @@ def _filtered_notas(brand=None):
 
 
 def _nota_row(nota):
+    status = calculate_invoice_status(nota)
     return _row(
         id=nota.id,
         invoice_number=nota.nota_number,
         nota_number=nota.nota_number,
         brand=nota.brand.name if nota.brand else "-",
         order_date=nota.order_date,
-        status=nota.status,
+        status=status,
+        status_class=invoice_status_badge_class(status),
         customer_name=nota.customer.name,
         team_name=nota.team_name,
         phone=nota.customer.phone,
