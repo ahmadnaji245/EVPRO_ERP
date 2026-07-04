@@ -155,65 +155,49 @@
                 </div>
                 <span class="badge {{ 'text-bg-success' if display_status.is_taken else 'text-bg-light border' }}">{{ display_status.short_status }}</span>
             </div>
-<div class="row g-4">
+            {% if design.has_design_image %}
+                <div class="row g-4">
+                    {% if design.display_top_image_path %}
+                        <div class="col-lg-6">
+                            <div class="fw-semibold mb-2">Gambar {{ design.primary_item_label }}</div>
+                            <img
+                                src="{{ url_for('static', filename=design.display_top_image_path) }}"
+                                class="img-fluid rounded border w-100 so-media-preview"
+                                alt="Gambar {{ design.primary_item_label }} {{ design.design_name }}">
+                        </div>
+                    {% endif %}
+                    {% if design.has_secondary_item and design.bottom_image_path %}
+                        <div class="col-lg-6">
+                            <div class="fw-semibold mb-2">Gambar {{ design.secondary_item_label }}</div>
+                            <img
+                                src="{{ url_for('static', filename=design.bottom_image_path) }}"
+                                class="img-fluid rounded border w-100 so-media-preview"
+                                alt="Gambar {{ design.secondary_item_label }} {{ design.design_name }}">
+                        </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="empty-state">Gambar desain belum tersedia.</div>
+            {% endif %}
 
-    <!-- KOLOM ATASAN -->
-    <div class="col-lg-6">
-
-        <div class="fw-semibold mb-2">
-            Gambar Atasan
-        </div>
-
-        {% if design.display_top_image_path %}
-            <img
-                src="{{ url_for('static', filename=design.display_top_image_path) }}"
-                class="img-fluid rounded border w-100 so-media-preview">
-        {% else %}
-            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">
-                Belum ada gambar atasan
+            <div class="row g-4 mt-1">
+                <div class="col-lg-6">
+                    <div class="fw-semibold mb-2">Catatan {{ design.primary_item_label }}</div>
+                    <div class="border rounded p-3 bg-light so-notes-box">
+                        {{ design.display_top_notes or '-' }}
+                    </div>
+                </div>
+                {% if design.has_secondary_item %}
+                    <div class="col-lg-6">
+                        <div class="fw-semibold mb-2">Catatan {{ design.secondary_item_label }}</div>
+                        <div class="border rounded p-3 bg-light so-notes-box">
+                            {{ design.bottom_notes or '-' }}
+                        </div>
+                    </div>
+                {% endif %}
             </div>
-        {% endif %}
-
-        <div class="fw-semibold mt-3 mb-2">
-            Catatan Atasan
-        </div>
-
-        <div class="border rounded p-3 bg-light so-notes-box">
-            {{ design.display_top_notes or '-' }}
-        </div>
-
-    </div>
-
-    <!-- KOLOM CELANA -->
-    <div class="col-lg-6">
-
-        <div class="fw-semibold mb-2">
-            Gambar Celana
-        </div>
-
-        {% if design.bottom_image_path %}
-            <img
-                src="{{ url_for('static', filename=design.bottom_image_path) }}"
-                class="img-fluid rounded border w-100 so-media-preview">
-        {% else %}
-            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">
-                Belum ada gambar celana
-            </div>
-        {% endif %}
-
-        <div class="fw-semibold mt-3 mb-2">
-            Catatan Celana
-        </div>
-
-        <div class="border rounded p-3 bg-light so-notes-box">
-            {{ design.bottom_notes or '-' }}
-        </div>
-
-    </div>
-
-</div>
             
-{% if recap.groups or recap.long_sleeve %}
+{% if recap.groups %}
     <div class="mt-4">
         <div class="fw-semibold mb-2">Rekap Size</div>
 
@@ -256,41 +240,31 @@
                     </div>
                 {% endif %}
             {% endfor %}
-
-            {% if recap.long_sleeve %}
-                <div class="col-md-4">
-                    <div class="card border">
-                        <div class="card-header bg-light fw-semibold text-center">
-                            Lengan Panjang
-                        </div>
-
-                        <div class="card-body p-0">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Size</th>
-                                        <th class="text-center" style="width: 80px;">Qty</th>
-                                        <th class="text-center" style="width: 90px;">Setting</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {% for row in recap.long_sleeve %}
-                                        <tr>
-                                            <td>{{ row.size }}</td>
-                                            <td class="text-center fw-semibold">{{ row.qty }}</td>
-                                            <td class="text-center">
-                                                <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %}>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
+        </div>
+    </div>
+{% endif %}
+{% if design.long_sleeve_recap %}
+    <div class="mt-4">
+        <div class="fw-semibold mb-2">Rekap Lengan Panjang</div>
+        <div class="card border">
+            <div class="card-body p-0">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Size</th>
+                            <th class="text-center" style="width: 80px;">Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in design.long_sleeve_recap %}
+                            <tr>
+                                <td>{{ row.size }}</td>
+                                <td class="text-center fw-semibold">{{ row.qty }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 {% endif %}
@@ -313,7 +287,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    {% for player in design.players %}
+                    {% for player in design.sorted_players %}
                         <tr>
                             <td>{{ loop.index }}</td>
                             <td>{{ player.player_name }}</td>

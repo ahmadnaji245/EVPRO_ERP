@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from database.db import db
+from utils.constants import has_long_sleeve_marker, long_sleeve_size_label, normalize_size_key, size_group_name, sort_players_by_size, sort_size_rows
 
 
 class SalesOrderDesign(db.Model):
@@ -43,66 +44,67 @@ class SalesOrderDesign(db.Model):
         return self.top_notes or self.instruction
 
     @property
+    def item_components(self):
+        parts = [part.strip() for part in str(self.item_name or "").split("+")]
+        return [part for part in parts if part]
+
+    @property
+    def primary_item_label(self):
+        components = self.item_components
+        return components[0] if components else (self.item_name or "Item")
+
+    @property
+    def secondary_item_label(self):
+        components = self.item_components
+        return components[1] if len(components) > 1 else None
+
+    @property
+    def has_secondary_item(self):
+        return bool(self.secondary_item_label)
+
+    @property
+    def has_design_image(self):
+        return bool(self.display_top_image_path or (self.has_secondary_item and self.bottom_image_path))
+
+    @property
+    def sorted_players(self):
+        return sort_players_by_size(self.players)
+
+    @property
     def size_recap(self):
-        groups = {
-            "Kids": ["XS Kids", "S Kids", "M Kids", "L Kids", "XL Kids", "XXL Kids"],
-            "Women": ["XS Women", "S Women", "M Women", "L Women", "XL Women", "XXL Women", "3XL Women"],
-            "Reguler": ["S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"],
-        }
-        long_sleeve_order = [
-            "XS Kids Lengan Panjang",
-            "S Kids Lengan Panjang",
-            "M Kids Lengan Panjang",
-            "L Kids Lengan Panjang",
-            "XL Kids Lengan Panjang",
-            "XXL Kids Lengan Panjang",
-            "XS Women Lengan Panjang",
-            "S Women Lengan Panjang",
-            "M Women Lengan Panjang",
-            "L Women Lengan Panjang",
-            "XL Women Lengan Panjang",
-            "XXL Women Lengan Panjang",
-            "3XL Women Lengan Panjang",
-            "S Lengan Panjang",
-            "M Lengan Panjang",
-            "L Lengan Panjang",
-            "XL Lengan Panjang",
-            "XXL Lengan Panjang",
-            "3XL Lengan Panjang",
-            "4XL Lengan Panjang",
-            "5XL Lengan Panjang",
-        ]
-        counts = {}
-        labels = {}
-        for player in self.players:
+        grouped_rows = {"Kids": {}, "Women": {}, "Reguler": {}}
+        for index, player in enumerate(self.players):
             normalized = " ".join((player.size or "").split())
-            key = normalized.lower()
-            if not key:
+            display_size = long_sleeve_size_label(normalized) if has_long_sleeve_marker(normalized) else normalized
+            key = normalize_size_key(display_size) or display_size.casefold()
+            if not key or not display_size:
                 continue
-            counts[key] = counts.get(key, 0) + 1
-            labels.setdefault(key, normalized)
+            group_name = size_group_name(display_size)
+            rows = grouped_rows.setdefault(group_name, {})
+            row = rows.setdefault(key, {"size": display_size, "qty": 0, "_first_index": index})
+            row["qty"] += 1
 
         grouped = {}
-        for group_name, sizes in groups.items():
-            rows = []
-            for size in sizes:
-                qty = counts.get(size.lower(), 0)
-                if qty:
-                    rows.append({"size": size, "qty": qty})
+        for group_name in ("Kids", "Women", "Reguler"):
+            rows = sort_size_rows(grouped_rows.get(group_name, {}).values())
             if rows:
-                grouped[group_name] = rows
+                grouped[group_name] = [{"size": row["size"], "qty": row["qty"]} for row in rows]
 
-        known_long_sleeve = {size.lower() for size in long_sleeve_order}
-        long_sleeve_rows = []
-        for size in long_sleeve_order:
-            qty = counts.get(size.lower(), 0)
-            if qty:
-                long_sleeve_rows.append({"size": size, "qty": qty})
-        for key, qty in counts.items():
-            if "lengan panjang" in key and key not in known_long_sleeve:
-                long_sleeve_rows.append({"size": labels[key], "qty": qty})
+        return {"groups": grouped, "long_sleeve": []}
 
-        return {"groups": grouped, "long_sleeve": long_sleeve_rows}
+    @property
+    def long_sleeve_recap(self):
+        rows = {}
+        for index, player in enumerate(self.players):
+            if not has_long_sleeve_marker(player.size, player.notes):
+                continue
+            display_size = long_sleeve_size_label(player.size) or " ".join((player.size or "").split())
+            if not display_size:
+                continue
+            key = normalize_size_key(display_size) or display_size.casefold()
+            row = rows.setdefault(key, {"size": display_size, "qty": 0, "_first_index": index})
+            row["qty"] += 1
+        return [{"size": row["size"], "qty": row["qty"]} for row in sort_size_rows(rows.values())]
 
     def size_setting_done(self, size):
         normalized = " ".join((size or "").split())

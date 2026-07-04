@@ -10,6 +10,7 @@ from models.revision_history import RevisionHistory
 from models.sales_order import SalesOrder
 from models.sales_order_design import SalesOrderDesign
 from models.sales_order_player import SalesOrderPlayer
+from models.sales_order_production_photo import SalesOrderProductionPhoto
 from models.setting import Setting
 from models.user import User
 
@@ -34,6 +35,7 @@ __all__ = [
     "SalesOrder",
     "SalesOrderDesign",
     "SalesOrderPlayer",
+    "SalesOrderProductionPhoto",
     "Setting",
     "User",
 ]

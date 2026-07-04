@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from datetime import datetime
-from flask import Blueprint, Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, Flask, abort, current_app, flash, redirect, render_template, request, send_file, session, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from sqlalchemy import inspect, text
 
@@ -9,20 +9,24 @@ from config import Config
 from database.db import db
 from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, Setting, User
 from routes.handover_routes import handover_bp
-from routes.nota_routes import nota_bp
+from routes.nota_routes import _pdf_invoice, _pdf_items, _pdf_payments, nota_bp
 from routes.so_shell_routes import master_bp, production_bp, reports_bp, settings_bp
 from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
-from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.nota_service import seed_default_nota_products
 from services.customer_service import find_by_access_code
 from services.history_service import record_history
 from services.nota_service import calculate_invoice_status, get_nota_by_so_id, totals
 from services.order_status_service import get_display_status
+from services.pdf_service import build_customer_sales_order_pdf
+from services.production_photo_service import get_photo_for_order
 from services.production_service import PRODUCTION_STATUSES, seed_production_sample_data
+from services.nota_pdf_ff_apparel_service import build_ff_apparel_pdf
+from services.nota_pdf_service import build_customer_invoice_pdf
 from services.sales_order_service import set_production_stage
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders
 from utils.permissions import has_permission, permission_required
+from utils.constants import normalize_size_key, sort_size_rows
 
 
 login_manager = LoginManager()
@@ -42,12 +46,7 @@ def load_user(user_id):
 @dashboard_bp.route("/")
 @permission_required("dashboard.view")
 def index():
-    return render_template(
-        "dashboard.html",
-        stats=dashboard_stats(),
-        monthly=monthly_point_chart(),
-        setting_progress=monthly_setting_point_progress(),
-    )
+    return render_template("dashboard.html")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -90,17 +89,27 @@ def detail(access_code):
             linked_nota=None,
             nota_totals=None,
             invoice_status=None,
+            production_photos=[],
+            portal_design_player_groups=[],
+            portal_size_recap={},
+            portal_long_sleeve_recap=[],
         ), 404
+    order = access_record.sales_order
     linked_nota = get_nota_by_so_id(access_record.sales_order.id) if access_record else None
     return render_template(
         "so/customer.html",
         access_record=access_record,
         production_statuses=PRODUCTION_STATUSES,
-        portal_progress=customer_portal_progress(access_record.sales_order) if access_record else None,
-        portal_order_status=customer_portal_order_status(access_record.sales_order) if access_record else None,
+        portal_progress=customer_portal_progress(order) if access_record else None,
+        portal_order_status=customer_portal_order_status(order) if access_record else None,
         linked_nota=linked_nota,
         nota_totals=totals(linked_nota) if linked_nota else None,
         invoice_status=calculate_invoice_status(linked_nota) if linked_nota else None,
+        production_photos=list(order.production_photos) if customer_can_view_production_photos(order) else [],
+        can_view_production_photos=customer_can_view_production_photos(order),
+        portal_design_player_groups=customer_portal_design_player_groups(order),
+        portal_size_recap=customer_portal_size_recap(order),
+        portal_long_sleeve_recap=customer_portal_long_sleeve_recap(order),
     )
 
 
@@ -129,6 +138,66 @@ def approve_customer(access_code):
         db.session.commit()
         flash("Surat Order berhasil disetujui.", "success")
     return redirect(url_for("tracking.detail", access_code=access_code))
+
+
+@tracking_bp.route("/<access_code>/production-photos/<int:photo_id>")
+def production_photo(access_code, photo_id):
+    access_record = find_by_access_code(access_code)
+    if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
+        abort(404)
+    order = access_record.sales_order
+    if not customer_can_view_production_photos(order):
+        abort(404)
+    photo = get_photo_for_order(order, photo_id)
+    return _send_production_photo_file(photo, as_attachment=False)
+
+
+@tracking_bp.route("/<access_code>/production-photos/<int:photo_id>/download")
+def production_photo_download(access_code, photo_id):
+    access_record = find_by_access_code(access_code)
+    if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
+        abort(404)
+    order = access_record.sales_order
+    if not customer_can_view_production_photos(order):
+        abort(404)
+    photo = get_photo_for_order(order, photo_id)
+    return _send_production_photo_file(photo, as_attachment=True)
+
+
+@tracking_bp.route("/<access_code>/surat-order.pdf")
+def sales_order_download(access_code):
+    access_record = find_by_access_code(access_code)
+    if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
+        abort(404)
+    order = access_record.sales_order
+    filename = f"SO-{_download_filename_token(order.so_number)}.pdf"
+    return send_file(
+        build_customer_sales_order_pdf(order),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@tracking_bp.route("/<access_code>/nota.pdf")
+def nota_download(access_code):
+    access_record = find_by_access_code(access_code)
+    if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
+        abort(404)
+    nota = get_nota_by_so_id(access_record.sales_order.id)
+    if not nota:
+        abort(404)
+    invoice = _pdf_invoice(nota, mapped_brand=True)
+    if invoice["brand"] == "FF Apparel":
+        pdf = build_ff_apparel_pdf(invoice, _pdf_items(nota), _pdf_payments(nota), totals(nota))
+    else:
+        pdf = build_customer_invoice_pdf(invoice, _pdf_items(nota), totals(nota))
+    return send_file(
+        pdf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"nota-{nota.nota_number.replace('/', '-')}.pdf",
+    )
 
 
 def customer_portal_progress(order):
@@ -164,6 +233,114 @@ def customer_portal_progress(order):
 
 def customer_portal_order_status(order):
     return get_display_status(order)
+
+
+def customer_can_view_production_photos(order):
+    return order.production_status_label == "Finish" or bool(order.tanggal_finish_produksi)
+
+
+def customer_portal_design_player_groups(order):
+    groups = []
+    for design_index, design in enumerate(sorted(order.designs, key=lambda item: (item.sort_order, item.id)), start=1):
+        players = []
+        for row_number, player in enumerate(design.sorted_players, start=1):
+            players.append(
+                {
+                    "no": row_number,
+                    "name": player.player_name,
+                    "number": player.player_number,
+                    "size": player.size,
+                    "notes": player.notes,
+                }
+            )
+        title = str(design.design_name or "").strip() or f"Desain {design_index}"
+        groups.append(
+            {
+                "title": title,
+                "item_label": design.primary_item_label,
+                "players": players,
+                "total": len(players),
+            }
+        )
+    return groups
+
+
+def customer_portal_player_rows(order):
+    rows = []
+    row_number = 1
+    for design in sorted(order.designs, key=lambda item: (item.sort_order, item.id)):
+        for player in design.sorted_players:
+            rows.append(
+                {
+                    "no": row_number,
+                    "name": player.player_name,
+                    "number": player.player_number,
+                    "size": player.size,
+                    "notes": player.notes,
+                }
+            )
+            row_number += 1
+    return rows
+
+
+def customer_portal_size_recap(order):
+    grouped = {"Kids": {}, "Women": {}, "Reguler": {}}
+    first_index = 0
+    for design in sorted(order.designs, key=lambda item: (item.sort_order, item.id)):
+        recap = design.size_recap
+        for group_name in ("Kids", "Women", "Reguler"):
+            for row in recap["groups"].get(group_name, []):
+                first_index += 1
+                key = normalize_size_key(row["size"]) or str(row["size"]).casefold()
+                target = grouped[group_name].setdefault(
+                    key,
+                    {"size": row["size"], "qty": 0, "_first_index": first_index},
+                )
+                target["qty"] += row["qty"]
+    return {
+        group_name: [{"size": row["size"], "qty": row["qty"]} for row in sort_size_rows(rows.values())]
+        for group_name, rows in grouped.items()
+        if rows
+    }
+
+
+def customer_portal_long_sleeve_recap(order):
+    rows_by_size = {}
+    first_index = 0
+    for design in sorted(order.designs, key=lambda item: (item.sort_order, item.id)):
+        for row in design.long_sleeve_recap:
+            first_index += 1
+            key = normalize_size_key(row["size"]) or str(row["size"]).casefold()
+            target = rows_by_size.setdefault(
+                key,
+                {"size": row["size"], "qty": 0, "_first_index": first_index},
+            )
+            target["qty"] += row["qty"]
+    return [{"size": row["size"], "qty": row["qty"]} for row in sort_size_rows(rows_by_size.values())]
+
+
+def _send_production_photo_file(photo, as_attachment):
+    stored_path = str(photo.file_path or "")
+    upload_root = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    if stored_path.startswith("uploads/"):
+        relative_upload_path = stored_path.removeprefix("uploads/")
+        file_path = upload_root.parent / stored_path if upload_root.name == "uploads" else upload_root / relative_upload_path
+        allowed_root = upload_root
+    else:
+        file_path = Path(current_app.static_folder) / stored_path
+        allowed_root = Path(current_app.static_folder).resolve()
+    try:
+        file_path.resolve().relative_to(allowed_root)
+    except ValueError:
+        abort(404)
+    if not file_path.exists():
+        abort(404)
+    download_name = photo.original_filename or file_path.name
+    return send_file(file_path, as_attachment=as_attachment, download_name=download_name)
+
+
+def _download_filename_token(value):
+    return "".join(char if char.isalnum() or char in ("-", "_") else "-" for char in str(value or "surat-order")).strip("-") or "surat-order"
 
 
 def create_app(config_class=Config):
@@ -256,6 +433,7 @@ def create_app(config_class=Config):
         ensure_v04_schema()
         ensure_v05_schema()
         ensure_v06_schema()
+        ensure_v07_schema()
         ensure_qc_schema()
         ensure_handover_schema()
         seed_initial_data()
@@ -349,6 +527,31 @@ def ensure_v06_schema():
         if "is_active" not in columns:
             db.session.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
         db.session.commit()
+
+
+def ensure_v07_schema():
+    inspector = inspect(db.engine)
+    if "sales_order_production_photos" in inspector.get_table_names():
+        return
+    db.session.execute(
+        text(
+            """
+            CREATE TABLE sales_order_production_photos (
+                id INTEGER NOT NULL PRIMARY KEY,
+                sales_order_id INTEGER NOT NULL,
+                file_path VARCHAR(255) NOT NULL,
+                original_filename VARCHAR(255),
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                uploaded_by_id INTEGER,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(sales_order_id) REFERENCES sales_orders (id),
+                FOREIGN KEY(uploaded_by_id) REFERENCES users (id)
+            )
+            """
+        )
+    )
+    db.session.execute(text("CREATE INDEX ix_sales_order_production_photos_sales_order_id ON sales_order_production_photos (sales_order_id)"))
+    db.session.commit()
 
 
 def ensure_qc_schema():

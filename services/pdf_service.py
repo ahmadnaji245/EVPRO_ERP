@@ -261,17 +261,28 @@ def _note_box(title, text, styles):
 
 def _design_images(design, styles):
     label_style = styles["SOLabel"]
-    widths = [92 * mm, 92 * mm]
+    image_columns = [
+        (
+            f"GAMBAR {str(design.primary_item_label).upper()}",
+            design.display_top_image_path,
+            f"CATATAN KHUSUS {str(design.primary_item_label).upper()}",
+            design.display_top_notes,
+        )
+    ]
+    if design.has_secondary_item:
+        image_columns.append(
+            (
+                f"GAMBAR {str(design.secondary_item_label).upper()}",
+                design.bottom_image_path,
+                f"CATATAN KHUSUS {str(design.secondary_item_label).upper()}",
+                design.bottom_notes,
+            )
+        )
+    widths = [92 * mm for _ in image_columns]
     rows = [
-        [Paragraph("GAMBAR ATASAN", label_style), Paragraph("GAMBAR CELANA", label_style)],
-        [
-            _image_flowable(design.display_top_image_path, "Belum ada gambar atasan", 88 * mm, 74 * mm),
-            _image_flowable(design.bottom_image_path, "Belum ada gambar celana", 88 * mm, 74 * mm),
-        ],
-        [
-            _note_box("CATATAN KHUSUS ATASAN", design.display_top_notes, styles),
-            _note_box("CATATAN KHUSUS CELANA", design.bottom_notes, styles),
-        ],
+        [Paragraph(column[0], label_style) for column in image_columns],
+        [_image_flowable(column[1], "Gambar desain belum tersedia", 88 * mm, 74 * mm) for column in image_columns],
+        [_note_box(column[2], column[3], styles) for column in image_columns],
     ]
     table = Table(rows, colWidths=widths, hAlign="CENTER")
     table.setStyle(
@@ -314,13 +325,13 @@ def _size_recap_flowables(design, styles):
         )
         flowables.append(_centered_section("Rekap Size", wrapper, styles))
 
-    if recap["long_sleeve"]:
+    if design.long_sleeve_recap:
         if flowables:
             flowables.append(Spacer(1, 3 * mm))
         flowables.append(
             _centered_section(
-                "Lengan Panjang",
-                _size_table("Size", recap["long_sleeve"], design.size_setting_done, h_align="CENTER"),
+                "Rekap Lengan Panjang",
+                _size_qty_table("Size", design.long_sleeve_recap, h_align="CENTER"),
                 styles,
             )
         )
@@ -359,6 +370,15 @@ def _size_table(first_header, rows, checked_lookup=None, h_align=None):
     return table
 
 
+def _size_qty_table(first_header, rows, h_align=None):
+    data = [[first_header, "Qty"]]
+    data.extend([[row["size"], row["qty"]] for row in rows])
+    data.append(["Total", sum(row["qty"] for row in rows)])
+    table = Table(data, colWidths=[30 * mm, 14 * mm], repeatRows=1, hAlign=h_align)
+    table.setStyle(_compact_table_style())
+    return table
+
+
 def _compact_table_style():
     return TableStyle(
         [
@@ -381,7 +401,7 @@ def _compact_table_style():
 def _player_table(design, styles):
     header = ["NO", "NAMA", "NP", "SIZE", "KETERANGAN", "Setting", "cek"]
     rows = [header]
-    for index, player in enumerate(design.players, start=1):
+    for index, player in enumerate(design.sorted_players, start=1):
         setting = PdfCheckbox(True) if (
             player.checklist and player.checklist.setting_done
         ) else PdfCheckbox(False)
@@ -431,6 +451,84 @@ def _player_table(design, styles):
     return table
 
 
+def _customer_player_table(design, styles):
+    header = ["NO", "NAMA", "NP", "SIZE", "KETERANGAN"]
+    rows = [header]
+    for index, player in enumerate(design.sorted_players, start=1):
+        rows.append(
+            [
+                index,
+                _paragraph(player.player_name, styles["SOText"]),
+                player.player_number or "-",
+                player.size,
+                _paragraph(player.notes or "-", styles["SOText"]),
+            ]
+        )
+    if len(rows) == 1:
+        rows.append(["-", "Belum ada player", "-", "-", "-"])
+
+    table = Table(
+        rows,
+        repeatRows=1,
+        colWidths=[12 * mm, 48 * mm, 18 * mm, 42 * mm, 50 * mm],
+        hAlign="CENTER",
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.25, GRID),
+                ("BACKGROUND", (0, 0), (-1, 0), INK),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (2, 0), (3, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+    return table
+
+
+def _customer_size_recap_flowables(design, styles):
+    recap = design.size_recap
+    flowables = []
+    if recap["groups"]:
+        active_groups = [group for group in ["Kids", "Women", "Reguler"] if recap["groups"].get(group)]
+        tables = [_size_qty_table(group, recap["groups"][group], h_align="CENTER") for group in active_groups]
+        wrapper = Table([tables], colWidths=[sum(table._argW) + 6 * mm for table in tables], hAlign="CENTER")
+        wrapper.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        flowables.append(_centered_section("Rekap Size", wrapper, styles))
+
+    if design.long_sleeve_recap:
+        if flowables:
+            flowables.append(Spacer(1, 3 * mm))
+        flowables.append(
+            _centered_section(
+                "Rekap Lengan Panjang",
+                _size_qty_table("Size", design.long_sleeve_recap, h_align="CENTER"),
+                styles,
+            )
+        )
+    return flowables
+
+
 def build_sales_order_pdf(order):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -454,9 +552,41 @@ def build_sales_order_pdf(order):
         story.append(Spacer(1, 4 * mm))
         for flowable in _size_recap_flowables(design, styles):
             story.append(flowable)
-        if design.size_recap["groups"] or design.size_recap["long_sleeve"]:
+        if design.size_recap["groups"] or design.long_sleeve_recap:
             story.append(Spacer(1, 4 * mm))
         story.append(_player_table(design, styles))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+def build_customer_sales_order_pdf(order):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=10 * mm,
+        leftMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+        title=f"Surat Order {order.so_number}",
+    )
+    styles = _styles()
+    story = []
+
+    for index, design in enumerate(order.designs):
+        if index:
+            story.append(PageBreak())
+        story.append(_brand_header(order, design, styles))
+        story.append(Spacer(1, 4 * mm))
+        story.append(_design_images(design, styles))
+        story.append(Spacer(1, 4 * mm))
+        for flowable in _customer_size_recap_flowables(design, styles):
+            story.append(flowable)
+        if design.size_recap["groups"] or design.long_sleeve_recap:
+            story.append(Spacer(1, 4 * mm))
+        story.append(_customer_player_table(design, styles))
 
     doc.build(story)
     buffer.seek(0)

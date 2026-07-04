@@ -137,12 +137,12 @@
                                 </div>
                             {% endif %}
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Catatan Atasan</label>
+                        <div class="col-md-6" data-note-primary-wrap>
+                            <label class="form-label" data-note-primary-label>Catatan Item</label>
                             <textarea class="form-control" name="top_notes[]" rows="4">{{ design.display_top_notes if design else '' }}</textarea>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Catatan Celana</label>
+                        <div class="col-md-6" data-note-secondary-wrap>
+                            <label class="form-label" data-note-secondary-label>Catatan Item 2</label>
                             <textarea class="form-control" name="bottom_notes[]" rows="4">{{ design.bottom_notes if design else '' }}</textarea>
                         </div>
                         <div class="col-12">
@@ -201,12 +201,12 @@
                         <label class="form-label" data-upload-secondary-label>Upload Gambar Item 2</label>
                         <input class="form-control" name="bottom_image[]" type="file" accept="image/*">
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Catatan Atasan</label>
+                    <div class="col-md-6" data-note-primary-wrap>
+                        <label class="form-label" data-note-primary-label>Catatan Item</label>
                         <textarea class="form-control" name="top_notes[]" rows="4"></textarea>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Catatan Celana</label>
+                    <div class="col-md-6" data-note-secondary-wrap>
+                        <label class="form-label" data-note-secondary-label>Catatan Item 2</label>
                         <textarea class="form-control" name="bottom_notes[]" rows="4"></textarea>
                     </div>
                     <div class="col-12">
@@ -255,11 +255,19 @@
         const secondaryWrap = section.querySelector("[data-upload-secondary-wrap]");
         const primaryLabel = section.querySelector("[data-upload-primary-label]");
         const secondaryLabel = section.querySelector("[data-upload-secondary-label]");
+        const primaryNoteWrap = section.querySelector("[data-note-primary-wrap]");
+        const secondaryNoteWrap = section.querySelector("[data-note-secondary-wrap]");
+        const primaryNoteLabel = section.querySelector("[data-note-primary-label]");
+        const secondaryNoteLabel = section.querySelector("[data-note-secondary-label]");
 
         if (primaryWrap) primaryWrap.classList.toggle("d-none", !needsUpload);
         if (secondaryWrap) secondaryWrap.classList.toggle("d-none", !needsUpload || components.length < 2);
         if (primaryLabel) primaryLabel.textContent = `Upload Gambar ${components[0] || "Item"}`;
         if (secondaryLabel) secondaryLabel.textContent = `Upload Gambar ${components[1] || "Item 2"}`;
+        if (primaryNoteWrap) primaryNoteWrap.classList.toggle("d-none", !components.length);
+        if (secondaryNoteWrap) secondaryNoteWrap.classList.toggle("d-none", components.length < 2);
+        if (primaryNoteLabel) primaryNoteLabel.textContent = `Catatan ${components[0] || "Item"}`;
+        if (secondaryNoteLabel) secondaryNoteLabel.textContent = `Catatan ${components[1] || "Item 2"}`;
     };
 
     const syncAllUploadFields = () => {

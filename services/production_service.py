@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 from database.db import db
 from models import Brand, CustomerAccess, QcChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
 from services.item_service import component_key, design_components, qc_enabled_components_for_order
-from utils.constants import PRODUCTION_STATUSES, PRODUCTION_VENDORS, normalize_production_status
+from utils.constants import PRODUCTION_STATUSES, PRODUCTION_VENDORS, normalize_production_status, sort_players_by_size
 
 
 ACTIVE_PRODUCTION_STATUSES = [status for status in PRODUCTION_STATUSES if status != "Finish"]
@@ -19,7 +19,7 @@ VENDOR_RETURNED_STATUSES = {"Terkirim dari Vendor", "Barang Masuk", "QC"}
 def list_production_orders(search=None):
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
-        .order_by(SalesOrder.approved_at.desc(), SalesOrder.created_at.desc())
+        .order_by(SalesOrder.deadline.asc().nullslast(), SalesOrder.created_at.asc(), SalesOrder.so_number.desc(), SalesOrder.id.desc())
         .all()
     )
     search_value = str(search or "").strip().casefold()
@@ -527,7 +527,7 @@ def _order_players(order):
     return [
         player
         for design in sorted(order.designs, key=lambda row: (row.sort_order, row.id or 0))
-        for player in sorted(design.players, key=lambda row: (row.sort_order, row.id or 0))
+        for player in sort_players_by_size(design.players)
     ]
 
 

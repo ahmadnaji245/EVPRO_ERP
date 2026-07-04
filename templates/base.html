@@ -13,7 +13,7 @@
     <div class="container-fluid">
         <a class="navbar-brand fw-bold brand-title" href="{{ url_for('dashboard.index') if has_permission('dashboard.view') else url_for('sales_orders.index') }}">
             EVPRO TEXTILE ERP
-            <span>Surat Order Management System</span>
+            <span>ERP Modules</span>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
@@ -21,29 +21,17 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <div class="navbar-nav ms-auto">
                 {% if current_user.is_authenticated %}
+                    {% set so_module_prefixes = ('sales_orders.', 'sales_orders_approval.', 'production.', 'handover.', 'master.', 'reports.', 'settings.') %}
+                    {% set is_so_module = request.endpoint and request.endpoint.startswith(so_module_prefixes) %}
+                    {% set is_nota_module = request.endpoint and request.endpoint.startswith('nota.') %}
                     {% if has_permission('dashboard.view') %}
                         <a class="nav-link {{ active_class('dashboard.') }}" href="{{ url_for('dashboard.index') }}">Dashboard</a>
                     {% endif %}
                     {% if has_permission('sales_order.view') %}
-                        <a class="nav-link {{ active_class('sales_orders.') }}" href="{{ url_for('sales_orders.index') }}">Surat Order</a>
-                    {% endif %}
-                    {% if has_permission('production.view') %}
-                        <a class="nav-link {{ active_class('production.') }}" href="{{ url_for('production.index') }}">Produksi</a>
-                    {% endif %}
-                    {% if has_permission('handover.view') %}
-                        <a class="nav-link {{ active_class('handover.') }}" href="{{ url_for('handover.index') }}">Serah Terima</a>
+                        <a class="nav-link {{ 'active' if is_so_module else '' }}" href="{{ url_for('sales_orders.dashboard') }}">Surat Order</a>
                     {% endif %}
                     {% if has_permission('nota.view') %}
-                        <a class="nav-link {{ active_class('nota.') }}" href="{{ url_for('nota.index') }}">Nota</a>
-                    {% endif %}
-                    {% if has_permission('master.view') %}
-                        <a class="nav-link {{ active_class('master.') }}" href="{{ url_for('master.index') }}">Master Data</a>
-                    {% endif %}
-                    {% if has_permission('reports.view') %}
-                        <a class="nav-link {{ active_class('reports.') }}" href="{{ url_for('reports.index') }}">Laporan</a>
-                    {% endif %}
-                    {% if has_permission('settings.view') %}
-                        <a class="nav-link {{ active_class('settings.') }}" href="{{ url_for('settings.index') }}">Setting</a>
+                        <a class="nav-link {{ 'active' if is_nota_module else '' }}" href="{{ url_for('nota.dashboard') }}">Nota</a>
                     {% endif %}
                     <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 {% else %}
@@ -54,27 +42,24 @@
     </div>
 </nav>
 
-{% set so_shell_prefixes = ('dashboard.', 'sales_orders.', 'sales_orders_approval.', 'production.', 'handover.', 'master.', 'reports.', 'settings.') %}
+{% set so_shell_prefixes = ('sales_orders.', 'sales_orders_approval.', 'production.', 'handover.', 'master.', 'reports.', 'settings.') %}
 {% set so_shell_excluded = ('sales_orders.print_view', 'sales_orders.pdf') %}
 {% set show_so_shell = current_user.is_authenticated and request.endpoint and request.endpoint.startswith(so_shell_prefixes) and request.endpoint not in so_shell_excluded %}
 {% if show_so_shell %}
     <nav class="so-subnav" aria-label="Surat Order navigation">
         <div class="container-fluid">
             <div class="so-subnav-inner">
-                {% if has_permission('dashboard.view') %}
-                    <a class="so-subnav-link {{ active_class('dashboard.') }}" href="{{ url_for('dashboard.index') }}">Dashboard</a>
+                {% if has_permission('sales_order.view') %}
+                    <a class="so-subnav-link {{ 'active' if request.endpoint == 'sales_orders.dashboard' else '' }}" href="{{ url_for('sales_orders.dashboard') }}">Ringkasan SO</a>
                 {% endif %}
                 {% if has_permission('sales_order.view') %}
-                    <a class="so-subnav-link {{ active_class('sales_orders.') }}" href="{{ url_for('sales_orders.index') }}">Surat Order</a>
+                    <a class="so-subnav-link {{ 'active' if request.endpoint and request.endpoint.startswith(('sales_orders.', 'sales_orders_approval.')) and request.endpoint != 'sales_orders.dashboard' else '' }}" href="{{ url_for('sales_orders.index') }}">Surat Order</a>
                 {% endif %}
                 {% if has_permission('production.view') %}
                     <a class="so-subnav-link {{ active_class('production.') }}" href="{{ url_for('production.index') }}">Produksi</a>
                 {% endif %}
                 {% if has_permission('handover.view') %}
                     <a class="so-subnav-link {{ active_class('handover.') }}" href="{{ url_for('handover.index') }}">Serah Terima</a>
-                {% endif %}
-                {% if has_permission('nota.view') %}
-                    <a class="so-subnav-link {{ active_class('nota.') }}" href="{{ url_for('nota.index') }}">Nota</a>
                 {% endif %}
                 {% if has_permission('master.view') %}
                     <a class="so-subnav-link {{ active_class('master.') }}" href="{{ url_for('master.index') }}">Master Data</a>
@@ -95,11 +80,11 @@
     <nav class="nota-subnav" aria-label="Nota navigation">
         <div class="container-fluid">
             <div class="nota-subnav-inner">
-                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.dashboard' else '' }}" href="{{ url_for('nota.dashboard') }}">Dashboard</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.dashboard' else '' }}" href="{{ url_for('nota.dashboard') }}">Dashboard Nota</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.index' else '' }}" href="{{ url_for('nota.index') }}">Nota</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.create' else '' }}" href="{{ url_for('nota.create') }}">Nota Baru</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.products' else '' }}" href="{{ url_for('nota.products') }}">Produk</a>
-                <a class="nota-subnav-link {{ 'active' if request.endpoint in ('nota.reports', 'nota.customer_report') else '' }}" href="{{ url_for('nota.reports') }}">Laporan</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint in ('nota.reports', 'nota.customer_report') else '' }}" href="{{ url_for('nota.reports') }}">Laporan Nota</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.receivables_page' else '' }}" href="{{ url_for('nota.receivables_page') }}">Piutang</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.income_page' else '' }}" href="{{ url_for('nota.income_page') }}">Pemasukan</a>
             </div>

@@ -1,78 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - EVPRO TEXTILE ERP{% endblock %}
+{% block title %}Dashboard ERP - EVPRO TEXTILE ERP{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
-        <h1 class="page-title">Dashboard</h1>
-        <p class="text-muted mb-0">Ringkasan point Surat Order dan status produksi.</p>
+        <h1 class="page-title">Dashboard ERP</h1>
+        <p class="text-muted mb-0">Pilih modul utama ERP yang ingin dibuka.</p>
     </div>
-    <a class="btn btn-rdr" href="{{ url_for('sales_orders.create') }}"><i class="bi bi-plus-lg"></i> Surat Order Baru</a>
 </div>
 
-<div class="row g-3 mb-4">
-    {% for label, value in [
-        ('SO Hari Ini (Point)', stats.today_point),
-        ('SO Bulan Ini (Point)', stats.month_point),
-        ('Total Size', stats.total_size),
-        ('Total Point', stats.total_point),
-        ('Approval Pending', stats.approval_pending),
-        ('Approval Selesai', stats.approval_done),
-        ('Produksi Berjalan', stats.production_running),
-        ('Produksi Selesai', stats.production_finish)
-    ] %}
-        <div class="col-md-6 col-xl-3">
-            <div class="metric">
-                <span>{{ label }}</span>
-                <strong>{{ value|number(1) }}</strong>
+<div class="module-grid">
+    {% if has_permission('sales_order.view') %}
+        <a class="module-card" href="{{ url_for('sales_orders.dashboard') }}">
+            <div class="module-card-icon"><i class="bi bi-clipboard-check"></i></div>
+            <div>
+                <h2>Surat Order</h2>
+                <p>Kelola order, produksi, serah terima, master data, laporan, dan setting Surat Order.</p>
             </div>
-        </div>
-    {% endfor %}
-</div>
-
-<div class="panel">
-    <div class="section-title">Grafik Total Point Bulanan</div>
-    <div class="dashboard-target-summary mb-4">
-        <div>
-            <span>Target Point Bulanan</span>
-            <strong>{{ monthly.target|number(1) }}</strong>
-        </div>
-        <div>
-            <span>Total Point Bulan Ini</span>
-            <strong>{{ monthly.current_month_point|number(1) }}</strong>
-        </div>
-        <div>
-            <span>Sisa Point Menuju Target</span>
-            <strong>{{ monthly.remaining|number(1) }}</strong>
-        </div>
-        <div>
-            <span>Persentase Capaian</span>
-            <strong>{{ monthly.percentage|number(1) }}%</strong>
-        </div>
-    </div>
-    <canvas id="monthlyPointChart"
-            data-labels='{{ monthly["labels"]|tojson }}'
-            data-values='{{ monthly["values"]|tojson }}'></canvas>
-</div>
-
-<div class="panel mt-4">
-    <div class="section-title">Poin Setting Bulanan</div>
-    <div class="dashboard-target-summary mb-4">
-        <div>
-            <span>Total Poin Setting Bulan Ini</span>
-            <strong>{{ setting_progress.total_point|number(1) }}</strong>
-        </div>
-        <div>
-            <span>User Poin Setting Tertinggi</span>
-            <strong>{{ setting_progress.top_user.name if setting_progress.top_user else '-' }}</strong>
-        </div>
-    </div>
-    {% if setting_progress.rows %}
-        <canvas id="settingTargetChart"
-                data-labels='{{ setting_progress["labels"]|tojson }}'
-                data-values='{{ setting_progress["values"]|tojson }}'
-                data-colors='{{ setting_progress["colors"]|tojson }}'></canvas>
-    {% else %}
-        <div class="text-muted">Belum ada poin setting pada bulan berjalan.</div>
+        </a>
+    {% endif %}
+    {% if has_permission('nota.view') %}
+        <a class="module-card" href="{{ url_for('nota.dashboard') }}">
+            <div class="module-card-icon"><i class="bi bi-receipt"></i></div>
+            <div>
+                <h2>Nota</h2>
+                <p>Kelola nota, produk, laporan keuangan, pembayaran, dan piutang customer.</p>
+            </div>
+        </a>
     {% endif %}
 </div>
 {% endblock %}

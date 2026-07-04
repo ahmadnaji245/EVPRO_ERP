@@ -8,10 +8,12 @@ from models import Brand, ProductionSizeChecklist, SalesOrderPlayer
 from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
 from services.history_service import record_history
 from services.brand_service import list_active_brands
+from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.master_data_service import list_active_rows
 from services.nota_service import billing_status_for_sales_order, get_nota_by_so_id
 from services.order_status_service import get_display_status
 from services.pdf_service import build_sales_order_pdf
+from services.production_photo_service import add_production_photos, delete_production_photo, get_photo_for_order
 from services.sales_order_service import (
     PRODUCTION_STATUSES,
     create_sales_order,
@@ -60,10 +62,12 @@ def index():
         def matches_search(order):
             brand_name = order.brand.name if order.brand else ""
             brand_code = order.brand.code if order.brand else ""
+            customer_name = order.customer_access.customer_name if order.customer_access else ""
             searchable_values = [
                 order.so_number,
                 brand_name,
                 brand_code,
+                customer_name,
                 order.team_name,
                 order.production_status_label,
                 display_statuses.get(order.id, {}).get("status"),
@@ -80,6 +84,17 @@ def index():
         billing_statuses=billing_statuses,
         display_statuses=display_statuses,
         search=search,
+    )
+
+
+@sales_orders_bp.route("/dashboard")
+@permission_required("sales_order.view")
+def dashboard():
+    return render_template(
+        "so/dashboard.html",
+        stats=dashboard_stats(),
+        monthly=monthly_point_chart(),
+        setting_progress=monthly_setting_point_progress(),
     )
 
 
@@ -127,6 +142,34 @@ def detail(sales_order_id):
         linked_nota=get_nota_by_so_id(sales_order.id),
         billing_status=billing_status_for_sales_order(sales_order),
     )
+
+
+@sales_orders_bp.route("/<int:sales_order_id>/production-photos", methods=["POST"])
+@permission_required("sales_order.manage")
+def upload_production_photos(sales_order_id):
+    _admin_required()
+    order = get_sales_order(sales_order_id)
+    try:
+        photos = add_production_photos(order, request.files.getlist("production_photos"), current_user)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        if photos:
+            flash(f"{len(photos)} foto hasil produksi berhasil diupload.", "success")
+        else:
+            flash("Pilih minimal satu foto hasil produksi.", "warning")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+@sales_orders_bp.route("/<int:sales_order_id>/production-photos/<int:photo_id>/delete", methods=["POST"])
+@permission_required("sales_order.manage")
+def delete_production_photo_route(sales_order_id, photo_id):
+    _admin_required()
+    order = get_sales_order(sales_order_id)
+    photo = get_photo_for_order(order, photo_id)
+    delete_production_photo(photo)
+    flash("Foto hasil produksi dihapus.", "success")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
 
 @sales_orders_approval_bp.route("/<int:sales_order_id>/approve-admin", methods=["POST"])

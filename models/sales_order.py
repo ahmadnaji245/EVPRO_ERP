@@ -57,6 +57,12 @@ class SalesOrder(db.Model):
     customer_revisions = db.relationship("CustomerRevisionNote", back_populates="sales_order", cascade="all, delete-orphan")
     customer_access = db.relationship("CustomerAccess", back_populates="sales_order", uselist=False, cascade="all, delete-orphan")
     qc_checklists = db.relationship("QcChecklist", back_populates="sales_order", cascade="all, delete-orphan")
+    production_photos = db.relationship(
+        "SalesOrderProductionPhoto",
+        back_populates="sales_order",
+        cascade="all, delete-orphan",
+        order_by="SalesOrderProductionPhoto.sort_order",
+    )
 
     @property
     def approved(self):

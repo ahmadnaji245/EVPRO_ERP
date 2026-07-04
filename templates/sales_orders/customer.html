@@ -12,17 +12,23 @@
             <div class="section-title">{{ design.design_name }}</div>
             <div class="row g-4">
                 <div class="col-lg-4">
-                    {% if design.display_top_image_path %}
-                        <img class="img-fluid rounded border" src="{{ url_for('static', filename=design.display_top_image_path) }}" alt="Gambar atasan {{ design.design_name }}">
+                    {% if design.has_design_image %}
+                        {% if design.display_top_image_path %}
+                            <div class="fw-semibold mb-2">Gambar {{ design.primary_item_label }}</div>
+                            <img class="img-fluid rounded border" src="{{ url_for('static', filename=design.display_top_image_path) }}" alt="Gambar {{ design.primary_item_label }} {{ design.design_name }}">
+                        {% endif %}
+                        {% if design.has_secondary_item and design.bottom_image_path %}
+                            <div class="fw-semibold mt-3 mb-2">Gambar {{ design.secondary_item_label }}</div>
+                            <img class="img-fluid rounded border" src="{{ url_for('static', filename=design.bottom_image_path) }}" alt="Gambar {{ design.secondary_item_label }} {{ design.design_name }}">
+                        {% endif %}
                     {% else %}
-                        <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted" style="min-height: 220px;">Belum ada gambar atasan</div>
+                        <div class="empty-state">Gambar desain belum tersedia.</div>
                     {% endif %}
-                    {% if design.bottom_image_path %}
-                        <img class="img-fluid rounded border mt-3" src="{{ url_for('static', filename=design.bottom_image_path) }}" alt="Gambar celana {{ design.design_name }}">
-                    {% endif %}
-                    <p class="text-muted mt-3 mb-0" style="white-space: pre-line;">{{ design.display_top_notes or '-' }}</p>
-                    {% if design.bottom_notes %}
-                        <p class="text-muted mt-2 mb-0" style="white-space: pre-line;">{{ design.bottom_notes }}</p>
+                    <div class="fw-semibold mt-3 mb-2">Catatan {{ design.primary_item_label }}</div>
+                    <p class="text-muted mb-0" style="white-space: pre-line;">{{ design.display_top_notes or '-' }}</p>
+                    {% if design.has_secondary_item %}
+                        <div class="fw-semibold mt-3 mb-2">Catatan {{ design.secondary_item_label }}</div>
+                        <p class="text-muted mb-0" style="white-space: pre-line;">{{ design.bottom_notes or '-' }}</p>
                     {% endif %}
                 </div>
                 <div class="col-lg-8">
@@ -30,7 +36,7 @@
                         <table class="table align-middle">
                             <thead><tr><th>No</th><th>Nama</th><th>Nomor</th><th>Size</th><th>Setting</th><th>Cek</th></tr></thead>
                             <tbody>
-                            {% for player in design.players %}
+                            {% for player in design.sorted_players %}
                                 <tr>
                                     <td>{{ loop.index }}</td>
                                     <td>{{ player.player_name }}</td>

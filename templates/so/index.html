@@ -30,7 +30,7 @@
         <table class="table table-hover align-middle so-table">
             <thead>
             <tr>
-                <th>No SO</th>
+                <th>Tanggal Masuk</th>
                 <th>Brand</th>
                 <th>Nama Tim</th>
                 <th>Total Size</th>
@@ -43,7 +43,7 @@
             <tbody>
             {% for so in sales_orders %}
                 <tr>
-                    <td>{{ so.so_number }}</td>
+                    <td>{{ so.created_at|pretty_date if so.created_at else '-' }}</td>
                     <td>{{ so.brand.code }}</td>
                     <td>{{ so.team_name }}</td>
                     <td>{{ so.total_size }}</td>

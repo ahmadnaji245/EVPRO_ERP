@@ -22,6 +22,13 @@
         </div>
     </div>
 
+    <div class="portal-action-bar mb-4">
+        <a class="btn btn-rdr" href="{{ url_for('tracking.sales_order_download', access_code=access_record.access_code) }}">Download Surat Order</a>
+        {% if linked_nota %}
+            <a class="btn btn-outline-dark" href="{{ url_for('tracking.nota_download', access_code=access_record.access_code) }}">Download Nota</a>
+        {% endif %}
+    </div>
+
     {% if not sales_order.approved and sales_order.revision_reason_admin %}
         <div class="alert alert-warning">
             <div class="fw-semibold">Data pesanan telah diperbarui.</div>
@@ -60,10 +67,16 @@
                             <div class="text-muted small">Status</div>
                             <strong>Barang sudah diambil</strong>
                         </div>
-                        <div class="col-md-4">
-                            <div class="text-muted small">Diambil oleh</div>
-                            <strong>{{ portal_order_status.picked_by or '-' }}</strong>
-                        </div>
+                        {% if portal_order_status.picked_by %}
+                            <div class="col-md-4">
+                                <div class="text-muted small">Diambil oleh</div>
+                                <strong>{{ portal_order_status.picked_by }}</strong>
+                            </div>
+                        {% else %}
+                            <div class="col-md-4">
+                                <strong>Barang sudah diambil.</strong>
+                            </div>
+                        {% endif %}
                         {% if portal_order_status.pickup_date %}
                             <div class="col-md-4">
                                 <div class="text-muted small">Tanggal ambil</div>
@@ -125,6 +138,34 @@
         </div>
     </div>
 
+    <div class="panel mb-4">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div>
+                <div class="section-title mb-1">Foto Hasil Produksi</div>
+                <div class="text-muted small">Real pict hasil produksi akan tampil setelah status produksi selesai.</div>
+            </div>
+        </div>
+        {% if not can_view_production_photos %}
+            <div class="empty-state">Foto hasil produksi akan tersedia setelah proses produksi selesai.</div>
+        {% elif production_photos %}
+            <div class="production-photo-gallery">
+                {% for photo in production_photos %}
+                    <div class="production-photo-card">
+                        <a href="{{ url_for('tracking.production_photo', access_code=access_record.access_code, photo_id=photo.id) }}" target="_blank" rel="noopener" aria-label="Perbesar foto hasil produksi {{ loop.index }}">
+                            <img src="{{ url_for('tracking.production_photo', access_code=access_record.access_code, photo_id=photo.id) }}" alt="Foto hasil produksi {{ loop.index }}">
+                        </a>
+                        <div class="production-photo-card-body">
+                            <span>Foto {{ loop.index }}</span>
+                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('tracking.production_photo_download', access_code=access_record.access_code, photo_id=photo.id) }}">Download Foto</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">Belum ada foto hasil produksi.</div>
+        {% endif %}
+    </div>
+
     {% if linked_nota %}
         <div class="panel mb-4">
             <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
@@ -162,107 +203,151 @@
         </div>
     {% endif %}
 
+    <div class="panel mb-4">
+        <div class="mb-3">
+            <div class="section-title mb-1">Data Pemain</div>
+            <div class="text-muted small">Gunakan data ini untuk mengecek nama, nomor, ukuran, dan keterangan saat pengambilan.</div>
+        </div>
+        {% if portal_design_player_groups %}
+            <div class="d-grid gap-4">
+                {% for group in portal_design_player_groups %}
+                    <div class="portal-design-player-section">
+                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+                            <div class="fw-semibold">{{ group.title }}</div>
+                            <div class="player-total-box">
+                                <span>Total {{ group.item_label }}</span>
+                                <strong>{{ group.total }} pcs</strong>
+                            </div>
+                        </div>
+                        {% if group.players %}
+                            <div class="table-responsive portal-player-table">
+                                <table class="table align-middle mb-0">
+                                    <thead><tr><th>No</th><th>Nama Punggung</th><th>Nomor Punggung</th><th>Ukuran</th><th>Keterangan</th></tr></thead>
+                                    <tbody>
+                                        {% for player in group.players %}
+                                            <tr>
+                                                <td>{{ player.no }}</td>
+                                                <td>{{ player.name }}</td>
+                                                <td>{{ player.number or '-' }}</td>
+                                                <td>{{ player.size }}</td>
+                                                <td>{{ player.notes or '-' }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="portal-player-list">
+                                {% for player in group.players %}
+                                    <div class="portal-player-card">
+                                        <div class="portal-player-card-head">
+                                            <strong>{{ player.no }}. {{ player.name }}</strong>
+                                            <span>{{ player.size }}</span>
+                                        </div>
+                                        <div class="portal-player-card-grid">
+                                            <div><span>Nomor Punggung</span><strong>{{ player.number or '-' }}</strong></div>
+                                            <div><span>Keterangan</span><strong>{{ player.notes or '-' }}</strong></div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">Belum ada data pemain untuk {{ group.title }}.</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">Belum ada data pemain pada Surat Order ini.</div>
+        {% endif %}
+    </div>
+
     <div class="d-grid gap-4">
         {% for design in sales_order.designs %}
-            {% set recap = design.size_recap %}
             <div class="panel">
                 <div class="section-title">{{ design.design_name }}</div>
-                <div class="row g-4">
-                    <div class="col-lg-6">
-                        <div class="fw-semibold mb-2">Gambar Desain Atasan</div>
+                {% if design.has_design_image %}
+                    <div class="row g-4">
                         {% if design.display_top_image_path %}
-                            <img src="{{ url_for('static', filename=design.display_top_image_path) }}" class="img-fluid rounded border w-100 so-media-preview" alt="Gambar atasan {{ design.design_name }}">
-                        {% else %}
-                            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">Belum ada gambar atasan</div>
+                            <div class="col-lg-6">
+                                <div class="fw-semibold mb-2">Gambar {{ design.primary_item_label }}</div>
+                                <img src="{{ url_for('static', filename=design.display_top_image_path) }}" class="img-fluid rounded border w-100 so-media-preview" alt="Gambar {{ design.primary_item_label }} {{ design.design_name }}">
+                            </div>
+                        {% endif %}
+                        {% if design.has_secondary_item and design.bottom_image_path %}
+                            <div class="col-lg-6">
+                                <div class="fw-semibold mb-2">Gambar {{ design.secondary_item_label }}</div>
+                                <img src="{{ url_for('static', filename=design.bottom_image_path) }}" class="img-fluid rounded border w-100 so-media-preview" alt="Gambar {{ design.secondary_item_label }} {{ design.design_name }}">
+                            </div>
                         {% endif %}
                     </div>
-                    <div class="col-lg-6">
-                        <div class="fw-semibold mb-2">Gambar Desain Celana</div>
-                        {% if design.bottom_image_path %}
-                            <img src="{{ url_for('static', filename=design.bottom_image_path) }}" class="img-fluid rounded border w-100 so-media-preview" alt="Gambar celana {{ design.design_name }}">
-                        {% else %}
-                            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">Belum ada gambar celana</div>
-                        {% endif %}
-                    </div>
+                {% else %}
+                    <div class="empty-state">Gambar desain belum tersedia.</div>
+                {% endif %}
+                <div class="row g-4 mt-1">
                     {% if not is_tracking %}
                         <div class="col-lg-6">
-                            <div class="fw-semibold mb-2">Catatan Desain Atasan</div>
+                            <div class="fw-semibold mb-2">Catatan {{ design.primary_item_label }}</div>
                             <div class="border rounded p-3 bg-light so-notes-box">{{ design.display_top_notes or '-' }}</div>
                         </div>
-                        <div class="col-lg-6">
-                            <div class="fw-semibold mb-2">Catatan Desain Celana</div>
-                            <div class="border rounded p-3 bg-light so-notes-box">{{ design.bottom_notes or '-' }}</div>
-                        </div>
+                        {% if design.has_secondary_item %}
+                            <div class="col-lg-6">
+                                <div class="fw-semibold mb-2">Catatan {{ design.secondary_item_label }}</div>
+                                <div class="border rounded p-3 bg-light so-notes-box">{{ design.bottom_notes or '-' }}</div>
+                            </div>
+                        {% endif %}
                     {% endif %}
                 </div>
 
-                {% if recap.groups or recap.long_sleeve %}
-                    <div class="mt-4">
-                        <div class="fw-semibold mb-2">Rekap Size</div>
-                        <div class="row g-4">
-                            {% for group_name in ['Kids', 'Women', 'Reguler'] %}
-                                {% set rows = recap.groups.get(group_name, []) %}
-                                {% if rows %}
-                                    <div class="col-md-4">
-                                        <div class="card border h-100">
-                                            <div class="card-header bg-light fw-semibold text-center">{{ group_name }}</div>
-                                            <div class="card-body p-0">
-                                                <table class="table table-sm align-middle mb-0">
-                                                    <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
-                                                    <tbody>
-                                                        {% for row in rows %}
-                                                            <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-                            {% if recap.long_sleeve %}
-                                <div class="col-md-4">
-                                    <div class="card border h-100">
-                                        <div class="card-header bg-light fw-semibold text-center">Lengan Panjang</div>
-                                        <div class="card-body p-0">
-                                            <table class="table table-sm align-middle mb-0">
-                                                <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
-                                                <tbody>
-                                                    {% for row in recap.long_sleeve %}
-                                                        <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if not is_tracking %}
-                    <div class="table-responsive mt-4">
-                        <table class="table align-middle so-table">
-                            <thead><tr><th>No</th><th>Nama</th><th>Nomor</th><th>Size</th><th>Keterangan</th></tr></thead>
-                            <tbody>
-                                {% for player in design.players %}
-                                    <tr>
-                                        <td>{{ loop.index }}</td>
-                                        <td>{{ player.player_name }}</td>
-                                        <td>{{ player.player_number or '-' }}</td>
-                                        <td>{{ player.size }}</td>
-                                        <td>{{ player.notes or '-' }}</td>
-                                    </tr>
-                                {% else %}
-                                    <tr><td colspan="5" class="text-center text-muted py-4">Belum ada player.</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% endif %}
             </div>
         {% endfor %}
+    </div>
+
+    <div class="panel mt-4">
+        <div class="section-title mb-3">Rekap Size</div>
+        {% if portal_size_recap %}
+            <div class="row g-4">
+                {% for group_name in ['Kids', 'Women', 'Reguler'] %}
+                    {% set rows = portal_size_recap.get(group_name, []) %}
+                    {% if rows %}
+                        <div class="col-md-4">
+                            <div class="card border h-100">
+                                <div class="card-header bg-light fw-semibold text-center">{{ group_name }}</div>
+                                <div class="card-body p-0">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
+                                        <tbody>
+                                            {% for row in rows %}
+                                                <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">Belum ada rekap size.</div>
+        {% endif %}
+
+        <div class="fw-semibold mt-4 mb-2">Rekap Lengan Panjang</div>
+        {% if portal_long_sleeve_recap %}
+            <div class="card border">
+                <div class="card-body p-0">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
+                        <tbody>
+                            {% for row in portal_long_sleeve_recap %}
+                                <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% else %}
+            <div class="text-muted">Tidak ada lengan panjang.</div>
+        {% endif %}
     </div>
 {% else %}
     <div class="row justify-content-center">
