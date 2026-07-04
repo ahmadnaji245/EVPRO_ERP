@@ -1,4 +1,5 @@
 from datetime import date
+from secrets import token_urlsafe
 
 from models.sales_order import SalesOrder
 
@@ -17,9 +18,12 @@ def generate_customer_code(brand_code, order_date=None):
 
 
 def generate_access_code(brand_code, order_date=None):
-    order_date = order_date or date.today()
-    total = SalesOrder.query.filter(SalesOrder.access_code.like(f"{order_date.strftime('%y%m%d')}-%")).count()
-    return f"{order_date.strftime('%y%m%d')}-{total + 1:02d}"
+    brand_prefix = "".join(ch for ch in str(brand_code or "SO").upper() if ch.isalnum())[:8] or "SO"
+    for _ in range(10):
+        access_code = f"{brand_prefix}-{token_urlsafe(24)}"
+        if not SalesOrder.query.filter_by(access_code=access_code).first():
+            return access_code
+    raise RuntimeError("Gagal membuat token customer portal yang unik.")
 
 
 def generate_nota_number(order_date=None):

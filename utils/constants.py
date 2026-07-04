@@ -39,15 +39,17 @@ LEGACY_PRODUCTION_STATUS_MAP = {
     "Selesai": "Finish",
     "Terkirim dari Vendor": "QC",
 }
-USER_ROLES = ["admin", "produksi"]
+USER_ROLES = ["admin", "desain", "produksi"]
 USER_ROLE_ALIASES = {
     "Admin": "admin",
+    "Desain": "desain",
+    "Designer": "desain",
+    "designer": "desain",
+    "Desainer": "desain",
+    "desainer": "desain",
     "Produksi": "produksi",
     "production": "produksi",
     "Production": "produksi",
-    "Desainer": "produksi",
-    "designer": "produksi",
-    "Designer": "produksi",
     "QC": "produksi",
     "qc": "produksi",
 }
@@ -70,6 +72,10 @@ def user_has_role(user, role):
 
 def user_is_admin(user):
     return user_has_role(user, "admin")
+
+
+def user_is_desain(user):
+    return user_has_role(user, "desain")
 
 
 def user_is_produksi(user):

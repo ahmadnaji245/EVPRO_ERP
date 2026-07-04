@@ -7,6 +7,36 @@
         <h1 class="page-title mb-2">Customer Sales Order</h1>
         <p class="text-muted mb-0">{{ sales_order.so_number }} · {{ sales_order.team_name }}</p>
     </div>
+    <div class="panel mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="section-title mb-1">Status Customer Portal</div>
+                <div class="text-muted">Progress produksi: {{ sales_order.portal_status_label }}</div>
+                {% if sales_order.approved %}
+                    <span class="badge text-bg-success mt-2">Approved {{ sales_order.approved_at|pretty_datetime if sales_order.approved_at else '' }}</span>
+                {% else %}
+                    <span class="badge text-bg-warning mt-2">Menunggu Approval Customer</span>
+                {% endif %}
+            </div>
+            {% if not sales_order.approved %}
+                <form method="post" action="{{ url_for('tracking.approve_customer', access_code=access_record.access_code) }}">
+                    <button class="btn btn-rdr" type="submit">Approve Surat Order</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+    {% if linked_nota %}
+        <div class="panel mb-4">
+            <div class="section-title">Nota</div>
+            <dl class="row mb-0 so-summary">
+                <dt class="col-md-3">Nomor Nota</dt><dd class="col-md-9">{{ linked_nota.nota_number }}</dd>
+                <dt class="col-md-3">Status</dt><dd class="col-md-9">{{ invoice_status }}</dd>
+                <dt class="col-md-3">Total</dt><dd class="col-md-9">{{ nota_totals.total|rupiah }}</dd>
+                <dt class="col-md-3">Sudah Dibayar</dt><dd class="col-md-9">{{ nota_totals.paid|rupiah }}</dd>
+                <dt class="col-md-3">Sisa</dt><dd class="col-md-9">{{ nota_totals.remaining|rupiah }}</dd>
+            </dl>
+        </div>
+    {% endif %}
     {% for design in sales_order.designs %}
         <div class="panel mb-4">
             <div class="section-title">{{ design.design_name }}</div>

@@ -72,12 +72,16 @@
                         <td>
                             <div class="d-flex flex-wrap gap-2">
                                 <a class="btn btn-sm btn-outline-dark" href="{{ url_for('sales_orders.detail', sales_order_id=order.id) }}">Detail SO</a>
-                                {% if nota %}
-                                    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Lihat / Update Nota</a>
-                                {% else %}
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('nota.create', so_id=order.id) }}">Buat Nota</a>
+                                {% if has_permission('nota.view') %}
+                                    {% if nota %}
+                                        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('nota.detail', nota_id=nota.id) }}">Lihat / Update Nota</a>
+                                    {% else %}
+                                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('nota.create', so_id=order.id) }}">Buat Nota</a>
+                                    {% endif %}
                                 {% endif %}
-                                <a class="btn btn-sm btn-rdr" href="{{ url_for('handover.pickup', sales_order_id=order.id) }}">Tandai Diambil</a>
+                                {% if has_permission('handover.manage') %}
+                                    <a class="btn btn-sm btn-rdr" href="{{ url_for('handover.pickup', sales_order_id=order.id) }}">Tandai Diambil</a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

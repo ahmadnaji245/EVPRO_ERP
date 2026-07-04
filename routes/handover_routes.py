@@ -1,7 +1,7 @@
 from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user
 
 from services.handover_service import (
     default_pickup_date,
@@ -17,21 +17,15 @@ from services.handover_service import (
 )
 from services.handover_pdf_service import build_pending_handover_pdf, build_picked_handover_pdf
 from services.pdf_render_service import render_first_pdf_page_to_jpg
-from utils.constants import user_is_admin
+from utils.permissions import permission_required
 
 
 handover_bp = Blueprint("handover", __name__, url_prefix="/serah-terima")
 
 
-def _admin_required():
-    if not user_is_admin(current_user):
-        abort(403)
-
-
 @handover_bp.route("/", endpoint="index")
-@login_required
+@permission_required("handover.view")
 def index():
-    _admin_required()
     active_tab = request.args.get("tab", "belum")
     selected_month, selected_year = handover_filter_from_args(request.args)
     return render_template(
@@ -50,9 +44,8 @@ def index():
 
 
 @handover_bp.route("/belum-diambil/pdf", endpoint="pending_pdf")
-@login_required
+@permission_required("handover.view")
 def pending_pdf():
-    _admin_required()
     pdf_buffer = build_pending_handover_pdf(pending_pickup_rows())
     response = send_file(
         pdf_buffer,
@@ -65,9 +58,8 @@ def pending_pdf():
 
 
 @handover_bp.route("/belum-diambil/jpg", endpoint="pending_jpg")
-@login_required
+@permission_required("handover.view")
 def pending_jpg():
-    _admin_required()
     pdf_buffer = build_pending_handover_pdf(pending_pickup_rows())
     jpg_buffer = render_first_pdf_page_to_jpg(pdf_buffer)
     filename = f"serah_terima_belum_diambil_{date.today().strftime('%Y-%m')}.jpg"
@@ -80,9 +72,8 @@ def pending_jpg():
 
 
 @handover_bp.route("/sudah-diambil/pdf", endpoint="picked_pdf")
-@login_required
+@permission_required("handover.view")
 def picked_pdf():
-    _admin_required()
     selected_month, selected_year = handover_filter_from_args(request.args)
     pdf_buffer = build_picked_handover_pdf(
         picked_up_rows(selected_month, selected_year),
@@ -103,9 +94,8 @@ def picked_pdf():
 
 
 @handover_bp.route("/<int:sales_order_id>/diambil", methods=["GET", "POST"], endpoint="pickup")
-@login_required
+@permission_required("handover.manage")
 def pickup(sales_order_id):
-    _admin_required()
     order = get_handover_order(sales_order_id)
     if request.method == "POST":
         try:

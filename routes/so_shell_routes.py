@@ -45,6 +45,7 @@ from services.report_service import (
 )
 from services.validation_service import validate_brand_form
 from utils.constants import USER_ROLES, normalize_user_role, user_is_admin, user_is_produksi
+from utils.permissions import has_permission, permission_required
 
 
 production_bp = Blueprint("production", __name__, url_prefix="/production")
@@ -100,9 +101,8 @@ def _get_production_order(sales_order_id):
 
 
 @production_bp.route("/", endpoint="index")
-@login_required
+@permission_required("production.view")
 def production_index():
-    _production_access_required()
     search = request.args.get("q", "").strip()
     sales_orders = list_production_orders(search)
     return render_template(
@@ -119,9 +119,8 @@ def production_index():
 
 
 @production_bp.route("/vendors", endpoint="vendors")
-@login_required
+@permission_required("production.view")
 def production_vendors():
-    _production_access_required()
     rows = list_vendor_production_rows()
     return render_template(
         "production/orders.html",
@@ -132,16 +131,15 @@ def production_vendors():
 
 
 @production_bp.route("/orders", endpoint="orders")
-@login_required
+@permission_required("production.view")
 def production_orders():
     _production_access_required()
     return redirect(url_for("production.vendors"))
 
 
 @production_bp.route("/vendors/pdf", endpoint="vendors_pdf")
-@login_required
+@permission_required("production.view")
 def production_vendors_pdf():
-    _production_access_required()
     rows = list_vendor_production_rows(active_only=True)
     pdf_buffer = build_order_production_list_pdf(rows)
     filename = "list-produksi-vendor.pdf"
@@ -151,24 +149,22 @@ def production_vendors_pdf():
 
 
 @production_bp.route("/orders/pdf", endpoint="orders_pdf")
-@login_required
+@permission_required("production.view")
 def production_orders_pdf():
     _production_access_required()
     return redirect(url_for("production.vendors_pdf"))
 
 
 @production_bp.route("/<int:sales_order_id>", endpoint="detail")
-@login_required
+@permission_required("production.view")
 def production_detail(sales_order_id):
-    _production_access_required()
     order = _get_production_order(sales_order_id)
     return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
 
 @production_bp.route("/<int:sales_order_id>/assign-vendor", methods=["POST"], endpoint="assign_vendor")
-@login_required
+@permission_required("production.manage")
 def production_assign_vendor(sales_order_id):
-    _admin_required()
     order = _get_production_order(sales_order_id)
     try:
         assign_vendor(order, request.form.get("production_vendor"))
@@ -180,9 +176,8 @@ def production_assign_vendor(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/deadline-vendor", methods=["POST"], endpoint="set_deadline")
-@login_required
+@permission_required("production.manage")
 def production_set_deadline(sales_order_id):
-    _admin_required()
     order = _get_production_order(sales_order_id)
     try:
         set_vendor_deadline(order, request.form.get("production_vendor_deadline"))
@@ -194,9 +189,8 @@ def production_set_deadline(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/finish", methods=["POST"], endpoint="finish")
-@login_required
+@permission_required("production.manage")
 def production_finish(sales_order_id):
-    _production_access_required()
     order = _get_production_order(sales_order_id)
     try:
         finish_production(order)
@@ -208,9 +202,8 @@ def production_finish(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/qc-checklist", methods=["GET", "POST"], endpoint="qc_checklist")
-@login_required
+@permission_required("production.manage")
 def production_qc_checklist(sales_order_id):
-    _production_access_required()
     order = _get_production_order(sales_order_id)
     if request.method == "POST":
         try:
@@ -227,9 +220,8 @@ def production_qc_checklist(sales_order_id):
 
 
 @production_bp.route("/vendor/<path:vendor_name>/print", endpoint="vendor_print")
-@login_required
+@permission_required("production.view")
 def production_vendor_print(vendor_name):
-    _production_access_required()
     try:
         vendor = validate_vendor(vendor_name)
     except ValueError:
@@ -247,9 +239,8 @@ def production_vendor_print(vendor_name):
 
 
 @production_bp.route("/vendor/<path:vendor_name>/print.jpg", endpoint="vendor_print_jpg")
-@login_required
+@permission_required("production.view")
 def production_vendor_print_jpg(vendor_name):
-    _production_access_required()
     try:
         vendor = validate_vendor(vendor_name)
     except ValueError:
@@ -307,7 +298,8 @@ def _status_badge_class(status):
 @master_bp.before_request
 @login_required
 def require_admin():
-    _admin_required()
+    if not has_permission("master.view"):
+        abort(403)
 
 
 @master_bp.route("/", endpoint="index")
@@ -521,9 +513,8 @@ def activate_user(user_id):
 
 
 @reports_bp.route("/", endpoint="index")
-@login_required
+@permission_required("reports.view")
 def reports_index():
-    _admin_required()
     selected_brand = request.args.get("brand", "").strip()
     selected_month = request.args.get("month", "").strip()
     selected_year = request.args.get("year", "").strip()
@@ -543,9 +534,8 @@ def reports_index():
 
 
 @reports_bp.route("/pdf", endpoint="pdf")
-@login_required
+@permission_required("reports.view")
 def reports_pdf():
-    _admin_required()
     selected_brand = request.args.get("brand", "").strip()
     selected_month = request.args.get("month", "").strip()
     selected_year = request.args.get("year", "").strip()
@@ -566,9 +556,8 @@ def reports_pdf():
 
 
 @settings_bp.route("/", methods=["GET", "POST"], endpoint="index")
-@login_required
+@permission_required("settings.view")
 def settings_index():
-    _admin_required()
     target = Setting.query.filter_by(key="monthly_target").first()
     if request.method == "POST":
         if not target:

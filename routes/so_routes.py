@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user
 
 from database.db import db
 from models import Brand, ProductionSizeChecklist, SalesOrderPlayer
@@ -22,7 +22,8 @@ from services.sales_order_service import (
     update_sales_order,
     validate_sales_order_form,
 )
-from utils.constants import user_is_admin, user_is_produksi
+from utils.constants import user_is_admin, user_is_desain, user_is_produksi
+from utils.permissions import permission_required
 
 
 sales_orders_bp = Blueprint("sales_orders", __name__, url_prefix="/sales-order")
@@ -39,8 +40,13 @@ def _production_or_admin_required():
         abort(403)
 
 
+def _sales_order_access_required():
+    if not (user_is_admin(current_user) or user_is_desain(current_user) or user_is_produksi(current_user)):
+        abort(403)
+
+
 @sales_orders_bp.route("/")
-@login_required
+@permission_required("sales_order.view")
 def index():
     search = request.args.get("q", "").strip()
     sales_orders = list_sales_orders()
@@ -89,9 +95,8 @@ def _form_context(**kwargs):
 
 
 @sales_orders_bp.route("/create", methods=["GET", "POST"])
-@login_required
+@permission_required("sales_order.manage")
 def create():
-    _admin_required()
     if request.method == "POST":
         errors = validate_sales_order_form(request.form)
         if errors:
@@ -105,9 +110,9 @@ def create():
 
 
 @sales_orders_bp.route("/<int:sales_order_id>")
-@login_required
+@permission_required("sales_order.view")
 def detail(sales_order_id):
-    _production_or_admin_required()
+    _sales_order_access_required()
     sales_order = get_sales_order(sales_order_id)
     return render_template(
         "so/detail.html",
@@ -119,9 +124,8 @@ def detail(sales_order_id):
 
 
 @sales_orders_approval_bp.route("/<int:sales_order_id>/approve-admin", methods=["POST"])
-@login_required
+@permission_required("sales_order.manage")
 def approve_admin(sales_order_id):
-    _admin_required()
     order = get_sales_order(sales_order_id)
     if not order.approved:
         order.approved = True
@@ -144,9 +148,8 @@ def approve_admin(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/edit", methods=["GET", "POST"])
-@login_required
+@permission_required("sales_order.manage")
 def edit(sales_order_id):
-    _admin_required()
     order = get_sales_order(sales_order_id)
     revision_reason_admin = request.values.get("revision_reason_admin", "").strip()
     if order.approved_source == "customer" and order.approved and not revision_reason_admin:
@@ -165,9 +168,8 @@ def edit(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/delete", methods=["POST"])
-@login_required
+@permission_required("sales_order.manage")
 def delete(sales_order_id):
-    _admin_required()
     order = get_sales_order(sales_order_id)
     if get_nota_by_so_id(order.id):
         flash("SO ini sudah memiliki Nota. Hapus Nota terlebih dahulu sebelum menghapus SO.", "warning")
@@ -178,16 +180,15 @@ def delete(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/print")
-@login_required
+@permission_required("sales_order.manage")
 def print_view(sales_order_id):
-    _admin_required()
     return render_template("so/print.html", sales_order=get_sales_order(sales_order_id))
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/pdf")
-@login_required
+@permission_required("sales_order.view")
 def pdf(sales_order_id):
-    _production_or_admin_required()
+    _sales_order_access_required()
     order = get_sales_order(sales_order_id)
     pdf_buffer = build_sales_order_pdf(order)
     filename = f"{order.so_number.replace('/', '-')}.pdf"
@@ -202,9 +203,9 @@ def pdf(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/production-checklist", methods=["POST"])
-@login_required
+@permission_required("sales_order.setting_checklist")
 def update_production_checklist(sales_order_id):
-    _production_or_admin_required()
+    _sales_order_access_required()
     order = get_sales_order(sales_order_id)
     player_ids = [player.id for design in order.designs for player in design.players]
     requested_setting = set(request.form.getlist("setting_done"))
@@ -235,22 +236,23 @@ def update_production_checklist(sales_order_id):
             checklist.setting_done_by_name = current_user_name
             checklist.setting_done_at = now
 
-        qc_owner_id = checklist.qc_done_by_user_id or checklist.qc_user_id
-        if checklist.qc_done:
-            if not qc_done and qc_owner_id == current_user.id:
-                checklist.qc_done = False
-                checklist.qc_user_id = None
-                checklist.qc_at = None
-                checklist.qc_done_by_user_id = None
-                checklist.qc_done_by_name = None
-                checklist.qc_done_at = None
-        elif qc_done:
-            checklist.qc_done = qc_done
-            checklist.qc_user_id = current_user.id
-            checklist.qc_at = now
-            checklist.qc_done_by_user_id = current_user.id
-            checklist.qc_done_by_name = current_user_name
-            checklist.qc_done_at = now
+        if user_is_admin(current_user) or user_is_produksi(current_user):
+            qc_owner_id = checklist.qc_done_by_user_id or checklist.qc_user_id
+            if checklist.qc_done:
+                if not qc_done and qc_owner_id == current_user.id:
+                    checklist.qc_done = False
+                    checklist.qc_user_id = None
+                    checklist.qc_at = None
+                    checklist.qc_done_by_user_id = None
+                    checklist.qc_done_by_name = None
+                    checklist.qc_done_at = None
+            elif qc_done:
+                checklist.qc_done = qc_done
+                checklist.qc_user_id = current_user.id
+                checklist.qc_at = now
+                checklist.qc_done_by_user_id = current_user.id
+                checklist.qc_done_by_name = current_user_name
+                checklist.qc_done_at = now
 
     for design in order.designs:
         rows = []

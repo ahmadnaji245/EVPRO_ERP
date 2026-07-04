@@ -37,5 +37,9 @@ class User(UserMixin, db.Model):
         return self.role_label == "admin"
 
     @property
+    def is_desain(self):
+        return self.role_label == "desain"
+
+    @property
     def is_produksi(self):
         return self.role_label == "produksi"

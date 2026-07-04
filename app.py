@@ -1,22 +1,26 @@
 from pathlib import Path
 
-from flask import Blueprint, Flask, abort, redirect, render_template, request, url_for
+from datetime import datetime
+from flask import Blueprint, Flask, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from sqlalchemy import inspect, text
 
 from config import Config
 from database.db import db
-from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, User
+from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, Setting, User
 from routes.handover_routes import handover_bp
 from routes.nota_routes import nota_bp
 from routes.so_shell_routes import master_bp, production_bp, reports_bp, settings_bp
 from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
 from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.nota_service import seed_default_nota_products
+from services.customer_service import find_by_access_code
+from services.nota_service import calculate_invoice_status, get_nota_by_so_id, totals
 from services.production_service import seed_production_sample_data
+from services.sales_order_service import set_production_stage
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders
-from utils.constants import user_is_admin
+from utils.permissions import has_permission, permission_required
 
 
 login_manager = LoginManager()
@@ -34,10 +38,8 @@ def load_user(user_id):
 
 
 @dashboard_bp.route("/")
-@login_required
+@permission_required("dashboard.view")
 def index():
-    if not user_is_admin(current_user):
-        abort(403)
     return render_template(
         "dashboard.html",
         stats=dashboard_stats(),
@@ -56,7 +58,7 @@ def login():
     if request.method == "POST":
         user = User.query.filter_by(username=request.form.get("username", "").strip()).first()
         if user and user.is_active and user.check_password(request.form.get("password", "")):
-            login_user(user)
+            login_user(user, remember=True)
             default_endpoint = "dashboard.index" if user.is_admin else "sales_orders.index"
             return redirect(request.args.get("next") or url_for(default_endpoint))
         flash("Username atau password tidak sesuai.", "danger")
@@ -76,7 +78,32 @@ def logout():
 
 @tracking_bp.route("/<access_code>")
 def detail(access_code):
-    return redirect(url_for("sales_orders.index"))
+    access_record = find_by_access_code(access_code)
+    linked_nota = get_nota_by_so_id(access_record.sales_order.id) if access_record else None
+    return render_template(
+        "so/customer.html",
+        access_record=access_record,
+        linked_nota=linked_nota,
+        nota_totals=totals(linked_nota) if linked_nota else None,
+        invoice_status=calculate_invoice_status(linked_nota) if linked_nota else None,
+    )
+
+
+@tracking_bp.route("/<access_code>/approve", methods=["POST"])
+def approve_customer(access_code):
+    access_record = find_by_access_code(access_code)
+    if not access_record:
+        abort(404)
+    order = access_record.sales_order
+    if not order.approved:
+        order.approved = True
+        order.approved_by = access_record.customer_name or order.team_name
+        order.approved_source = "customer"
+        order.approved_at = datetime.utcnow()
+        set_production_stage(order, "Setting")
+        db.session.commit()
+        flash("Surat Order berhasil disetujui.", "success")
+    return redirect(url_for("tracking.detail", access_code=access_code))
 
 
 def create_app(config_class=Config):
@@ -88,6 +115,7 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     register_filters(app)
     app.jinja_env.globals["active_class"] = active_class
+    app.jinja_env.globals["has_permission"] = has_permission
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -101,10 +129,15 @@ def create_app(config_class=Config):
     app.register_blueprint(nota_bp)
     app.register_blueprint(tracking_bp)
 
+    @app.before_request
+    def keep_staff_session_persistent():
+        if current_user.is_authenticated:
+            session.permanent = True
+
     @app.route("/")
     def root():
         if current_user.is_authenticated:
-            return redirect(url_for("dashboard.index"))
+            return redirect(url_for("dashboard.index") if current_user.is_admin else url_for("sales_orders.index"))
         return redirect(url_for("auth.login"))
 
     @app.route("/login", methods=["GET", "POST"])
@@ -112,36 +145,28 @@ def create_app(config_class=Config):
         return login()
 
     @app.route("/so/")
-    @login_required
+    @permission_required("sales_order.view")
     def sales_order_alias():
         return redirect(url_for("sales_orders.index", **request.args))
 
     @app.route("/master-data")
-    @login_required
+    @permission_required("master.view")
     def master_data_alias():
-        if not user_is_admin(current_user):
-            abort(403)
         return redirect(url_for("master.index"))
 
     @app.route("/laporan")
-    @login_required
+    @permission_required("reports.view")
     def laporan_alias():
-        if not user_is_admin(current_user):
-            abort(403)
         return redirect(url_for("reports.index", **request.args))
 
     @app.route("/laporan/pdf")
-    @login_required
+    @permission_required("reports.view")
     def laporan_pdf_alias():
-        if not user_is_admin(current_user):
-            abort(403)
         return redirect(url_for("reports.pdf", **request.args))
 
     @app.route("/setting")
-    @login_required
+    @permission_required("settings.view")
     def setting_alias():
-        if not user_is_admin(current_user):
-            abort(403)
         return redirect(url_for("settings.index"))
 
     @app.route("/dev/seed-production-sample")
@@ -153,6 +178,7 @@ def create_app(config_class=Config):
         db.create_all()
         ensure_v04_schema()
         ensure_v05_schema()
+        ensure_v06_schema()
         ensure_qc_schema()
         ensure_handover_schema()
         seed_initial_data()
@@ -161,16 +187,27 @@ def create_app(config_class=Config):
 
 
 def seed_initial_data():
-    has_users = User.query.first() is not None
-    if not has_users and not User.query.filter_by(username="admin").first():
-        admin = User(name="Administrator", username="admin", role="admin")
-        admin.set_password("admin")
-        db.session.add(admin)
+    v06_marker = Setting.query.filter_by(key="erp_v06_default_users_seeded").first()
+    default_users = [
+        ("Administrator", "admin", "admin", "admin"),
+        ("Desain", "desain", "desain", "desain"),
+        ("Produksi", "produksi", "produksi", "produksi"),
+    ]
+    for name, username, password, role in default_users:
+        user = User.query.filter_by(username=username).first()
+        created = False
+        if not user:
+            user = User(name=name, username=username, role=role)
+            db.session.add(user)
+            created = True
+        user.name = user.name or name
+        user.role = role
+        user.is_active = True
+        if created or not v06_marker:
+            user.set_password(password)
 
-    if not has_users and not User.query.filter_by(username="produksi").first():
-        produksi = User(name="Produksi", username="produksi", role="produksi")
-        produksi.set_password("produksi")
-        db.session.add(produksi)
+    if not v06_marker:
+        db.session.add(Setting(key="erp_v06_default_users_seeded", value="1"))
 
     if Brand.query.first() is None:
         db.session.add(Brand(code="EVPRO", name="Evpro", color="#c5162e", point_per_size=1))
@@ -224,6 +261,17 @@ def ensure_v05_schema():
         if column_name not in columns:
             db.session.execute(text(statement))
     db.session.commit()
+
+
+def ensure_v06_schema():
+    inspector = inspect(db.engine)
+    if "users" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("users")}
+        if "role" not in columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(30) NOT NULL DEFAULT 'admin'"))
+        if "is_active" not in columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+        db.session.commit()
 
 
 def ensure_qc_schema():

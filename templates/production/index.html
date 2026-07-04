@@ -69,7 +69,7 @@
                     <td>{{ so.brand.code if so.brand else '-' }}</td>
                     <td>{{ so.deadline|pretty_date if so.deadline else '-' }}</td>
                     <td>
-                        {% if current_user.is_admin %}
+                        {% if has_permission('production.manage') %}
                             <form method="post" action="{{ url_for('production.assign_vendor', sales_order_id=so.id) }}" class="production-inline-form">
                                 <input type="hidden" name="q" value="{{ search or '' }}">
                                 <select class="form-select form-select-sm" name="production_vendor">
@@ -85,7 +85,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if current_user.is_admin %}
+                        {% if has_permission('production.manage') %}
                             <form method="post" action="{{ url_for('production.set_deadline', sales_order_id=so.id) }}" class="production-inline-form">
                                 <input type="hidden" name="q" value="{{ search or '' }}">
                                 <input class="form-control form-control-sm" type="date" name="production_vendor_deadline" value="{{ so.production_vendor_deadline.isoformat() if so.production_vendor_deadline else '' }}">

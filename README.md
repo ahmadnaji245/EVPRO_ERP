@@ -8,7 +8,7 @@ EVPRO ERP adalah sistem ERP internal untuk perusahaan custom apparel yang mengin
 
 | Item | Status |
 | --- | --- |
-| Current Version | ERP v0.5 Stable |
+| Current Version | ERP v0.6 Role & Permission |
 | Release Date | July 2026 |
 | Repository Status | Main ERP Repository |
 
@@ -60,6 +60,19 @@ EVPRO ERP adalah sistem ERP internal untuk perusahaan custom apparel yang mengin
 - [x] Handover Report
 - [x] Monthly Filter
 
+### ✅ ERP v0.6 Role & Permission
+
+- [x] Role user: admin, desain, produksi
+- [x] Persistent login / remember session
+- [x] Middleware permission untuk proteksi route backend
+- [x] Sidebar/menu berbasis role
+- [x] Admin bisa akses semua modul
+- [x] Desain bisa melihat Surat Order, detail, checklist setting/desain, dan Serah Terima
+- [x] Produksi bisa melihat Surat Order, produksi, assignment vendor, checklist produksi, PDF vendor, dan Serah Terima
+- [x] Desain dan produksi diblokir dari create/edit/delete data utama Surat Order dan Nota
+- [x] Customer Portal tetap public-token based melalui `/tracking/<token>`
+- [x] Token Customer Portal untuk SO baru menggunakan token unik acak, bukan ID berurutan
+
 ## Workflow
 
 ```text
@@ -91,7 +104,7 @@ Nota Lunas
 - [x] v0.3 Nota
 - [x] v0.4 Integration
 - [x] v0.5 Production Management
-- [ ] v0.6 Role & Permission
+- [x] v0.6 Role & Permission
 - [ ] v0.7 Customer Portal
 - [ ] v0.8 CRM
 - [ ] v0.9 AI Integration
@@ -117,12 +130,33 @@ Nota Lunas
 | Serah Terima | Mencatat barang yang belum dan sudah diambil, termasuk laporan PDF/JPG. |
 | Reports | Menyediakan laporan operasional untuk monitoring internal. |
 
+## Role & Permission
+
+Default user ERP v0.6:
+
+| Username | Password | Role |
+| --- | --- | --- |
+| admin | admin | admin |
+| desain | desain | desain |
+| produksi | produksi | produksi |
+
+Ringkasan akses:
+
+| Role | Akses |
+| --- | --- |
+| Admin | Semua halaman dan aksi: Dashboard, Surat Order, Produksi, Nota, Master Data, Laporan, Setting, dan User. |
+| Desain | Login internal, lihat Surat Order/detail, update checklist setting/desain, lihat Serah Terima. Tidak bisa membuat/edit data utama SO atau Nota. |
+| Produksi | Login internal, lihat Surat Order/detail, update checklist produksi, assign vendor/deadline vendor, cetak PDF vendor, akses Serah Terima dan laporan pengambilan. Tidak bisa membuat/edit data utama SO atau Nota. |
+| Customer/Konsumen | Tidak login dashboard internal. Akses hanya lewat public link/token untuk melihat SO, approve SO, melihat Nota, dan progress produksi. |
+
+Session login staff dibuat persisten dengan remember cookie dan lifetime panjang. Login ulang diperlukan saat logout manual, token/session di-reset, atau setelah maintenance/update yang mengganti secret/session aplikasi.
+
 ## Development Notes
 
-Repository ini adalah source utama pengembangan EVPRO ERP setelah rilis ERP v0.5 Stable.
+Repository ini adalah source utama pengembangan EVPRO ERP setelah rilis ERP v0.6 Role & Permission.
 
 ```text
-EVPRO ERP v0.5 Stable
+EVPRO ERP v0.6 Role & Permission
 Release: July 2026
-Focus: Production Management, Vendor Report, QC, Handover, and SO-Nota integration
+Focus: Role-based access control, persistent login, secure customer token portal
 ```

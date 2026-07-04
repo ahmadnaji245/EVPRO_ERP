@@ -2,8 +2,9 @@ from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 
-from flask_login import current_user, login_required
+from flask_login import current_user
 
+from utils.permissions import permission_required
 from services.nota_service import (
     NOTA_STATUSES,
     add_payment,
@@ -72,9 +73,8 @@ def _brand_filter():
 
 
 @nota_bp.route("/dashboard")
-@login_required
+@permission_required("nota.view")
 def dashboard():
-    _admin_required()
     brand = _brand_filter()
     return render_template(
         "nota/dashboard.html",
@@ -87,9 +87,8 @@ def dashboard():
 
 
 @nota_bp.route("/")
-@login_required
+@permission_required("nota.view")
 def index():
-    _admin_required()
     search = {
         "q": request.args.get("q", "").strip(),
         "status": request.args.get("status", "").strip(),
@@ -109,9 +108,8 @@ def index():
 
 
 @nota_bp.route("/produk", methods=["GET", "POST"])
-@login_required
+@permission_required("nota.manage")
 def products():
-    _admin_required()
     if request.method == "POST":
         try:
             upsert_product(request.form)
@@ -124,18 +122,16 @@ def products():
 
 
 @nota_bp.route("/produk/delete/<int:product_id>")
-@login_required
+@permission_required("nota.manage")
 def delete_product_view(product_id):
-    _admin_required()
     delete_product(product_id)
     flash("Produk berhasil dihapus.", "success")
     return redirect(url_for("nota.products"))
 
 
 @nota_bp.route("/<int:nota_id>/delete", methods=["POST"])
-@login_required
+@permission_required("nota.manage")
 def delete(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     delete_nota(nota)
     flash("Nota berhasil dihapus.", "success")
@@ -143,9 +139,8 @@ def delete(nota_id):
 
 
 @nota_bp.route("/laporan")
-@login_required
+@permission_required("nota.view")
 def reports():
-    _admin_required()
     brand = _brand_filter()
     return render_template(
         "nota/reports/index.html",
@@ -159,9 +154,8 @@ def reports():
 
 
 @nota_bp.route("/laporan/customer")
-@login_required
+@permission_required("nota.view")
 def customer_report():
-    _admin_required()
     brand = _brand_filter()
     return render_template(
         "nota/reports/customers.html",
@@ -172,9 +166,8 @@ def customer_report():
 
 
 @nota_bp.route("/piutang")
-@login_required
+@permission_required("nota.view")
 def receivables_page():
-    _admin_required()
     brand = _brand_filter()
     status = request.args.get("status", "").strip()
     return render_template(
@@ -188,9 +181,8 @@ def receivables_page():
 
 
 @nota_bp.route("/pemasukan")
-@login_required
+@permission_required("nota.view")
 def income_page():
-    _admin_required()
     brand = _brand_filter()
     return render_template(
         "nota/reports/income.html",
@@ -202,9 +194,8 @@ def income_page():
 
 
 @nota_bp.route("/export/nota")
-@login_required
+@permission_required("nota.view")
 def export_invoices():
-    _admin_required()
     rows = invoice_export_rows(report_nota_rows(_brand_filter() or None))
     workbook = workbook_response(
         "Semua Nota",
@@ -215,9 +206,8 @@ def export_invoices():
 
 
 @nota_bp.route("/export/piutang")
-@login_required
+@permission_required("nota.view")
 def export_receivables():
-    _admin_required()
     rows = invoice_export_rows(receivables(_brand_filter() or None))
     workbook = workbook_response(
         "Piutang",
@@ -228,27 +218,24 @@ def export_receivables():
 
 
 @nota_bp.route("/export/omset-bulanan")
-@login_required
+@permission_required("nota.view")
 def export_monthly_revenue():
-    _admin_required()
     rows = [[row.month, row.total] for row in monthly_revenue(_brand_filter() or None)]
     workbook = workbook_response("Omset Bulanan", ["Bulan", "Omset"], rows)
     return _excel_file(workbook, "omset-bulanan.xlsx")
 
 
 @nota_bp.route("/export/customer")
-@login_required
+@permission_required("nota.view")
 def export_customers():
-    _admin_required()
     rows = [[row.name, row.team_name, row.brand, row.invoice_count, row.total] for row in top_customers(_brand_filter() or None)]
     workbook = workbook_response("Customer", ["Nama Customer", "Tim", "Brand", "Jumlah Nota", "Total Omset"], rows)
     return _excel_file(workbook, "customer.xlsx")
 
 
 @nota_bp.route("/baru", methods=["GET", "POST"])
-@login_required
+@permission_required("nota.manage")
 def create():
-    _admin_required()
     if request.method == "POST":
         so_id = request.form.get("so_id")
         existing_nota = get_nota_by_so_id(so_id)
@@ -288,9 +275,8 @@ def create():
 
 
 @nota_bp.route("/<int:nota_id>")
-@login_required
+@permission_required("nota.view")
 def detail(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     return render_template(
         "nota/detail.html",
@@ -303,9 +289,8 @@ def detail(nota_id):
 
 
 @nota_bp.route("/<int:nota_id>/edit", methods=["GET", "POST"])
-@login_required
+@permission_required("nota.manage")
 def edit(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     if request.method == "POST":
         errors = validate_nota_form(request.form)
@@ -320,9 +305,8 @@ def edit(nota_id):
 
 
 @nota_bp.route("/<int:nota_id>/pembayaran", methods=["POST"])
-@login_required
+@permission_required("nota.manage")
 def payment(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     try:
         add_payment(nota, request.form)
@@ -334,9 +318,8 @@ def payment(nota_id):
 
 
 @nota_bp.route("/<int:nota_id>/print")
-@login_required
+@permission_required("nota.view")
 def print_view(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     return render_template(
         "nota/print.html",
@@ -351,9 +334,8 @@ def print_view(nota_id):
 
 
 @nota_bp.route("/<int:nota_id>/pdf/internal")
-@login_required
+@permission_required("nota.view")
 def internal_pdf(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     pdf = build_internal_note_pdf(
         _pdf_invoice(nota),
@@ -370,9 +352,8 @@ def internal_pdf(nota_id):
 
 
 @nota_bp.route("/<int:nota_id>/pdf/customer")
-@login_required
+@permission_required("nota.view")
 def customer_pdf(nota_id):
-    _admin_required()
     nota = get_nota(nota_id)
     invoice = _pdf_invoice(nota, mapped_brand=True)
     if invoice["brand"] == "FF Apparel":
