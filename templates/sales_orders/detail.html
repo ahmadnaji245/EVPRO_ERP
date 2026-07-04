@@ -16,7 +16,9 @@
     </div>
     <div class="d-flex flex-wrap gap-2 so-page-actions">
         <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.index') }}">Kembali</a>
-        <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.pdf', sales_order_id=sales_order.id) }}" target="_blank" rel="noopener">Cetak PDF</a>
+        {% if has_permission('sales_order.pdf') %}
+            <a class="btn btn-outline-dark" href="{{ url_for('sales_orders.pdf', sales_order_id=sales_order.id) }}" target="_blank" rel="noopener">Cetak PDF</a>
+        {% endif %}
         {% if current_user.role_label == 'admin' %}
             {% if sales_order.approved %}
                 <span class="btn btn-success disabled" aria-disabled="true">Approved by {{ 'Customer' if sales_order.approved_source == 'customer' else 'Admin' }}</span>
@@ -100,26 +102,46 @@
 </div>
 
 <div class="panel mb-4">
-    <div class="section-title">Status Produksi</div>
     {% set current_status = sales_order.production_status_label %}
     {% set current_status_index = production_statuses.index(current_status) if current_status in production_statuses else 0 %}
-    <div class="production-stepper mb-4">
-        {% for status in production_statuses %}
-            {% set step_index = loop.index0 %}
-            {% if step_index < current_status_index %}
-                {% set step_state = 'done' %}
-            {% elif step_index == current_status_index %}
-                {% set step_state = 'active' %}
-            {% else %}
-                {% set step_state = 'upcoming' %}
-            {% endif %}
-            <div class="production-step production-step-{{ step_state }}">
-                <div class="production-step-marker">{{ loop.index }}</div>
-                <div class="production-step-label">{{ status }}</div>
+    {% if display_status.is_taken %}
+        <div class="section-title">Status Barang</div>
+        <div class="row g-3 so-summary">
+            <div class="col-md-4">
+                <div class="text-muted small">Status</div>
+                <strong>Barang sudah diambil</strong>
             </div>
-        {% endfor %}
-    </div>
-    <span class="badge text-bg-light border">{{ current_status }}</span>
+            <div class="col-md-4">
+                <div class="text-muted small">Diambil oleh</div>
+                <strong>{{ display_status.picked_by or '-' }}</strong>
+            </div>
+            {% if display_status.pickup_date %}
+                <div class="col-md-4">
+                    <div class="text-muted small">Tanggal ambil</div>
+                    <strong>{{ display_status.pickup_date|pretty_datetime }}</strong>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="section-title">Status Produksi</div>
+        <div class="production-stepper mb-4">
+            {% for status in production_statuses %}
+                {% set step_index = loop.index0 %}
+                {% if step_index < current_status_index %}
+                    {% set step_state = 'done' %}
+                {% elif step_index == current_status_index %}
+                    {% set step_state = 'active' %}
+                {% else %}
+                    {% set step_state = 'upcoming' %}
+                {% endif %}
+                <div class="production-step production-step-{{ step_state }}">
+                    <div class="production-step-marker">{{ loop.index }}</div>
+                    <div class="production-step-label">{{ status }}</div>
+                </div>
+            {% endfor %}
+        </div>
+        <span class="so-status-badge {{ display_status.badge_class }}">{{ display_status.status }}</span>
+    {% endif %}
 </div>
 
 <form method="post" action="{{ url_for('sales_orders.update_production_checklist', sales_order_id=sales_order.id) }}">
@@ -131,7 +153,7 @@
                     <div class="section-title mb-1">{{ design.design_name }}</div>
                     <p class="text-muted mb-0">{{ design.item_name }} · {{ design.total_size }} size</p>
                 </div>
-                <span class="badge text-bg-light border">{{ sales_order.production_status_label }}</span>
+                <span class="badge {{ 'text-bg-success' if display_status.is_taken else 'text-bg-light border' }}">{{ display_status.short_status }}</span>
             </div>
 <div class="row g-4">
 

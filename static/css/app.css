@@ -414,9 +414,9 @@ a {
 }
 
 .production-stepper {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: 10px;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .production-step {
@@ -426,8 +426,11 @@ a {
     border-radius: 8px;
     color: #555f6f;
     display: flex;
+    flex: 1 1 136px;
     gap: 8px;
+    max-width: 180px;
     min-height: 52px;
+    min-width: 136px;
     padding: 10px;
 }
 
@@ -446,7 +449,13 @@ a {
     font-size: 0.88rem;
     font-weight: 800;
     line-height: 1.15;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    white-space: normal;
+    word-break: normal;
+}
+
+.production-step-badge {
+    display: none;
 }
 
 .production-step-done {
@@ -577,6 +586,52 @@ a {
     color: #17633a;
 }
 
+.so-status-badge {
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1;
+    padding: 7px 10px;
+    white-space: nowrap;
+}
+
+.so-status-badge-approval {
+    background: #e8f2ff;
+    color: #084298;
+}
+
+.so-status-badge-setting,
+.so-status-badge-packing {
+    background: #dbeafe;
+    color: #0b4f9f;
+}
+
+.so-status-badge-printing {
+    background: #e8e7ff;
+    color: #3730a3;
+}
+
+.so-status-badge-jahit {
+    background: #fff3cd;
+    color: #8a5a00;
+}
+
+.so-status-badge-qc {
+    background: #d7e3ff;
+    color: #12356b;
+}
+
+.so-status-badge-finish {
+    background: #dff3e8;
+    color: #17633a;
+}
+
+.so-status-badge-taken {
+    background: #14532d;
+    color: #fff;
+}
+
 .track-hero {
     align-items: center;
     background: #fff;
@@ -621,6 +676,36 @@ a {
     overflow-wrap: anywhere;
 }
 
+.customer-progress-grid {
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+}
+
+.customer-progress-grid > div {
+    background: #f8fafc;
+    min-width: 0;
+    padding: 14px 16px;
+}
+
+.customer-progress-grid > div + div {
+    border-left: 1px solid #e4e7ec;
+}
+
+.customer-progress-grid span {
+    color: #687182;
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 6px;
+}
+
+.customer-progress-grid strong {
+    display: block;
+    font-size: 1.15rem;
+}
+
 @media (max-width: 768px) {
     .page-shell {
         padding: 18px 12px;
@@ -631,8 +716,76 @@ a {
         padding: 16px;
     }
 
-    .production-stepper {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .customer-production-stepper {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        position: relative;
+    }
+
+    .customer-production-stepper::before {
+        background: #d9dee7;
+        bottom: 18px;
+        content: "";
+        left: 18px;
+        position: absolute;
+        top: 18px;
+        width: 2px;
+        z-index: 0;
+    }
+
+    .customer-production-stepper .production-step {
+        align-items: center;
+        display: grid;
+        flex: none;
+        gap: 10px;
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        max-width: none;
+        min-height: 58px;
+        min-width: 0;
+        padding: 10px 12px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .customer-production-stepper .production-step-marker {
+        flex: 0 0 36px;
+        height: 36px;
+        width: 36px;
+    }
+
+    .customer-production-stepper .production-step-label {
+        font-size: 0.95rem;
+        line-height: 1.25;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
+    .customer-production-stepper .production-step-badge {
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 0.75rem;
+        font-weight: 800;
+        justify-content: center;
+        line-height: 1;
+        min-width: 76px;
+        padding: 7px 9px;
+        white-space: nowrap;
+    }
+
+    .customer-production-stepper .production-step-done .production-step-badge {
+        background: #dff3e8;
+        color: #17633a;
+    }
+
+    .customer-production-stepper .production-step-active .production-step-badge {
+        background: #dbeafe;
+        color: #084298;
+    }
+
+    .customer-production-stepper .production-step-upcoming .production-step-badge {
+        background: #eceff3;
+        color: #555f6f;
     }
 
     .track-hero {
@@ -641,6 +794,15 @@ a {
 
     .dashboard-target-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .customer-progress-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .customer-progress-grid > div + div {
+        border-left: 0;
+        border-top: 1px solid #e4e7ec;
     }
 
     .dashboard-target-summary > div + div {
@@ -675,10 +837,6 @@ a {
 
     textarea.font-monospace {
         font-size: 0.875rem;
-    }
-
-    .production-stepper {
-        grid-template-columns: 1fr;
     }
 
     .track-hero {

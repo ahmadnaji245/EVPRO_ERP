@@ -15,6 +15,7 @@ PERMISSIONS = {
     "dashboard.view": {ROLE_ADMIN},
     "sales_order.view": {ROLE_ADMIN, ROLE_DESAIN, ROLE_PRODUKSI},
     "sales_order.manage": {ROLE_ADMIN},
+    "sales_order.pdf": {ROLE_ADMIN},
     "sales_order.setting_checklist": {ROLE_ADMIN, ROLE_DESAIN, ROLE_PRODUKSI},
     "sales_order.production_checklist": {ROLE_ADMIN, ROLE_PRODUKSI},
     "production.view": {ROLE_ADMIN, ROLE_PRODUKSI},

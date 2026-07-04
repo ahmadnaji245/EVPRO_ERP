@@ -10,6 +10,7 @@ from services.history_service import record_history
 from services.brand_service import list_active_brands
 from services.master_data_service import list_active_rows
 from services.nota_service import billing_status_for_sales_order, get_nota_by_so_id
+from services.order_status_service import get_display_status
 from services.pdf_service import build_sales_order_pdf
 from services.sales_order_service import (
     PRODUCTION_STATUSES,
@@ -51,6 +52,7 @@ def index():
     search = request.args.get("q", "").strip()
     sales_orders = list_sales_orders()
     billing_statuses = {order.id: billing_status_for_sales_order(order) for order in sales_orders}
+    display_statuses = {order.id: get_display_status(order) for order in sales_orders}
 
     if search:
         search_value = search.casefold()
@@ -64,6 +66,8 @@ def index():
                 brand_code,
                 order.team_name,
                 order.production_status_label,
+                display_statuses.get(order.id, {}).get("status"),
+                display_statuses.get(order.id, {}).get("list_status"),
                 billing_statuses.get(order.id, "Belum Ada Nota"),
             ]
             return any(search_value in str(value or "").casefold() for value in searchable_values)
@@ -74,6 +78,7 @@ def index():
         "so/index.html",
         sales_orders=sales_orders,
         billing_statuses=billing_statuses,
+        display_statuses=display_statuses,
         search=search,
     )
 
@@ -118,6 +123,7 @@ def detail(sales_order_id):
         "so/detail.html",
         production_statuses=PRODUCTION_STATUSES,
         sales_order=sales_order,
+        display_status=get_display_status(sales_order),
         linked_nota=get_nota_by_so_id(sales_order.id),
         billing_status=billing_status_for_sales_order(sales_order),
     )
@@ -186,9 +192,8 @@ def print_view(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/pdf")
-@permission_required("sales_order.view")
+@permission_required("sales_order.pdf")
 def pdf(sales_order_id):
-    _sales_order_access_required()
     order = get_sales_order(sales_order_id)
     pdf_buffer = build_sales_order_pdf(order)
     filename = f"{order.so_number.replace('/', '-')}.pdf"

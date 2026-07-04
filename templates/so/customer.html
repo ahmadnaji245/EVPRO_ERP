@@ -1,85 +1,277 @@
 {% extends "base.html" %}
-{% block title %}Customer Sales Order - EVPRO TEXTILE ERP{% endblock %}
+{% block title %}Customer Portal - EVPRO TEXTILE ERP{% endblock %}
 {% block content %}
 {% if access_record %}
     {% set sales_order = access_record.sales_order %}
-    <div class="mb-4">
-        <h1 class="page-title mb-2">Customer Sales Order</h1>
-        <p class="text-muted mb-0">{{ sales_order.so_number }} · {{ sales_order.team_name }}</p>
-    </div>
-    <div class="panel mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div>
-                <div class="section-title mb-1">Status Customer Portal</div>
-                <div class="text-muted">Progress produksi: {{ sales_order.portal_status_label }}</div>
-                {% if sales_order.approved %}
-                    <span class="badge text-bg-success mt-2">Approved {{ sales_order.approved_at|pretty_datetime if sales_order.approved_at else '' }}</span>
-                {% else %}
-                    <span class="badge text-bg-warning mt-2">Menunggu Approval Customer</span>
-                {% endif %}
-            </div>
-            {% if not sales_order.approved %}
-                <form method="post" action="{{ url_for('tracking.approve_customer', access_code=access_record.access_code) }}">
-                    <button class="btn btn-rdr" type="submit">Approve Surat Order</button>
-                </form>
+    {% set portal_status = sales_order.portal_status_label %}
+    {% set is_tracking = sales_order.approved or portal_progress.current_index > 0 %}
+    {% set current_status = portal_progress.current_status %}
+    {% set status_updated_at = portal_progress.status_updated_at %}
+    <div class="track-hero mb-4">
+        <div class="track-brand">
+            {% if sales_order.brand.logo_path %}
+                <img src="{{ url_for('static', filename=sales_order.brand.logo_path) }}" alt="Logo {{ sales_order.brand.name }}">
+            {% else %}
+                <span style="background: {{ sales_order.brand.color }}">{{ sales_order.brand.code }}</span>
             {% endif %}
         </div>
+        <div>
+            <div class="text-muted fw-semibold mb-1">{{ 'Tracking Produksi' if is_tracking else 'Persetujuan Surat Order' }}</div>
+            <h1 class="page-title">{{ sales_order.team_name }}</h1>
+            <p class="text-muted mb-0">{{ sales_order.brand.name }} - {{ sales_order.so_number }}</p>
+        </div>
     </div>
-    {% if linked_nota %}
-        <div class="panel mb-4">
-            <div class="section-title">Nota</div>
-            <dl class="row mb-0 so-summary">
-                <dt class="col-md-3">Nomor Nota</dt><dd class="col-md-9">{{ linked_nota.nota_number }}</dd>
-                <dt class="col-md-3">Status</dt><dd class="col-md-9">{{ invoice_status }}</dd>
-                <dt class="col-md-3">Total</dt><dd class="col-md-9">{{ nota_totals.total|rupiah }}</dd>
-                <dt class="col-md-3">Sudah Dibayar</dt><dd class="col-md-9">{{ nota_totals.paid|rupiah }}</dd>
-                <dt class="col-md-3">Sisa</dt><dd class="col-md-9">{{ nota_totals.remaining|rupiah }}</dd>
-            </dl>
+
+    {% if not sales_order.approved and sales_order.revision_reason_admin %}
+        <div class="alert alert-warning">
+            <div class="fw-semibold">Data pesanan telah diperbarui.</div>
+            <div>Silakan periksa kembali detail Surat Order sebelum menyetujui.</div>
+            <div class="mt-2" style="white-space: pre-line;">{{ sales_order.revision_reason_admin }}</div>
         </div>
     {% endif %}
-    {% for design in sales_order.designs %}
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+            <div class="panel h-100 track-summary">
+                <div class="section-title">Informasi Pesanan</div>
+                <dl class="row mb-0">
+                    <dt class="col-5">Customer</dt><dd class="col-7">{{ access_record.customer_name or sales_order.team_name }}</dd>
+                    <dt class="col-5">Nomor SO</dt><dd class="col-7">{{ sales_order.so_number }}</dd>
+                    <dt class="col-5">Brand</dt><dd class="col-7">{{ sales_order.brand.name }}</dd>
+                    <dt class="col-5">Tanggal Masuk</dt><dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
+                    <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
+                    <dt class="col-5">Total Size</dt><dd class="col-7">{{ sales_order.total_size }}</dd>
+                    <dt class="col-5">Status</dt><dd class="col-7">{{ portal_order_status.status }}</dd>
+                    {% if portal_order_status.pickup_date %}
+                        <dt class="col-5">Diambil pada</dt><dd class="col-7">{{ portal_order_status.pickup_date|pretty_datetime }}</dd>
+                    {% endif %}
+                    {% if is_tracking %}
+                        <dt class="col-5">Update</dt><dd class="col-7">{{ status_updated_at|pretty_datetime if status_updated_at else '-' }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="panel h-100">
+                {% if portal_order_status.is_taken %}
+                    <div class="section-title">Status Barang</div>
+                    <div class="row g-3 so-summary">
+                        <div class="col-md-4">
+                            <div class="text-muted small">Status</div>
+                            <strong>Barang sudah diambil</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-muted small">Diambil oleh</div>
+                            <strong>{{ portal_order_status.picked_by or '-' }}</strong>
+                        </div>
+                        {% if portal_order_status.pickup_date %}
+                            <div class="col-md-4">
+                                <div class="text-muted small">Tanggal ambil</div>
+                                <strong>{{ portal_order_status.pickup_date|pretty_datetime }}</strong>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% elif is_tracking %}
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+                        <div>
+                            <div class="section-title mb-1">Progress Produksi</div>
+                            <div class="text-muted small">Progress mengikuti update produksi internal terakhir.</div>
+                        </div>
+                        <span class="badge text-bg-primary track-status-badge">{{ current_status }}</span>
+                    </div>
+                    <div class="production-stepper customer-production-stepper mb-4">
+                        {% for status in production_statuses %}
+                            {% set step_index = loop.index0 %}
+                            {% if step_index < portal_progress.current_index %}
+                                {% set step_state = 'done' %}
+                                {% set step_badge = 'Selesai' %}
+                            {% elif step_index == portal_progress.current_index %}
+                                {% set step_state = 'active' %}
+                                {% set step_badge = 'Proses' %}
+                            {% else %}
+                                {% set step_state = 'upcoming' %}
+                                {% set step_badge = 'Menunggu' %}
+                            {% endif %}
+                            <div class="production-step production-step-{{ step_state }}">
+                                <div class="production-step-marker">{{ loop.index }}</div>
+                                <div class="production-step-label">{{ status }}</div>
+                                <div class="production-step-badge">{{ step_badge }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="customer-progress-grid">
+                        <div>
+                            <span>Setting Nama/Size</span>
+                            <strong>{{ portal_progress.setting_done }} / {{ portal_progress.setting_total }}</strong>
+                        </div>
+                        <div>
+                            <span>Setting Rekap Size</span>
+                            <strong>{{ portal_progress.size_setting_done }} / {{ portal_progress.size_setting_total }}</strong>
+                        </div>
+                        <div>
+                            <span>Final Check</span>
+                            <strong>{{ portal_progress.packing_done }} / {{ portal_progress.packing_total }}</strong>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="section-title">Status Persetujuan</div>
+                    <span class="badge text-bg-warning mb-3">{{ portal_status }}</span>
+                    <p class="text-muted">Periksa desain, ukuran, nama, nomor punggung, dan detail pesanan. Jika sudah sesuai, tekan tombol approve untuk memulai proses produksi.</p>
+                    <form method="post" action="{{ url_for('tracking.approve_customer', access_code=access_record.access_code) }}">
+                        <button class="btn btn-success" type="submit">Approve Surat Order</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if linked_nota %}
         <div class="panel mb-4">
-            <div class="section-title">{{ design.design_name }}</div>
-            <div class="row g-4">
-                <div class="col-lg-4">
-                    {% if design.display_top_image_path %}
-                        <img class="img-fluid rounded border" src="{{ url_for('static', filename=design.display_top_image_path) }}" alt="Gambar atasan {{ design.design_name }}">
-                    {% else %}
-                        <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted" style="min-height: 220px;">Belum ada gambar atasan</div>
-                    {% endif %}
-                    {% if design.bottom_image_path %}
-                        <img class="img-fluid rounded border mt-3" src="{{ url_for('static', filename=design.bottom_image_path) }}" alt="Gambar celana {{ design.design_name }}">
-                    {% endif %}
-                    <p class="text-muted mt-3 mb-0" style="white-space: pre-line;">{{ design.display_top_notes or '-' }}</p>
-                    {% if design.bottom_notes %}
-                        <p class="text-muted mt-2 mb-0" style="white-space: pre-line;">{{ design.bottom_notes }}</p>
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                    <div class="section-title mb-1">Informasi Nota</div>
+                    <div class="text-muted small">Ringkasan tagihan yang terhubung dengan Surat Order ini.</div>
+                </div>
+                <span class="status-pill status-{{ invoice_status|lower|replace(' ', '-') }}">{{ invoice_status }}</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-3"><div class="info-label">Nomor Nota</div><div class="info-value">{{ linked_nota.nota_number }}</div></div>
+                <div class="col-md-3"><div class="info-label">Total Nota</div><div class="info-value">{{ nota_totals.total|rupiah }}</div></div>
+                <div class="col-md-3"><div class="info-label">Sudah Dibayar</div><div class="info-value">{{ nota_totals.paid|rupiah }}</div></div>
+                <div class="col-md-3"><div class="info-label">Sisa Tagihan</div><div class="info-value">{{ nota_totals.remaining|rupiah }}</div></div>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th></tr></thead>
+                    <tbody>
+                        {% for item in linked_nota.items|sort(attribute='sort_order') %}
+                            <tr>
+                                <td>{{ item.description }}</td>
+                                <td class="text-end">{{ item.quantity }}</td>
+                                <td class="text-end">{{ item.subtotal|rupiah }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="panel mb-4">
+            <div class="section-title mb-1">Informasi Nota</div>
+            <div class="text-muted">Nota untuk Surat Order ini belum dibuat.</div>
+        </div>
+    {% endif %}
+
+    <div class="d-grid gap-4">
+        {% for design in sales_order.designs %}
+            {% set recap = design.size_recap %}
+            <div class="panel">
+                <div class="section-title">{{ design.design_name }}</div>
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="fw-semibold mb-2">Gambar Desain Atasan</div>
+                        {% if design.display_top_image_path %}
+                            <img src="{{ url_for('static', filename=design.display_top_image_path) }}" class="img-fluid rounded border w-100 so-media-preview" alt="Gambar atasan {{ design.design_name }}">
+                        {% else %}
+                            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">Belum ada gambar atasan</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="fw-semibold mb-2">Gambar Desain Celana</div>
+                        {% if design.bottom_image_path %}
+                            <img src="{{ url_for('static', filename=design.bottom_image_path) }}" class="img-fluid rounded border w-100 so-media-preview" alt="Gambar celana {{ design.design_name }}">
+                        {% else %}
+                            <div class="border rounded bg-light d-flex align-items-center justify-content-center text-muted so-media-placeholder">Belum ada gambar celana</div>
+                        {% endif %}
+                    </div>
+                    {% if not is_tracking %}
+                        <div class="col-lg-6">
+                            <div class="fw-semibold mb-2">Catatan Desain Atasan</div>
+                            <div class="border rounded p-3 bg-light so-notes-box">{{ design.display_top_notes or '-' }}</div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="fw-semibold mb-2">Catatan Desain Celana</div>
+                            <div class="border rounded p-3 bg-light so-notes-box">{{ design.bottom_notes or '-' }}</div>
+                        </div>
                     {% endif %}
                 </div>
-                <div class="col-lg-8">
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead><tr><th>No</th><th>Nama</th><th>Nomor</th><th>Size</th><th>Setting</th><th>Cek</th></tr></thead>
-                            <tbody>
-                            {% for player in design.players %}
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-                                    <td>{{ player.player_name }}</td>
-                                    <td>{{ player.player_number or '-' }}</td>
-                                    <td>{{ player.size }}</td>
-                                    <td><input class="form-check-input" type="checkbox" disabled {% if player.checklist and player.checklist.setting_done %}checked{% endif %}></td>
-                                    <td><input class="form-check-input" type="checkbox" disabled {% if player.checklist and player.checklist.qc_done %}checked{% endif %}></td>
-                                </tr>
+
+                {% if recap.groups or recap.long_sleeve %}
+                    <div class="mt-4">
+                        <div class="fw-semibold mb-2">Rekap Size</div>
+                        <div class="row g-4">
+                            {% for group_name in ['Kids', 'Women', 'Reguler'] %}
+                                {% set rows = recap.groups.get(group_name, []) %}
+                                {% if rows %}
+                                    <div class="col-md-4">
+                                        <div class="card border h-100">
+                                            <div class="card-header bg-light fw-semibold text-center">{{ group_name }}</div>
+                                            <div class="card-body p-0">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
+                                                    <tbody>
+                                                        {% for row in rows %}
+                                                            <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
                             {% endfor %}
+                            {% if recap.long_sleeve %}
+                                <div class="col-md-4">
+                                    <div class="card border h-100">
+                                        <div class="card-header bg-light fw-semibold text-center">Lengan Panjang</div>
+                                        <div class="card-body p-0">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
+                                                <tbody>
+                                                    {% for row in recap.long_sleeve %}
+                                                        <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if not is_tracking %}
+                    <div class="table-responsive mt-4">
+                        <table class="table align-middle so-table">
+                            <thead><tr><th>No</th><th>Nama</th><th>Nomor</th><th>Size</th><th>Keterangan</th></tr></thead>
+                            <tbody>
+                                {% for player in design.players %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ player.player_name }}</td>
+                                        <td>{{ player.player_number or '-' }}</td>
+                                        <td>{{ player.size }}</td>
+                                        <td>{{ player.notes or '-' }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr><td colspan="5" class="text-center text-muted py-4">Belum ada player.</td></tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+            <div class="panel text-center">
+                <h1 class="page-title mb-2">Pesanan tidak ditemukan</h1>
+                <p class="text-muted mb-0">Kode tracking tidak valid atau pesanan sudah tidak aktif.</p>
             </div>
         </div>
-    {% endfor %}
-{% else %}
-    <div class="panel">
-        <div class="alert alert-danger mb-0">Kode akses tidak ditemukan atau sudah tidak aktif.</div>
     </div>
 {% endif %}
 {% endblock %}

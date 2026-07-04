@@ -6,7 +6,9 @@
         <h1 class="page-title">Print {{ sales_order.so_number }}</h1>
         <p class="text-muted mb-0">{{ sales_order.team_name }}</p>
     </div>
-    <a class="btn btn-rdr" href="{{ url_for('sales_orders.pdf', sales_order_id=sales_order.id) }}">Cetak PDF</a>
+    {% if has_permission('sales_order.pdf') %}
+        <a class="btn btn-rdr" href="{{ url_for('sales_orders.pdf', sales_order_id=sales_order.id) }}">Cetak PDF</a>
+    {% endif %}
 </div>
 {% for design in sales_order.designs %}
     <div class="panel mb-4">

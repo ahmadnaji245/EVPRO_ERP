@@ -15,8 +15,10 @@ from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
 from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.nota_service import seed_default_nota_products
 from services.customer_service import find_by_access_code
+from services.history_service import record_history
 from services.nota_service import calculate_invoice_status, get_nota_by_so_id, totals
-from services.production_service import seed_production_sample_data
+from services.order_status_service import get_display_status
+from services.production_service import PRODUCTION_STATUSES, seed_production_sample_data
 from services.sales_order_service import set_production_stage
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders
@@ -79,10 +81,23 @@ def logout():
 @tracking_bp.route("/<access_code>")
 def detail(access_code):
     access_record = find_by_access_code(access_code)
+    if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
+        return render_template(
+            "so/customer.html",
+            access_record=None,
+            production_statuses=PRODUCTION_STATUSES,
+            portal_progress=None,
+            linked_nota=None,
+            nota_totals=None,
+            invoice_status=None,
+        ), 404
     linked_nota = get_nota_by_so_id(access_record.sales_order.id) if access_record else None
     return render_template(
         "so/customer.html",
         access_record=access_record,
+        production_statuses=PRODUCTION_STATUSES,
+        portal_progress=customer_portal_progress(access_record.sales_order) if access_record else None,
+        portal_order_status=customer_portal_order_status(access_record.sales_order) if access_record else None,
         linked_nota=linked_nota,
         nota_totals=totals(linked_nota) if linked_nota else None,
         invoice_status=calculate_invoice_status(linked_nota) if linked_nota else None,
@@ -96,14 +111,59 @@ def approve_customer(access_code):
         abort(404)
     order = access_record.sales_order
     if not order.approved:
+        old_status = order.approval_status
         order.approved = True
         order.approved_by = access_record.customer_name or order.team_name
         order.approved_source = "customer"
         order.approved_at = datetime.utcnow()
         set_production_stage(order, "Setting")
+        record_history(
+            order,
+            actor_name=access_record.customer_name or "Customer",
+            action="Surat Order disetujui customer",
+            field_name="approval_status",
+            old_value=old_status,
+            new_value="approved",
+            notes=f"Customer portal token: {access_record.access_code}",
+        )
         db.session.commit()
         flash("Surat Order berhasil disetujui.", "success")
     return redirect(url_for("tracking.detail", access_code=access_code))
+
+
+def customer_portal_progress(order):
+    players = [player for design in order.designs for player in design.players]
+    player_total = len(players)
+    setting_done = sum(1 for player in players if player.checklist and player.checklist.setting_done)
+    packing_done = sum(1 for player in players if player.checklist and player.checklist.qc_done)
+    size_rows = []
+    size_done = 0
+    for design in order.designs:
+        recap = design.size_recap
+        for group_rows in recap["groups"].values():
+            size_rows.extend((design, row["size"]) for row in group_rows)
+        size_rows.extend((design, row["size"]) for row in recap["long_sleeve"])
+    for design, size in size_rows:
+        if design.size_setting_done(size):
+            size_done += 1
+    size_total = len(size_rows)
+    current_status = order.production_status_label
+    current_index = PRODUCTION_STATUSES.index(current_status) if current_status in PRODUCTION_STATUSES else 0
+    return {
+        "current_status": current_status,
+        "current_index": current_index,
+        "status_updated_at": order.production_status_updated_at or order.approved_at or order.created_at,
+        "setting_done": setting_done,
+        "setting_total": player_total,
+        "size_setting_done": size_done,
+        "size_setting_total": size_total,
+        "packing_done": packing_done,
+        "packing_total": player_total,
+    }
+
+
+def customer_portal_order_status(order):
+    return get_display_status(order)
 
 
 def create_app(config_class=Config):
@@ -143,6 +203,23 @@ def create_app(config_class=Config):
     @app.route("/login", methods=["GET", "POST"])
     def login_alias():
         return login()
+
+    @app.route("/track/<access_code>")
+    def tracking_short_alias(access_code):
+        return redirect(url_for("tracking.detail", access_code=access_code))
+
+    @app.route("/track/<access_code>/approve", methods=["POST"])
+    def tracking_approve_short_alias(access_code):
+        return approve_customer(access_code)
+
+    @app.route("/customer/access", methods=["GET", "POST"])
+    def customer_access_alias():
+        if request.method == "POST":
+            access_record = find_by_access_code(request.form.get("access_code", "").strip())
+            if access_record:
+                return redirect(url_for("tracking.detail", access_code=access_record.access_code))
+            flash("Kode akses tidak ditemukan.", "danger")
+        return render_template("so/customer_access.html")
 
     @app.route("/so/")
     @permission_required("sales_order.view")
