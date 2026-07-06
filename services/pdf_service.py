@@ -796,7 +796,6 @@ def _order_production_list_table(rows, styles):
         "Nama Tim",
         "Brand",
         "Vendor Jahit",
-        "Setting Oleh",
         "Status Produksi",
         "Deadline Customer",
         "Deadline Vendor",
@@ -810,7 +809,6 @@ def _order_production_list_table(rows, styles):
                 _safe_paragraph(row["team_name"], styles["SOText"]),
                 row["brand"],
                 row["vendor"],
-                _safe_paragraph(row["setting_by"], styles["SOText"]),
                 row["status"],
                 row["deadline_customer"].strftime("%d/%m/%Y") if row["deadline_customer"] else "-",
                 row["deadline_vendor"].strftime("%d/%m/%Y") if row["deadline_vendor"] else "-",
@@ -818,7 +816,7 @@ def _order_production_list_table(rows, styles):
         )
     table = Table(
         data,
-        colWidths=[8 * mm, 25 * mm, 35 * mm, 14 * mm, 23 * mm, 25 * mm, 23 * mm, 24 * mm, 24 * mm],
+        colWidths=[8 * mm, 25 * mm, 42 * mm, 16 * mm, 24 * mm, 23 * mm, 26 * mm, 26 * mm],
         repeatRows=1,
         hAlign="LEFT",
     )
@@ -833,7 +831,7 @@ def _order_production_list_table(rows, styles):
                 ("FONTSIZE", (0, 0), (-1, -1), 6.5),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (1, 0), (1, -1), "CENTER"),
-                ("ALIGN", (3, 0), (4, -1), "CENTER"),
+                ("ALIGN", (3, 0), (-1, -1), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -848,7 +846,7 @@ def _order_production_list_table(rows, styles):
 def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
     header = ["NO", "NAMA TEAM", "STATUS", "MERK"]
     header.extend([_vendor_qty_label(component) for component in quantity_columns])
-    header.extend(["TANGGAL MASUK", "DEADLINE JAHIT", "KETERANGAN"])
+    header.extend(["TGL MASUK", "DEADLINE", "KETERANGAN"])
 
     data = [header]
     for index, row in enumerate(rows, start=1):
