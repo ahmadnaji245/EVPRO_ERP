@@ -319,6 +319,10 @@
                                             {% for row in rows %}
                                                 <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
                                             {% endfor %}
+                                            <tr class="fw-bold">
+                                                <td>Total {{ group_name }}</td>
+                                                <td class="text-center">{{ rows | sum(attribute='qty') }}</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>

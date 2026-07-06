@@ -271,6 +271,11 @@
                                                 </td>
                                             </tr>
                                         {% endfor %}
+                                        <tr class="fw-bold">
+                                            <td>Total {{ group_name }}</td>
+                                            <td class="text-center">{{ rows | sum(attribute='qty') }}</td>
+                                            <td class="text-center">-</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>

@@ -61,6 +61,7 @@ SIZE_ORDER = {
     "KM": 2,
     "KL": 3,
     "KXL": 4,
+    "KXXL": 5,
     "WS": 10,
     "WM": 11,
     "WL": 12,
@@ -83,7 +84,7 @@ SIZE_ALIASES = {
     "L KIDS": "KL",
     "XL KIDS": "KXL",
     "XS KIDS": "KS",
-    "XXL KIDS": "KXL",
+    "XXL KIDS": "KXXL",
     "S WOMEN": "WS",
     "M WOMEN": "WM",
     "L WOMEN": "WL",
@@ -94,7 +95,7 @@ SIZE_ALIASES = {
 }
 
 SIZE_GROUPS = {
-    "Kids": {"KS", "KM", "KL", "KXL"},
+    "Kids": {"KS", "KM", "KL", "KXL", "KXXL"},
     "Women": {"WS", "WM", "WL", "WXL"},
 }
 LONG_SLEEVE_MARKERS = ("LENGAN PANJANG", "LONG SLEEVE", "LP")

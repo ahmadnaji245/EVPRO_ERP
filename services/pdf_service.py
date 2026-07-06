@@ -364,16 +364,16 @@ def _size_table(first_header, rows, checked_lookup=None, h_align=None):
     checked_lookup = checked_lookup or (lambda size: False)
     data = [[first_header, "Qty", "setting"]]
     data.extend([[row["size"], row["qty"], PdfCheckbox(checked_lookup(row["size"]))] for row in rows])
-    data.append(["Total size", sum(row["qty"] for row in rows), PdfCheckbox(False)])
+    data.append([f"Total {first_header}", sum(row["qty"] for row in rows), "-"])
     table = Table(data, colWidths=[30 * mm, 11 * mm, 14 * mm], repeatRows=1, hAlign=h_align)
     table.setStyle(_compact_table_style())
     return table
 
 
-def _size_qty_table(first_header, rows, h_align=None):
+def _size_qty_table(first_header, rows, h_align=None, total_label="Total"):
     data = [[first_header, "Qty"]]
     data.extend([[row["size"], row["qty"]] for row in rows])
-    data.append(["Total", sum(row["qty"] for row in rows)])
+    data.append([total_label, sum(row["qty"] for row in rows)])
     table = Table(data, colWidths=[30 * mm, 14 * mm], repeatRows=1, hAlign=h_align)
     table.setStyle(_compact_table_style())
     return table
@@ -500,7 +500,10 @@ def _customer_size_recap_flowables(design, styles):
     flowables = []
     if recap["groups"]:
         active_groups = [group for group in ["Kids", "Women", "Reguler"] if recap["groups"].get(group)]
-        tables = [_size_qty_table(group, recap["groups"][group], h_align="CENTER") for group in active_groups]
+        tables = [
+            _size_qty_table(group, recap["groups"][group], h_align="CENTER", total_label=f"Total {group}")
+            for group in active_groups
+        ]
         wrapper = Table([tables], colWidths=[sum(table._argW) + 6 * mm for table in tables], hAlign="CENTER")
         wrapper.setStyle(
             TableStyle(
