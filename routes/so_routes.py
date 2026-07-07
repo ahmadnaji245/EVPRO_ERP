@@ -26,6 +26,7 @@ from services.sales_order_service import (
     validate_sales_order_form,
 )
 from utils.constants import user_is_admin, user_is_desain, user_is_produksi
+from utils.helpers import sales_order_pdf_download_name
 from utils.permissions import permission_required
 
 
@@ -239,7 +240,7 @@ def print_view(sales_order_id):
 def pdf(sales_order_id):
     order = get_sales_order(sales_order_id)
     pdf_buffer = build_sales_order_pdf(order)
-    filename = f"{order.so_number.replace('/', '-')}.pdf"
+    filename = sales_order_pdf_download_name(order)
     response = send_file(
         pdf_buffer,
         mimetype="application/pdf",

@@ -24,7 +24,7 @@ from services.nota_pdf_ff_apparel_service import build_ff_apparel_pdf
 from services.nota_pdf_service import build_customer_invoice_pdf
 from services.sales_order_service import set_production_stage
 from utils.formatters import register_filters
-from utils.helpers import active_class, ensure_upload_folders
+from utils.helpers import active_class, ensure_upload_folders, sales_order_pdf_download_name
 from utils.permissions import has_permission, permission_required
 from utils.constants import normalize_size_key, sort_size_rows
 
@@ -170,7 +170,7 @@ def sales_order_download(access_code):
     if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
         abort(404)
     order = access_record.sales_order
-    filename = f"SO-{_download_filename_token(order.so_number)}.pdf"
+    filename = sales_order_pdf_download_name(order)
     return send_file(
         build_customer_sales_order_pdf(order),
         mimetype="application/pdf",
@@ -337,10 +337,6 @@ def _send_production_photo_file(photo, as_attachment):
         abort(404)
     download_name = photo.original_filename or file_path.name
     return send_file(file_path, as_attachment=as_attachment, download_name=download_name)
-
-
-def _download_filename_token(value):
-    return "".join(char if char.isalnum() or char in ("-", "_") else "-" for char in str(value or "surat-order")).strip("-") or "surat-order"
 
 
 def create_app(config_class=Config):
