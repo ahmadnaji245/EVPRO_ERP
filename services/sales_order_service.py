@@ -257,7 +257,7 @@ def ensure_player_checklist(player):
 def list_sales_orders():
     return (
         SalesOrder.query.filter_by(is_deleted=False)
-        .order_by(SalesOrder.created_at.desc(), SalesOrder.so_number.desc(), SalesOrder.id.desc())
+        .order_by(SalesOrder.created_at.desc(), SalesOrder.id.desc())
         .all()
     )
 
