@@ -146,9 +146,9 @@ def detail(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/production-photos", methods=["POST"])
-@permission_required("sales_order.manage")
+@permission_required("sales_order.production_photo")
 def upload_production_photos(sales_order_id):
-    _admin_required()
+    _production_or_admin_required()
     order = get_sales_order(sales_order_id)
     try:
         photos = add_production_photos(order, request.files.getlist("production_photos"), current_user)
@@ -163,9 +163,9 @@ def upload_production_photos(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/production-photos/<int:photo_id>/delete", methods=["POST"])
-@permission_required("sales_order.manage")
+@permission_required("sales_order.production_photo")
 def delete_production_photo_route(sales_order_id, photo_id):
-    _admin_required()
+    _production_or_admin_required()
     order = get_sales_order(sales_order_id)
     photo = get_photo_for_order(order, photo_id)
     delete_production_photo(photo)

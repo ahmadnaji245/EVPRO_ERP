@@ -15,7 +15,7 @@ from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
 from services.nota_service import seed_default_nota_products
 from services.customer_service import find_by_access_code
 from services.history_service import record_history
-from services.nota_service import calculate_invoice_status, get_nota_by_so_id, totals
+from services.nota_service import calculate_invoice_status, display_nota_number, get_nota_by_so_id, totals
 from services.order_status_service import get_display_status
 from services.pdf_service import build_customer_sales_order_pdf
 from services.production_photo_service import get_photo_for_order
@@ -196,7 +196,7 @@ def nota_download(access_code):
         pdf,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"nota-{nota.nota_number.replace('/', '-')}.pdf",
+        download_name=f"{display_nota_number(nota).replace('/', '-')}.pdf",
     )
 
 
@@ -349,6 +349,7 @@ def create_app(config_class=Config):
     register_filters(app)
     app.jinja_env.globals["active_class"] = active_class
     app.jinja_env.globals["has_permission"] = has_permission
+    app.jinja_env.globals["display_nota_number"] = display_nota_number
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)

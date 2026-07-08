@@ -13,6 +13,7 @@ from services.nota_service import (
     dashboard_stats,
     delete_nota,
     delete_product,
+    display_nota_number,
     format_so_number_for_invoice,
     form_data_from_sales_order,
     get_nota,
@@ -347,7 +348,7 @@ def internal_pdf(nota_id):
         pdf,
         mimetype="application/pdf",
         as_attachment=False,
-        download_name=f"nota-internal-{nota.nota_number}.pdf",
+        download_name=f"nota-internal-{display_nota_number(nota).replace('/', '-')}.pdf",
     )
 
 
@@ -384,7 +385,7 @@ def _pdf_invoice(nota, mapped_brand=False):
         brand_name = invoice_brand["display_name"] if invoice_brand["display_name"] in ("RDR Apparel", "FF Apparel") else "Evpro"
     return {
         "id": nota.id,
-        "invoice_number": nota.nota_number,
+        "invoice_number": display_nota_number(nota),
         "brand": brand_name,
         "order_date": nota.order_date,
         "customer_name": nota.customer.name,

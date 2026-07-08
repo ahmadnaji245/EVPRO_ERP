@@ -307,7 +307,7 @@ def validate_sales_order_form(form):
 def create_sales_order(form, user, files=None):
     order = SalesOrder(created_by_id=user.id if user else None, access_code="-", production_status="Approval Customer")
     brand = _fill_sales_order(order, form)
-    order.so_number = generate_so_number(brand.code)
+    order.so_number = generate_so_number(brand.code, order.created_at.date() if order.created_at else None)
     order.access_code = generate_access_code(brand.code)
     order.customer_portal_status = "Approval Customer"
     _sync_designs(order, form, files)

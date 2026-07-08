@@ -103,6 +103,12 @@ def format_invoice_so_code(sales_order):
     return format_so_number_for_invoice(sales_order)
 
 
+def display_nota_number(nota):
+    if nota and nota.sales_order and nota.sales_order.so_number:
+        return f"Nota-{nota.sales_order.so_number}"
+    return nota.nota_number if nota else "-"
+
+
 def list_customers():
     return NotaCustomer.query.order_by(NotaCustomer.name).all()
 
@@ -163,7 +169,9 @@ def list_notas(search=None):
     brand_group = str(search.get("brand_group") or "").strip()
 
     if q:
+        normalized_q = q.removeprefix("Nota-")
         needle = f"%{q}%"
+        normalized_needle = f"%{normalized_q}%"
         query = query.filter(
             or_(
                 Nota.nota_number.ilike(needle),
@@ -171,6 +179,7 @@ def list_notas(search=None):
                 Nota.team_name.ilike(needle),
                 NotaCustomer.phone.ilike(needle),
                 SalesOrder.so_number.ilike(needle),
+                SalesOrder.so_number.ilike(normalized_needle),
             )
         )
     if brand_id.isdigit():
@@ -313,7 +322,7 @@ def income_payments(brand=None):
             payment_date=payment.payment_date,
             amount=payment.amount,
             description=payment.description,
-            invoice_number=payment.nota.nota_number,
+            invoice_number=display_nota_number(payment.nota),
             brand=payment.nota.brand.name if payment.nota.brand else "-",
             customer_name=payment.nota.customer.name,
             team_name=payment.nota.team_name,
@@ -576,10 +585,11 @@ def _filtered_notas(brand=None):
 
 def _nota_row(nota):
     status = calculate_invoice_status(nota)
+    invoice_number = display_nota_number(nota)
     return _row(
         id=nota.id,
-        invoice_number=nota.nota_number,
-        nota_number=nota.nota_number,
+        invoice_number=invoice_number,
+        nota_number=invoice_number,
         brand=nota.brand.name if nota.brand else "-",
         order_date=nota.order_date,
         status=status,

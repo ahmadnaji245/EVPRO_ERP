@@ -176,7 +176,7 @@
                 <span class="status-pill status-{{ invoice_status|lower|replace(' ', '-') }}">{{ invoice_status }}</span>
             </div>
             <div class="row g-3">
-                <div class="col-md-3"><div class="info-label">Nomor Nota</div><div class="info-value">{{ linked_nota.nota_number }}</div></div>
+                <div class="col-md-3"><div class="info-label">Nomor Nota</div><div class="info-value">{{ display_nota_number(linked_nota) }}</div></div>
                 <div class="col-md-3"><div class="info-label">Total Nota</div><div class="info-value">{{ nota_totals.total|rupiah }}</div></div>
                 <div class="col-md-3"><div class="info-label">Sudah Dibayar</div><div class="info-value">{{ nota_totals.paid|rupiah }}</div></div>
                 <div class="col-md-3"><div class="info-label">Sisa Tagihan</div><div class="info-value">{{ nota_totals.remaining|rupiah }}</div></div>

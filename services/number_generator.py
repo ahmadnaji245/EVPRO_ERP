@@ -8,8 +8,14 @@ def generate_so_number(brand_code, order_date=None):
     order_date = order_date or date.today()
     compact = order_date.strftime("%y%m%d")
     prefix = f"{brand_code}/{compact}/"
-    total = SalesOrder.query.filter(SalesOrder.so_number.like(f"{prefix}%")).count()
-    return f"{prefix}{total + 1:04d}"
+    brand_prefix = f"{brand_code}/"
+    sequence_numbers = []
+    for so_number, in SalesOrder.query.with_entities(SalesOrder.so_number).filter(SalesOrder.so_number.like(f"{brand_prefix}%")).all():
+        parts = str(so_number or "").split("/")
+        if len(parts) == 3 and parts[0] == brand_code and parts[2].isdigit():
+            sequence_numbers.append(int(parts[2]))
+    next_sequence = (max(sequence_numbers) if sequence_numbers else 0) + 1
+    return f"{prefix}{next_sequence:04d}"
 
 
 def generate_customer_code(brand_code, order_date=None):

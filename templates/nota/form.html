@@ -37,7 +37,7 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Nomor Nota</label>
-            <input class="form-control" value="{{ nota.nota_number if nota else 'Otomatis saat disimpan' }}" disabled>
+            <input class="form-control" value="{{ display_nota_number(nota) if nota else 'Otomatis saat disimpan' }}" disabled>
         </div>
         <div class="col-md-6">
             <label class="form-label">Nama Customer</label>

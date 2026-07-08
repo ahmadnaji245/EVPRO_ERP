@@ -63,7 +63,7 @@
             {% for nota in notas %}
                 {% set invoice_status = calculate_invoice_status(nota) %}
                 <tr>
-                    <td><a href="{{ url_for('nota.detail', nota_id=nota.id) }}" class="fw-semibold">{{ nota.nota_number }}</a></td>
+                    <td><a href="{{ url_for('nota.detail', nota_id=nota.id) }}" class="fw-semibold">{{ display_nota_number(nota) }}</a></td>
                     <td>
                         {% if nota.sales_order %}
                             <a href="{{ url_for('sales_orders.detail', sales_order_id=nota.sales_order.id) }}">{{ format_so_number_for_invoice(nota.sales_order) }}</a>

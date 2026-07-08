@@ -278,8 +278,18 @@
                     <thead>
                     <tr>
                         <th>NO</th>
-                        <th>NAMA</th>
-                        <th>NP</th>
+                        <th>
+                            <div class="d-inline-flex align-items-center gap-2">
+                                <span>NAMA</span>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-1 d-print-none" type="button" data-copy-player-column="name">Copy</button>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="d-inline-flex align-items-center gap-2">
+                                <span>NP</span>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-1 d-print-none" type="button" data-copy-player-column="number">Copy</button>
+                            </div>
+                        </th>
                         <th>SIZE</th>
                         <th>KETERANGAN</th>
                         <th class="text-center">Setting</th>
@@ -295,8 +305,8 @@
                     {% for player in design.sorted_players %}
                         <tr>
                             <td>{{ loop.index }}</td>
-                            <td>{{ player.player_name }}</td>
-                            <td>{{ player.player_number or '-' }}</td>
+                            <td data-player-name>{{ player.player_name or '-' }}</td>
+                            <td data-player-number>{{ player.player_number or '-' }}</td>
                             <td>{{ player.size }}</td>
                             <td>{{ player.notes or '-' }}</td>
                             <td class="text-center">
@@ -357,6 +367,40 @@ document.querySelectorAll("[data-customer-approved-edit]").forEach((link) => {
         const targetUrl = new URL(link.href, window.location.origin);
         targetUrl.searchParams.set("revision_reason_admin", reason.trim());
         window.location.href = targetUrl.toString();
+    });
+});
+document.querySelectorAll("[data-copy-player-column]").forEach((button) => {
+    button.addEventListener("click", async () => {
+        const table = button.closest("table");
+        const column = button.dataset.copyPlayerColumn;
+        const selector = column === "number" ? "[data-player-number]" : "[data-player-name]";
+        const lines = Array.from(table.querySelectorAll("tbody tr"))
+            .map((row) => {
+                const cell = row.querySelector(selector);
+                const value = cell ? cell.textContent.trim() : "";
+                return value || "-";
+            })
+            .filter((value) => value);
+        const text = lines.join("\n");
+        const originalText = button.textContent;
+        const copiedText = column === "number" ? "NP disalin" : "Nama disalin";
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (error) {
+            const fallbackInput = document.createElement("textarea");
+            fallbackInput.value = text;
+            fallbackInput.setAttribute("readonly", "");
+            fallbackInput.style.position = "fixed";
+            fallbackInput.style.opacity = "0";
+            document.body.appendChild(fallbackInput);
+            fallbackInput.select();
+            document.execCommand("copy");
+            fallbackInput.remove();
+        }
+        button.textContent = copiedText;
+        window.setTimeout(() => {
+            button.textContent = originalText;
+        }, 1400);
     });
 });
 document.querySelectorAll("[data-checklist-cek-master]").forEach((master) => {

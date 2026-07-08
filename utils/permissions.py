@@ -18,6 +18,7 @@ PERMISSIONS = {
     "sales_order.pdf": {ROLE_ADMIN},
     "sales_order.setting_checklist": {ROLE_ADMIN, ROLE_DESAIN, ROLE_PRODUKSI},
     "sales_order.production_checklist": {ROLE_ADMIN, ROLE_PRODUKSI},
+    "sales_order.production_photo": {ROLE_ADMIN, ROLE_PRODUKSI},
     "production.view": {ROLE_ADMIN, ROLE_PRODUKSI},
     "production.manage": {ROLE_ADMIN, ROLE_PRODUKSI},
     "handover.view": {ROLE_ADMIN, ROLE_DESAIN, ROLE_PRODUKSI},
