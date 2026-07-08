@@ -33,6 +33,18 @@ def get_display_status(order):
     if taken_info["is_taken"]:
         return taken_info
 
+    if getattr(order, "approval_status", None) != "approved":
+        production_status = "Approval Customer"
+        return {
+            "is_taken": False,
+            "status": production_status,
+            "short_status": production_status,
+            "list_status": production_status,
+            "badge_class": get_status_badge_class(production_status),
+            "picked_by": None,
+            "pickup_date": None,
+        }
+
     production_status = order.production_status_label
     return {
         "is_taken": False,

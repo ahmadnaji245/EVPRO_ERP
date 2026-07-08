@@ -70,7 +70,6 @@ def index():
                 brand_code,
                 customer_name,
                 order.team_name,
-                order.production_status_label,
                 display_statuses.get(order.id, {}).get("status"),
                 display_statuses.get(order.id, {}).get("list_status"),
                 billing_statuses.get(order.id, "Belum Ada Nota"),
@@ -327,11 +326,11 @@ def update_production_checklist(sales_order_id):
                 checklist.setting_user_id = current_user.id if setting_done else None
                 checklist.setting_at = now if setting_done else None
 
-    if _setting_checklist_complete(order) and _production_stage_index(order.production_status_label) < _production_stage_index("Printing"):
+    if order.approved and _setting_checklist_complete(order) and _production_stage_index(order.production_status_label) < _production_stage_index("Printing"):
         order.setting_by_name = current_user_name
         set_production_stage(order, "Printing")
 
-    if _final_packing_checklist_complete(order):
+    if order.approved and _final_packing_checklist_complete(order):
         set_production_stage(order, "Finish")
 
     db.session.commit()

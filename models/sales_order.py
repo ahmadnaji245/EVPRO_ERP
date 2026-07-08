@@ -82,6 +82,8 @@ class SalesOrder(db.Model):
 
     @property
     def production_status_label(self):
+        if self.approval_status != "approved":
+            return "Approval Customer"
         return normalize_production_status(self.production_status)
 
     @property
@@ -92,4 +94,6 @@ class SalesOrder(db.Model):
 
     @property
     def portal_status_label(self):
+        if self.approval_status != "approved":
+            return "Approval Customer"
         return normalize_production_status(self.customer_portal_status or self.production_status or "Approval Customer")

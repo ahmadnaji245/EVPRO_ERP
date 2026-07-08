@@ -102,7 +102,7 @@
 </div>
 
 <div class="panel mb-4">
-    {% set current_status = sales_order.production_status_label %}
+    {% set current_status = display_status.status %}
     {% set current_status_index = production_statuses.index(current_status) if current_status in production_statuses else 0 %}
     {% if display_status.is_taken %}
         <div class="section-title">Status Barang</div>

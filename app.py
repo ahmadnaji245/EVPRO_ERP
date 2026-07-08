@@ -216,7 +216,7 @@ def customer_portal_progress(order):
         if design.size_setting_done(size):
             size_done += 1
     size_total = len(size_rows)
-    current_status = order.production_status_label
+    current_status = "Approval Customer" if not order.approved else order.production_status_label
     current_index = PRODUCTION_STATUSES.index(current_status) if current_status in PRODUCTION_STATUSES else 0
     return {
         "current_status": current_status,
@@ -236,6 +236,8 @@ def customer_portal_order_status(order):
 
 
 def customer_can_view_production_photos(order):
+    if not order.approved:
+        return False
     return order.production_status_label == "Finish" or bool(order.tanggal_finish_produksi)
 
 

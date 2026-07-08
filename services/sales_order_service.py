@@ -370,6 +370,8 @@ def update_production_status(order, production_status):
     production_status = normalize_production_status(production_status)
     if production_status not in PRODUCTION_STATUSES:
         raise ValueError("Status produksi tidak valid.")
+    if not order.approved and production_status != "Approval Customer":
+        return order
     order.production_status = production_status
     order.production_status_updated_at = datetime.utcnow()
     db.session.commit()
@@ -377,7 +379,10 @@ def update_production_status(order, production_status):
 
 
 def set_production_stage(order, status):
-    order.production_status = normalize_production_status(status)
+    next_status = normalize_production_status(status)
+    if not order.approved and next_status != "Approval Customer":
+        return order
+    order.production_status = next_status
     order.customer_portal_status = order.production_status
     order.production_status_updated_at = datetime.utcnow()
     if order.production_status == "Finish" and not order.tanggal_finish_produksi:
