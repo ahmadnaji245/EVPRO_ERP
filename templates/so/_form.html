@@ -13,6 +13,10 @@
                     <input class="form-control" name="customer_name" value="{{ form.get('customer_name', sales_order.customer_access.customer_name if sales_order and sales_order.customer_access else '') }}">
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label">No WhatsApp Customer</label>
+                    <input class="form-control" name="customer_phone" value="{{ form.get('customer_phone', sales_order.customer_access.customer_phone if sales_order and sales_order.customer_access else '') }}">
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Brand</label>
                     <select class="form-select" name="brand_id" required data-brand-select>
                         <option value="">Pilih brand</option>
@@ -26,6 +30,24 @@
                 <div class="col-md-4 d-none" data-seller-field>
                     <label class="form-label">Nama Seller</label>
                     <input class="form-control" name="seller_name" value="{{ form.get('seller_name', sales_order.seller_name if sales_order else '') }}" data-seller-input>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Sumber Customer</label>
+                    {% set selected_customer_source = form.get('customer_source', sales_order.crm_customer.source if sales_order and sales_order.crm_customer else '') %}
+                    <select class="form-select" name="customer_source">
+                        <option value="">Otomatis dari brand/seller</option>
+                        {% for source in ('Ahmad', 'Reseller EVPRO', 'Brand') %}
+                            <option value="{{ source }}" {% if selected_customer_source == source %}selected{% endif %}>{{ source }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nama Reseller / Brand</label>
+                    <input class="form-control" name="source_name" value="{{ form.get('source_name', sales_order.crm_customer.source_name if sales_order and sales_order.crm_customer else '') }}">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Alamat Customer</label>
+                    <input class="form-control" name="customer_address" value="{{ form.get('customer_address', sales_order.crm_customer.address if sales_order and sales_order.crm_customer else '') }}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Tanggal Masuk</label>

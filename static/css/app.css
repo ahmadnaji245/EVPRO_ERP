@@ -189,6 +189,65 @@ a {
     margin: 0;
 }
 
+.crm-detail-header {
+    align-items: stretch;
+    display: grid;
+    gap: 20px;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+}
+
+.crm-detail-main {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    min-height: 250px;
+    padding-top: 4px;
+}
+
+.crm-detail-summary {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin-top: 18px;
+}
+
+.crm-detail-summary div {
+    background: #fff;
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.crm-detail-summary span {
+    color: #687182;
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+}
+
+.crm-detail-summary strong {
+    color: #20242a;
+    display: block;
+    font-size: 0.98rem;
+    line-height: 1.25;
+}
+
+.crm-detail-actions {
+    align-self: stretch;
+    max-width: 100%;
+}
+
+.crm-wa-panel {
+    min-height: 250px;
+    padding: 16px;
+    width: 100%;
+}
+
+.crm-wa-message {
+    min-height: 132px;
+}
+
 .btn-rdr {
     background: var(--rdr-red);
     border-color: var(--rdr-red);
@@ -736,6 +795,50 @@ a {
     overflow-wrap: anywhere;
 }
 
+.public-tracking-body {
+    min-height: 100vh;
+    background: #f5f6f8;
+}
+
+.public-tracking-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.public-tracking-card {
+    width: min(100%, 420px);
+    display: grid;
+    gap: 18px;
+    justify-items: center;
+    padding: 32px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.public-tracking-logo {
+    max-width: 128px;
+    max-height: 72px;
+    object-fit: contain;
+}
+
+.public-tracking-card h1 {
+    margin: 0;
+    font-size: 1.55rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.public-tracking-card .form-label {
+    margin-bottom: -8px;
+    font-weight: 700;
+    text-align: center;
+}
+
 .customer-progress-grid {
     border: 1px solid #e4e7ec;
     border-radius: 8px;
@@ -935,6 +1038,18 @@ a {
 @media (max-width: 768px) {
     .page-shell {
         padding: 18px 12px;
+    }
+
+    .crm-detail-header {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-detail-main {
+        min-height: auto;
+    }
+
+    .crm-wa-panel {
+        min-height: 220px;
     }
 
     .panel,

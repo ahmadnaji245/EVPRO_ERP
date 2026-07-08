@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Customer CRM - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Customer Database</h1>
+        <p class="text-muted mb-0">Database customer dari Surat Order dan Nota.</p>
+    </div>
+    <a class="btn btn-rdr" href="{{ url_for('crm.lead_new') }}">+ Lead Baru</a>
+</div>
+
+<section class="panel mb-4">
+    <form class="row g-3 align-items-end" method="get">
+        <div class="col-md-4">
+            <label class="form-label">Cari</label>
+            <input class="form-control" name="q" value="{{ search.q }}" placeholder="Nama, WA, alamat">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Sumber customer</label>
+            <select class="form-select" name="source">
+                <option value="">Semua sumber</option>
+                {% for source in sources %}<option value="{{ source }}" {% if search.source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Status customer</label>
+            <select class="form-select" name="status">
+                <option value="">Semua status</option>
+                {% for status in statuses %}<option value="{{ status }}" {% if search.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid"><button class="btn btn-rdr">Filter</button></div>
+    </form>
+</section>
+
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Nama customer</th><th>No WhatsApp</th><th>Alamat</th><th>Sumber</th><th>Tanggal pertama order</th>
+                    <th class="text-end">SO</th><th class="text-end">Nota</th><th>Status</th><th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for customer in customers %}
+                <tr>
+                    <td class="fw-semibold">{{ customer.name }}</td>
+                    <td>{{ customer.whatsapp or '-' }}</td>
+                    <td>{{ customer.address or '-' }}</td>
+                    <td>{{ customer.source }}{% if customer.source_name %}<div class="small text-muted">{{ customer.source_name }}</div>{% endif %}</td>
+                    <td>{{ customer.first_order_date|pretty_date if customer.first_order_date else '-' }}</td>
+                    <td class="text-end">{{ customer.total_sales_orders }}</td>
+                    <td class="text-end">{{ customer.total_notas }}</td>
+                    <td><span class="status-pill">{{ customer.status }}</span></td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('crm.customer_detail', customer_id=customer.id) }}">Detail</a>
+                        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('crm.customer_edit', customer_id=customer.id) }}">Edit</a>
+                        <form class="d-grid gap-1 mt-1" method="post" target="_blank" action="{{ url_for('crm.customer_send_whatsapp', customer_id=customer.id) }}" data-wa-form>
+                            <select class="form-select form-select-sm" name="template_id" aria-label="Template WhatsApp {{ customer.name }}" data-wa-select>
+                                {% for template in wa_templates %}
+                                    {% set rendered = template.content|replace('{name}', customer.name)|replace('{status}', customer.status or '-')|replace('{need_type}', 'jersey')|replace('{estimated_qty}', '') %}
+                                    <option value="{{ template.id }}" data-message="{{ rendered|e }}">{{ template.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <textarea class="form-control form-control-sm" name="message" rows="3" data-wa-message></textarea>
+                            <button class="btn btn-sm btn-rdr" type="submit" {% if not customer.whatsapp %}disabled{% endif %}>Kirim WA</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-4">Belum ada customer.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-wa-form]").forEach((form) => {
+    const select = form.querySelector("[data-wa-select]");
+    const message = form.querySelector("[data-wa-message]");
+    const sync = () => {
+        const option = select.options[select.selectedIndex];
+        message.value = option ? option.dataset.message || "" : "";
+    };
+    select.addEventListener("change", sync);
+    sync();
+});
+</script>
+{% endblock %}

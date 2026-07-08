@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.name }} - Lead CRM{% endblock %}
+{% block content %}
+<div class="crm-detail-header mb-4">
+    <div class="crm-detail-main">
+        <h1 class="page-title">{{ lead.name }}</h1>
+        <p class="text-muted mb-0">{{ lead.source }}{% if lead.source_detail %} - {{ lead.source_detail }}{% endif %}</p>
+        <div class="crm-detail-summary">
+            <div><span>No WhatsApp</span><strong>{{ lead.whatsapp or '-' }}</strong></div>
+            <div><span>Status</span><strong>{{ lead.status }}</strong></div>
+            <div><span>Kebutuhan</span><strong>{{ lead.need_type or '-' }}</strong></div>
+            <div><span>Estimasi Qty</span><strong>{{ lead.estimated_qty or '-' }}</strong></div>
+        </div>
+    </div>
+    <div class="crm-detail-actions">
+        <div class="d-flex flex-wrap justify-content-lg-end gap-2 mb-3">
+            <a class="btn btn-outline-dark" href="{{ url_for('crm.leads') }}">Kembali</a>
+            <a class="btn btn-outline-dark" href="{{ url_for('crm.lead_edit', lead_id=lead.id) }}">Edit Lead</a>
+            {% if lead.status == 'Closing' and not lead.converted_so_id %}
+                <a class="btn btn-rdr" href="{{ url_for('crm.lead_create_so', lead_id=lead.id) }}">Buat Surat Order dari Lead</a>
+            {% endif %}
+            {% if lead.converted_so_id %}
+                <a class="btn btn-rdr" href="{{ url_for('sales_orders.detail', sales_order_id=lead.converted_so_id) }}">Lihat Surat Order</a>
+            {% endif %}
+        </div>
+        <section class="panel crm-wa-panel">
+            <h2 class="section-title">Kirim WhatsApp</h2>
+            <form class="d-grid gap-2" method="post" target="_blank" action="{{ url_for('crm.lead_send_whatsapp', lead_id=lead.id) }}" data-wa-form>
+            <select class="form-select" name="template_id" aria-label="Template WhatsApp" data-wa-select>
+                {% for template in wa_templates %}
+                    {% set estimated_qty = lead.estimated_qty|string if lead.estimated_qty else '' %}
+                    {% set rendered = template.content|replace('{name}', lead.name)|replace('{status}', lead.status or '-')|replace('{need_type}', lead.need_type or 'jersey')|replace('{estimated_qty}', estimated_qty) %}
+                    <option value="{{ template.id }}" data-message="{{ rendered|e }}">{{ template.name }}</option>
+                {% endfor %}
+            </select>
+            <textarea class="form-control crm-wa-message" name="message" rows="6" data-wa-message></textarea>
+            <button class="btn btn-rdr" type="submit" {% if not lead.whatsapp %}disabled{% endif %}>Kirim WA</button>
+        </form>
+        </section>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <section class="panel">
+            <h2 class="section-title">Detail Lead</h2>
+            <div class="row g-3">
+                <div class="col-md-6"><div class="info-label">Nama</div><div class="info-value">{{ lead.name }}</div></div>
+                <div class="col-md-6"><div class="info-label">WhatsApp</div><div class="info-value">{{ lead.whatsapp or '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Sumber</div><div class="info-value">{{ lead.source }}</div></div>
+                <div class="col-md-6"><div class="info-label">Detail sumber</div><div class="info-value">{{ lead.source_detail or '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Jenis kebutuhan</div><div class="info-value">{{ lead.need_type or '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Estimasi qty</div><div class="info-value">{{ lead.estimated_qty or '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Status</div><div class="info-value"><span class="status-pill">{{ lead.status }}</span></div></div>
+                <div class="col-md-6"><div class="info-label">Follow up berikutnya</div><div class="info-value">{{ lead.next_follow_up_date|pretty_date if lead.next_follow_up_date else '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Admin/CS</div><div class="info-value">{{ lead.assigned_user.name if lead.assigned_user else '-' }}</div></div>
+                <div class="col-md-6"><div class="info-label">Converted</div><div class="info-value">{{ 'Ya' if lead.is_converted else 'Belum' }}</div></div>
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="panel mb-4">
+            <h2 class="section-title">Catatan</h2>
+            <div class="text-muted">{{ lead.notes or 'Belum ada catatan.' }}</div>
+        </section>
+        <section class="panel mb-4">
+            <h2 class="section-title">Tambah Follow Up Lead</h2>
+            <form method="post" action="{{ url_for('crm.add_lead_follow_up', lead_id=lead.id) }}" class="row g-3">
+                <div class="col-12"><label class="form-label">Tanggal follow up</label><input class="form-control" type="date" name="follow_up_date" value="{{ today }}" required></div>
+                <div class="col-12"><label class="form-label">Isi follow up</label><textarea class="form-control" name="content" rows="3" required></textarea></div>
+                <div class="col-12"><label class="form-label">Respon lead</label><textarea class="form-control" name="customer_response" rows="2"></textarea></div>
+                <div class="col-12"><label class="form-label">Status follow up</label><select class="form-select" name="status">{% for status in follow_up_statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}</select></div>
+                <div class="col-12"><label class="form-label">Tanggal follow up berikutnya</label><input class="form-control" type="date" name="next_follow_up_date"></div>
+                <div class="col-12"><label class="form-label">Catatan tambahan</label><textarea class="form-control" name="notes" rows="2"></textarea></div>
+                <div class="col-12 d-grid"><button class="btn btn-rdr">Tambah Follow Up</button></div>
+            </form>
+        </section>
+        <section class="panel">
+            <h2 class="section-title">Hasil Konversi</h2>
+            <div class="summary-row"><span>Customer</span><strong>{% if lead.converted_customer %}<a href="{{ url_for('crm.customer_detail', customer_id=lead.converted_customer_id) }}">{{ lead.converted_customer.name }}</a>{% else %}-{% endif %}</strong></div>
+            <div class="summary-row"><span>Surat Order</span><strong>{% if lead.converted_sales_order %}<a href="{{ url_for('sales_orders.detail', sales_order_id=lead.converted_so_id) }}">{{ lead.converted_sales_order.so_number }}</a>{% else %}-{% endif %}</strong></div>
+        </section>
+    </div>
+    <div class="col-12">
+        <section class="panel table-panel">
+            <h2 class="section-title">Riwayat Follow Up Lead</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Tanggal</th><th>Admin/CS</th><th>Isi</th><th>Respon</th><th>Status</th><th>Follow up berikutnya</th><th>Catatan</th></tr></thead>
+                    <tbody>
+                    {% for item in lead.follow_ups|sort(attribute='follow_up_date', reverse=true) %}
+                        <tr>
+                            <td>{{ item.follow_up_date|pretty_date }}</td>
+                            <td>{{ item.admin.name if item.admin else item.admin_name or '-' }}</td>
+                            <td>{{ item.content }}</td>
+                            <td>{{ item.customer_response or '-' }}</td>
+                            <td>{{ item.status }}</td>
+                            <td>{{ item.next_follow_up_date|pretty_date if item.next_follow_up_date else '-' }}</td>
+                            <td>{{ item.notes or '-' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">Belum ada follow up lead.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-wa-form]").forEach((form) => {
+    const select = form.querySelector("[data-wa-select]");
+    const message = form.querySelector("[data-wa-message]");
+    const sync = () => {
+        const option = select.options[select.selectedIndex];
+        message.value = option ? option.dataset.message || "" : "";
+    };
+    select.addEventListener("change", sync);
+    sync();
+});
+</script>
+{% endblock %}

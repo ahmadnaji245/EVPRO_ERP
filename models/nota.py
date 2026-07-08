@@ -43,6 +43,7 @@ class Nota(db.Model):
     notes = db.Column(db.Text)
     so_id = db.Column(db.Integer, db.ForeignKey("sales_orders.id"), nullable=True, unique=True, index=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    crm_customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -50,6 +51,7 @@ class Nota(db.Model):
     customer = db.relationship("NotaCustomer", back_populates="notas")
     sales_order = db.relationship("SalesOrder")
     created_by = db.relationship("User")
+    crm_customer = db.relationship("Customer", back_populates="notas")
     items = db.relationship("NotaItem", back_populates="nota", cascade="all, delete-orphan")
     payments = db.relationship("NotaPayment", back_populates="nota", cascade="all, delete-orphan")
 

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Follow Up CRM - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div><h1 class="page-title">Follow Up CRM</h1><p class="text-muted mb-0">Follow up jatuh tempo hari ini ditampilkan paling atas.</p></div>
+    <a class="btn btn-rdr" href="{{ url_for('crm.lead_new') }}">+ Lead Baru</a>
+</div>
+
+<section class="panel mb-4">
+    <form class="row g-3 align-items-end" method="get">
+        <div class="col-md-2"><label class="form-label">Tipe</label><select class="form-select" name="follow_up_type"><option value="">Semua</option><option value="Lead" {% if search.follow_up_type == 'Lead' %}selected{% endif %}>Lead</option><option value="Customer" {% if search.follow_up_type == 'Customer' %}selected{% endif %}>Customer</option></select></div>
+        <div class="col-md-2"><label class="form-label">Status</label><select class="form-select" name="status"><option value="">Semua</option>{% for status in statuses %}<option value="{{ status }}" {% if search.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><label class="form-label">Tanggal berikutnya</label><input class="form-control" type="date" name="next_follow_up_date" value="{{ search.next_follow_up_date }}"></div>
+        <div class="col-md-2"><label class="form-label">Nama</label><input class="form-control" name="name" value="{{ search.name }}"></div>
+        <div class="col-md-2"><label class="form-label">Admin/CS</label><input class="form-control" name="admin" value="{{ search.admin }}"></div>
+        <div class="col-md-2"><label class="form-label">Sumber</label><select class="form-select" name="source"><option value="">Semua</option>{% for source in sources %}<option value="{{ source }}" {% if search.source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}</select></div>
+        <div class="col-md-12 d-grid d-md-block"><button class="btn btn-rdr">Filter</button></div>
+    </form>
+</section>
+
+<section class="panel mb-4">
+    <h2 class="section-title">Tambah Follow Up</h2>
+    <form method="post" action="{{ url_for('crm.create_follow_up_route') }}" class="row g-3">
+        <div class="col-md-3"><label class="form-label">Tipe Follow Up</label><select class="form-select" name="follow_up_type" data-follow-up-type><option value="Customer">Customer</option><option value="Lead">Lead</option></select></div>
+        <div class="col-md-5" data-follow-up-target="Customer"><label class="form-label">Nama Customer</label><select class="form-select" name="customer_id" data-customer-select>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }} - {{ customer.whatsapp or '-' }}</option>{% endfor %}</select></div>
+        <div class="col-md-5 d-none" data-follow-up-target="Lead"><label class="form-label">Nama Lead</label><select class="form-select" name="lead_id" data-lead-select disabled>{% for lead in leads %}<option value="{{ lead.id }}">{{ lead.name }} - {{ lead.whatsapp or '-' }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><label class="form-label">Tanggal</label><input class="form-control" type="date" name="follow_up_date" value="{{ today }}" required></div>
+        <div class="col-md-2"><label class="form-label">Status</label><select class="form-select" name="status">{% for status in statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="form-label">Follow up berikutnya</label><input class="form-control" type="date" name="next_follow_up_date"></div>
+        <div class="col-md-6"><label class="form-label">Isi follow up</label><textarea class="form-control" name="content" rows="2" required></textarea></div>
+        <div class="col-md-6"><label class="form-label">Respon customer</label><textarea class="form-control" name="customer_response" rows="2"></textarea></div>
+        <div class="col-12"><label class="form-label">Catatan tambahan</label><input class="form-control" name="notes"></div>
+        <div class="col-12"><button class="btn btn-rdr">Tambah Follow Up</button></div>
+    </form>
+</section>
+
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Tipe</th><th>Nama</th><th>Tanggal</th><th>Admin/CS</th><th>Isi</th><th>Respon</th><th>Status</th><th>Follow up berikutnya</th><th>Catatan</th></tr></thead>
+            <tbody>
+            {% for item in follow_ups %}
+                {% set due = item.next_follow_up_date and item.next_follow_up_date.isoformat() <= today and item.status not in ('Closing', 'Tidak jadi') %}
+                <tr class="{{ 'table-warning' if due else '' }}">
+                    <td>{{ item.follow_up_type }}</td>
+                    <td>
+                        {% if item.follow_up_type == 'Lead' and item.lead %}
+                            <a href="{{ url_for('crm.lead_detail', lead_id=item.lead_id) }}">{{ item.lead.name }}</a><div class="small text-muted">{{ item.lead.source }}</div>
+                        {% elif item.customer %}
+                            <a href="{{ url_for('crm.customer_detail', customer_id=item.customer_id) }}">{{ item.customer.name }}</a><div class="small text-muted">{{ item.customer.source }}</div>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ item.follow_up_date|pretty_date }}</td>
+                    <td>{{ item.admin.name if item.admin else item.admin_name or '-' }}</td>
+                    <td>{{ item.content }}</td>
+                    <td>{{ item.customer_response or '-' }}</td>
+                    <td>{{ item.status }}</td>
+                    <td>{{ item.next_follow_up_date|pretty_date if item.next_follow_up_date else '-' }}</td>
+                    <td>{{ item.notes or '-' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-4">Belum ada follow up.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-follow-up-type]").forEach((typeSelect) => {
+    const form = typeSelect.closest("form");
+    const customerWrap = form.querySelector('[data-follow-up-target="Customer"]');
+    const leadWrap = form.querySelector('[data-follow-up-target="Lead"]');
+    const customerSelect = form.querySelector("[data-customer-select]");
+    const leadSelect = form.querySelector("[data-lead-select]");
+    const syncType = () => {
+        const isLead = typeSelect.value === "Lead";
+        customerWrap.classList.toggle("d-none", isLead);
+        leadWrap.classList.toggle("d-none", !isLead);
+        customerSelect.disabled = isLead;
+        leadSelect.disabled = !isLead;
+    };
+    typeSelect.addEventListener("change", syncType);
+    syncType();
+});
+</script>
+{% endblock %}

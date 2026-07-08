@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ customer.name }} - CRM EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div><h1 class="page-title">Edit Customer</h1><p class="text-muted mb-0">{{ customer.name }}</p></div>
+    <a class="btn btn-outline-dark" href="{{ url_for('crm.customer_detail', customer_id=customer.id) }}">Kembali</a>
+</div>
+<section class="panel">
+    <form method="post" class="row g-3">
+        <div class="col-md-6"><label class="form-label">Nama customer</label><input class="form-control" name="name" value="{{ customer.name }}" required></div>
+        <div class="col-md-6"><label class="form-label">No WhatsApp</label><input class="form-control" name="whatsapp" value="{{ customer.whatsapp or '' }}"></div>
+        <div class="col-md-6"><label class="form-label">Sumber customer</label><select class="form-select" name="source">{% for source in sources %}<option value="{{ source }}" {% if customer.source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}</select></div>
+        <div class="col-md-6"><label class="form-label">Nama reseller atau brand</label><input class="form-control" name="source_name" value="{{ customer.source_name or '' }}"></div>
+        <div class="col-md-6"><label class="form-label">Status customer</label><select class="form-select" name="status">{% for status in statuses %}<option value="{{ status }}" {% if customer.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
+        <div class="col-12"><label class="form-label">Alamat</label><textarea class="form-control" name="address" rows="2">{{ customer.address or '' }}</textarea></div>
+        <div class="col-12"><label class="form-label">Catatan karakter customer</label><textarea class="form-control" name="character_notes" rows="4">{{ customer.character_notes or '' }}</textarea></div>
+        <div class="col-12"><button class="btn btn-rdr">Simpan Customer</button></div>
+    </form>
+</section>
+{% endblock %}

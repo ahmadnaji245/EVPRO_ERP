@@ -3,6 +3,7 @@
 {% block content %}
 {% if access_record %}
     {% set sales_order = access_record.sales_order %}
+    {% set tracking_code = public_tracking_code if public_tracking_code is defined and public_tracking_code else none %}
     {% set portal_status = sales_order.portal_status_label %}
     {% set is_tracking = sales_order.approved or portal_progress.current_index > 0 %}
     {% set current_status = portal_progress.current_status %}
@@ -23,9 +24,9 @@
     </div>
 
     <div class="portal-action-bar mb-4">
-        <a class="btn btn-rdr" href="{{ url_for('tracking.sales_order_download', access_code=access_record.access_code) }}">Download Surat Order</a>
+        <a class="btn btn-rdr" href="{{ url_for('public_tracking_sales_order_download', tracking_code=tracking_code) if tracking_code else url_for('tracking.sales_order_download', access_code=access_record.access_code) }}">Download Surat Order</a>
         {% if linked_nota %}
-            <a class="btn btn-outline-dark" href="{{ url_for('tracking.nota_download', access_code=access_record.access_code) }}">Download Nota</a>
+            <a class="btn btn-outline-dark" href="{{ url_for('public_tracking_nota_download', tracking_code=tracking_code) if tracking_code else url_for('tracking.nota_download', access_code=access_record.access_code) }}">Download Nota</a>
         {% endif %}
     </div>
 
@@ -130,7 +131,7 @@
                     <div class="section-title">Status Persetujuan</div>
                     <span class="badge text-bg-warning mb-3">{{ portal_status }}</span>
                     <p class="text-muted">Periksa desain, ukuran, nama, nomor punggung, dan detail pesanan. Jika sudah sesuai, tekan tombol approve untuk memulai proses produksi.</p>
-                    <form method="post" action="{{ url_for('tracking.approve_customer', access_code=access_record.access_code) }}">
+                    <form method="post" action="{{ url_for('public_tracking_approve', tracking_code=tracking_code) if tracking_code else url_for('tracking.approve_customer', access_code=access_record.access_code) }}">
                         <button class="btn btn-success" type="submit">Approve Surat Order</button>
                     </form>
                 {% endif %}
@@ -151,12 +152,12 @@
             <div class="production-photo-gallery">
                 {% for photo in production_photos %}
                     <div class="production-photo-card">
-                        <a href="{{ url_for('tracking.production_photo', access_code=access_record.access_code, photo_id=photo.id) }}" target="_blank" rel="noopener" aria-label="Perbesar foto hasil produksi {{ loop.index }}">
-                            <img src="{{ url_for('tracking.production_photo', access_code=access_record.access_code, photo_id=photo.id) }}" alt="Foto hasil produksi {{ loop.index }}">
+                        <a href="{{ url_for('public_tracking_production_photo', tracking_code=tracking_code, photo_id=photo.id) if tracking_code else url_for('tracking.production_photo', access_code=access_record.access_code, photo_id=photo.id) }}" target="_blank" rel="noopener" aria-label="Perbesar foto hasil produksi {{ loop.index }}">
+                            <img src="{{ url_for('public_tracking_production_photo', tracking_code=tracking_code, photo_id=photo.id) if tracking_code else url_for('tracking.production_photo', access_code=access_record.access_code, photo_id=photo.id) }}" alt="Foto hasil produksi {{ loop.index }}">
                         </a>
                         <div class="production-photo-card-body">
                             <span>Foto {{ loop.index }}</span>
-                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('tracking.production_photo_download', access_code=access_record.access_code, photo_id=photo.id) }}">Download Foto</a>
+                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('public_tracking_production_photo_download', tracking_code=tracking_code, photo_id=photo.id) if tracking_code else url_for('tracking.production_photo_download', access_code=access_record.access_code, photo_id=photo.id) }}">Download Foto</a>
                         </div>
                     </div>
                 {% endfor %}

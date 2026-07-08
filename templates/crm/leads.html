@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Lead CRM - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Daftar Lead</h1>
+        <p class="text-muted mb-0">Calon customer sebelum dibuatkan Surat Order.</p>
+    </div>
+    <a class="btn btn-rdr" href="{{ url_for('crm.lead_new') }}">+ Lead Baru</a>
+</div>
+
+<section class="panel mb-4">
+    <form class="row g-3 align-items-end" method="get">
+        <div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><option value="">Semua</option>{% for status in statuses %}<option value="{{ status }}" {% if search.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><label class="form-label">Sumber</label><select class="form-select" name="source"><option value="">Semua</option>{% for source in sources %}<option value="{{ source }}" {% if search.source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="form-label">Tanggal follow up</label><input class="form-control" type="date" name="next_follow_up_date" value="{{ search.next_follow_up_date }}"></div>
+        <div class="col-md-2"><label class="form-label">Admin/CS</label><input class="form-control" name="assigned" value="{{ search.assigned }}"></div>
+        <div class="col-md-2 d-grid"><button class="btn btn-rdr">Filter</button></div>
+    </form>
+</section>
+
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Lead</th><th>WhatsApp</th><th>Sumber</th><th>Kebutuhan</th><th class="text-end">Qty</th><th>Status</th><th>Follow up</th><th>Admin/CS</th><th>Converted</th><th>Aksi</th></tr></thead>
+            <tbody>
+            {% for lead in leads %}
+                {% set due = lead.next_follow_up_date and lead.next_follow_up_date.isoformat() <= today and lead.status not in ('Closing', 'Tidak jadi') %}
+                <tr class="{{ 'table-warning' if due else '' }}">
+                    <td class="fw-semibold">{{ lead.name }}</td>
+                    <td>{{ lead.whatsapp or '-' }}</td>
+                    <td>{{ lead.source }}{% if lead.source_detail %}<div class="small text-muted">{{ lead.source_detail }}</div>{% endif %}</td>
+                    <td>{{ lead.need_type or '-' }}</td>
+                    <td class="text-end">{{ lead.estimated_qty or '-' }}</td>
+                    <td><span class="status-pill">{{ lead.status }}</span></td>
+                    <td>{{ lead.next_follow_up_date|pretty_date if lead.next_follow_up_date else '-' }}</td>
+                    <td>{{ lead.assigned_user.name if lead.assigned_user else '-' }}</td>
+                    <td>{{ 'Ya' if lead.is_converted else '-' }}</td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('crm.lead_detail', lead_id=lead.id) }}">Detail</a>
+                        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('crm.lead_edit', lead_id=lead.id) }}">Edit</a>
+                        <form class="d-grid gap-1 mt-1" method="post" target="_blank" action="{{ url_for('crm.lead_send_whatsapp', lead_id=lead.id) }}" data-wa-form>
+                            <select class="form-select form-select-sm" name="template_id" aria-label="Template WhatsApp {{ lead.name }}" data-wa-select>
+                                {% for template in wa_templates %}
+                                    {% set estimated_qty = lead.estimated_qty|string if lead.estimated_qty else '' %}
+                                    {% set rendered = template.content|replace('{name}', lead.name)|replace('{status}', lead.status or '-')|replace('{need_type}', lead.need_type or 'jersey')|replace('{estimated_qty}', estimated_qty) %}
+                                    <option value="{{ template.id }}" data-message="{{ rendered|e }}">{{ template.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <textarea class="form-control form-control-sm" name="message" rows="3" data-wa-message></textarea>
+                            <button class="btn btn-sm btn-rdr" type="submit" {% if not lead.whatsapp %}disabled{% endif %}>Kirim WA</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="10" class="text-center text-muted py-4">Belum ada lead.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-wa-form]").forEach((form) => {
+    const select = form.querySelector("[data-wa-select]");
+    const message = form.querySelector("[data-wa-message]");
+    const sync = () => {
+        const option = select.options[select.selectedIndex];
+        message.value = option ? option.dataset.message || "" : "";
+    };
+    select.addEventListener("change", sync);
+    sync();
+});
+</script>
+{% endblock %}

@@ -1,4 +1,5 @@
 from models.brand import Brand
+from models.crm import CUSTOMER_SOURCES, CUSTOMER_STATUSES, FOLLOW_UP_STATUSES, LEAD_SOURCES, LEAD_STATUSES, Customer, FollowUp, Lead, WhatsAppTemplate
 from models.customer_access import CustomerAccess
 from models.customer_revision_note import CustomerRevisionNote
 from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
@@ -17,6 +18,12 @@ from models.user import User
 
 __all__ = [
     "Brand",
+    "CUSTOMER_SOURCES",
+    "CUSTOMER_STATUSES",
+    "FOLLOW_UP_STATUSES",
+    "LEAD_SOURCES",
+    "LEAD_STATUSES",
+    "Customer",
     "CustomerAccess",
     "CustomerRevisionNote",
     "MasterInstruction",
@@ -28,6 +35,9 @@ __all__ = [
     "NotaItem",
     "NotaPayment",
     "NotaProduct",
+    "FollowUp",
+    "Lead",
+    "WhatsAppTemplate",
     "ProductionChecklist",
     "ProductionSizeChecklist",
     "QcChecklist",

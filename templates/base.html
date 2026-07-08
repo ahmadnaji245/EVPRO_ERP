@@ -26,6 +26,7 @@
                     {% set so_module_prefixes = ('sales_orders.', 'sales_orders_approval.', 'production.', 'handover.', 'master.', 'reports.', 'settings.') %}
                     {% set is_so_module = request.endpoint and request.endpoint.startswith(so_module_prefixes) %}
                     {% set is_nota_module = request.endpoint and request.endpoint.startswith('nota.') %}
+                    {% set is_crm_module = request.endpoint and request.endpoint.startswith('crm.') %}
                     {% if has_permission('dashboard.view') %}
                         <a class="nav-link {{ active_class('dashboard.') }}" href="{{ url_for('dashboard.index') }}">Dashboard</a>
                     {% endif %}
@@ -34,6 +35,9 @@
                     {% endif %}
                     {% if has_permission('nota.view') %}
                         <a class="nav-link {{ 'active' if is_nota_module else '' }}" href="{{ url_for('nota.index') }}">Nota</a>
+                    {% endif %}
+                    {% if has_permission('crm.view') %}
+                        <a class="nav-link {{ 'active' if is_crm_module else '' }}" href="{{ url_for('crm.dashboard') }}">CRM</a>
                     {% endif %}
                     <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 {% else %}
@@ -89,6 +93,21 @@
                 <a class="nota-subnav-link {{ 'active' if request.endpoint in ('nota.reports', 'nota.customer_report') else '' }}" href="{{ url_for('nota.reports') }}">Laporan Nota</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.receivables_page' else '' }}" href="{{ url_for('nota.receivables_page') }}">Piutang</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint == 'nota.income_page' else '' }}" href="{{ url_for('nota.income_page') }}">Pemasukan</a>
+            </div>
+        </div>
+    </nav>
+{% endif %}
+
+{% set show_crm_shell = current_user.is_authenticated and request.endpoint and request.endpoint.startswith('crm.') %}
+{% if show_crm_shell and has_permission('crm.view') %}
+    <nav class="nota-subnav" aria-label="CRM navigation">
+        <div class="container-fluid">
+            <div class="nota-subnav-inner">
+                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'crm.dashboard' else '' }}" href="{{ url_for('crm.dashboard') }}">Dashboard CRM</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.leads', 'crm.lead_new', 'crm.lead_detail', 'crm.lead_edit') else '' }}" href="{{ url_for('crm.leads') }}">Lead</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.customers', 'crm.customer_detail', 'crm.customer_edit') else '' }}" href="{{ url_for('crm.customers') }}">Customer</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.follow_ups', 'crm.create_follow_up_route') else '' }}" href="{{ url_for('crm.follow_ups') }}">Follow Up</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.wa_templates', 'crm.wa_template_edit') else '' }}" href="{{ url_for('crm.wa_templates') }}">Template WA</a>
             </div>
         </div>
     </nav>

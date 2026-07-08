@@ -8,6 +8,7 @@ from openpyxl.styles import Font, PatternFill
 
 from database.db import db
 from models import Brand, Nota, NotaCustomer, NotaItem, NotaPayment, NotaProduct, SalesOrder
+from services.crm_service import sync_nota_customer
 from services.number_generator import generate_nota_number
 from utils.formatters import pretty_date
 
@@ -522,6 +523,7 @@ def create_nota(form, user=None):
     )
     _replace_items(nota, items)
     db.session.add(nota)
+    sync_nota_customer(nota)
     db.session.commit()
     return nota
 
@@ -543,6 +545,7 @@ def update_nota(nota, form):
             raise ValueError("Sales Order ini sudah memiliki Nota.")
     nota.so_id = so_id
     _replace_items(nota, items)
+    sync_nota_customer(nota)
     db.session.commit()
     return nota
 

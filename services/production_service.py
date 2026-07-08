@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timedelta
 from database.db import db
 from models import Brand, CustomerAccess, QcChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
 from services.item_service import component_key, design_components, qc_enabled_components_for_order
+from services.number_generator import generate_tracking_code
 from utils.constants import PRODUCTION_STATUSES, PRODUCTION_VENDORS, normalize_production_status, sort_players_by_size
 
 
@@ -309,6 +310,7 @@ def seed_production_sample_data():
             brand_id=brand.id,
             customer_code=f"SAMPLE-{sample['team_name'].replace(' ', '-')[:24]}",
             access_code=f"sample-prod-{so_number.replace('/', '-').lower()}",
+            tracking_code=generate_tracking_code(),
             material="Dryfit",
             pattern="Reguler",
             grade="A",

@@ -25,6 +25,8 @@ PERMISSIONS = {
     "handover.manage": {ROLE_ADMIN},
     "nota.view": {ROLE_ADMIN},
     "nota.manage": {ROLE_ADMIN},
+    "crm.view": {ROLE_ADMIN},
+    "crm.manage": {ROLE_ADMIN},
     "master.view": {ROLE_ADMIN},
     "reports.view": {ROLE_ADMIN},
     "settings.view": {ROLE_ADMIN},

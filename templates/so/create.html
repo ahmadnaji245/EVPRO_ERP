@@ -10,6 +10,14 @@
 <form method="post" enctype="multipart/form-data">
     {% set sales_order = none %}
     {% set submit_label = 'Simpan Surat Order' %}
+    {% if source_lead %}
+        <input type="hidden" name="lead_id" value="{{ source_lead.id }}">
+        <div class="alert alert-info">
+            Membuat Surat Order dari lead {{ source_lead.name }}. Lengkapi brand, produksi, dan detail desain sebelum menyimpan.
+        </div>
+    {% elif form.get('lead_id') %}
+        <input type="hidden" name="lead_id" value="{{ form.get('lead_id') }}">
+    {% endif %}
     {% include "so/_form.html" %}
 </form>
 {% endblock %}

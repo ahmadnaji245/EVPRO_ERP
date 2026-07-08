@@ -7,12 +7,14 @@ from sqlalchemy import inspect, text
 
 from config import Config
 from database.db import db
-from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, Setting, User
+from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, SalesOrder, Setting, User
+from routes.crm_routes import crm_bp
 from routes.handover_routes import handover_bp
 from routes.nota_routes import _pdf_invoice, _pdf_items, _pdf_payments, nota_bp
 from routes.so_shell_routes import master_bp, production_bp, reports_bp, settings_bp
 from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
 from services.nota_service import seed_default_nota_products
+from services.crm_service import refresh_all_customer_stats, seed_default_whatsapp_templates, sync_nota_customer, sync_sales_order_customer
 from services.customer_service import find_by_access_code
 from services.history_service import record_history
 from services.nota_service import calculate_invoice_status, display_nota_number, get_nota_by_so_id, totals
@@ -22,7 +24,8 @@ from services.production_photo_service import get_photo_for_order
 from services.production_service import PRODUCTION_STATUSES, seed_production_sample_data
 from services.nota_pdf_ff_apparel_service import build_ff_apparel_pdf
 from services.nota_pdf_service import build_customer_invoice_pdf
-from services.sales_order_service import set_production_stage
+from services.number_generator import generate_tracking_code
+from services.sales_order_service import get_sales_order_by_tracking_code, set_production_stage
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders, nota_pdf_download_name, sales_order_pdf_download_name
 from utils.permissions import has_permission, permission_required
@@ -110,7 +113,56 @@ def detail(access_code):
         portal_design_player_groups=customer_portal_design_player_groups(order),
         portal_size_recap=customer_portal_size_recap(order),
         portal_long_sleeve_recap=customer_portal_long_sleeve_recap(order),
+        public_tracking_code=None,
     )
+
+
+def _render_tracking_detail(order, status_code=200):
+    if not order or order.is_deleted or not order.customer_access:
+        return render_template(
+            "so/customer.html",
+            access_record=None,
+            production_statuses=PRODUCTION_STATUSES,
+            portal_progress=None,
+            linked_nota=None,
+            nota_totals=None,
+            invoice_status=None,
+            production_photos=[],
+            portal_design_player_groups=[],
+            portal_size_recap={},
+            portal_long_sleeve_recap=[],
+            public_tracking_code=None,
+        ), 404
+    access_record = order.customer_access
+    linked_nota = get_nota_by_so_id(order.id)
+    return render_template(
+        "so/customer.html",
+        access_record=access_record,
+        production_statuses=PRODUCTION_STATUSES,
+        portal_progress=customer_portal_progress(order),
+        portal_order_status=customer_portal_order_status(order),
+        linked_nota=linked_nota,
+        nota_totals=totals(linked_nota) if linked_nota else None,
+        invoice_status=calculate_invoice_status(linked_nota) if linked_nota else None,
+        production_photos=list(order.production_photos) if customer_can_view_production_photos(order) else [],
+        can_view_production_photos=customer_can_view_production_photos(order),
+        portal_design_player_groups=customer_portal_design_player_groups(order),
+        portal_size_recap=customer_portal_size_recap(order),
+        portal_long_sleeve_recap=customer_portal_long_sleeve_recap(order),
+        public_tracking_code=order.tracking_code,
+    ), status_code
+
+
+@tracking_bp.route("", methods=["GET", "POST"])
+@tracking_bp.route("/", methods=["GET", "POST"])
+def lookup():
+    tracking_code = request.form.get("tracking_code", "").strip().upper()
+    if request.method == "POST":
+        order = get_sales_order_by_tracking_code(tracking_code)
+        if order:
+            return redirect(url_for("public_tracking_detail", tracking_code=order.tracking_code))
+        flash("Kode tracking tidak ditemukan.", "danger")
+    return render_template("so/tracking_lookup.html", tracking_code=tracking_code)
 
 
 @tracking_bp.route("/<access_code>/approve", methods=["POST"])
@@ -138,6 +190,30 @@ def approve_customer(access_code):
         db.session.commit()
         flash("Surat Order berhasil disetujui.", "success")
     return redirect(url_for("tracking.detail", access_code=access_code))
+
+
+def approve_customer_order(order):
+    access_record = order.customer_access if order else None
+    if not access_record:
+        abort(404)
+    if not order.approved:
+        old_status = order.approval_status
+        order.approved = True
+        order.approved_by = access_record.customer_name or order.team_name
+        order.approved_source = "customer"
+        order.approved_at = datetime.utcnow()
+        set_production_stage(order, "Setting")
+        record_history(
+            order,
+            actor_name=access_record.customer_name or "Customer",
+            action="Surat Order disetujui customer",
+            field_name="approval_status",
+            old_value=old_status,
+            new_value="approved",
+            notes=f"Tracking code: {order.tracking_code}",
+        )
+        db.session.commit()
+        flash("Surat Order berhasil disetujui.", "success")
 
 
 @tracking_bp.route("/<access_code>/production-photos/<int:photo_id>")
@@ -185,6 +261,37 @@ def nota_download(access_code):
     if not access_record or not access_record.sales_order or access_record.sales_order.is_deleted:
         abort(404)
     nota = get_nota_by_so_id(access_record.sales_order.id)
+    if not nota:
+        abort(404)
+    invoice = _pdf_invoice(nota, mapped_brand=True)
+    if invoice["brand"] == "FF Apparel":
+        pdf = build_ff_apparel_pdf(invoice, _pdf_items(nota), _pdf_payments(nota), totals(nota))
+    else:
+        pdf = build_customer_invoice_pdf(invoice, _pdf_items(nota), totals(nota))
+    return send_file(
+        pdf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=nota_pdf_download_name(nota),
+    )
+
+
+def _sales_order_download_for_order(order):
+    if not order or order.is_deleted:
+        abort(404)
+    filename = sales_order_pdf_download_name(order)
+    return send_file(
+        build_customer_sales_order_pdf(order),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+def _nota_download_for_order(order):
+    if not order or order.is_deleted:
+        abort(404)
+    nota = get_nota_by_so_id(order.id)
     if not nota:
         abort(404)
     invoice = _pdf_invoice(nota, mapped_brand=True)
@@ -363,6 +470,7 @@ def create_app(config_class=Config):
     app.register_blueprint(reports_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(nota_bp)
+    app.register_blueprint(crm_bp)
     app.register_blueprint(tracking_bp)
 
     @app.before_request
@@ -387,6 +495,40 @@ def create_app(config_class=Config):
     @app.route("/track/<access_code>/approve", methods=["POST"])
     def tracking_approve_short_alias(access_code):
         return approve_customer(access_code)
+
+    @app.route("/t/<tracking_code>")
+    def public_tracking_detail(tracking_code):
+        return _render_tracking_detail(get_sales_order_by_tracking_code(tracking_code))
+
+    @app.route("/t/<tracking_code>/approve", methods=["POST"])
+    def public_tracking_approve(tracking_code):
+        order = get_sales_order_by_tracking_code(tracking_code)
+        approve_customer_order(order)
+        return redirect(url_for("public_tracking_detail", tracking_code=order.tracking_code))
+
+    @app.route("/t/<tracking_code>/production-photos/<int:photo_id>")
+    def public_tracking_production_photo(tracking_code, photo_id):
+        order = get_sales_order_by_tracking_code(tracking_code)
+        if not order or not customer_can_view_production_photos(order):
+            abort(404)
+        photo = get_photo_for_order(order, photo_id)
+        return _send_production_photo_file(photo, as_attachment=False)
+
+    @app.route("/t/<tracking_code>/production-photos/<int:photo_id>/download")
+    def public_tracking_production_photo_download(tracking_code, photo_id):
+        order = get_sales_order_by_tracking_code(tracking_code)
+        if not order or not customer_can_view_production_photos(order):
+            abort(404)
+        photo = get_photo_for_order(order, photo_id)
+        return _send_production_photo_file(photo, as_attachment=True)
+
+    @app.route("/t/<tracking_code>/surat-order.pdf")
+    def public_tracking_sales_order_download(tracking_code):
+        return _sales_order_download_for_order(get_sales_order_by_tracking_code(tracking_code))
+
+    @app.route("/t/<tracking_code>/nota.pdf")
+    def public_tracking_nota_download(tracking_code):
+        return _nota_download_for_order(get_sales_order_by_tracking_code(tracking_code))
 
     @app.route("/customer/access", methods=["GET", "POST"])
     def customer_access_alias():
@@ -433,9 +575,14 @@ def create_app(config_class=Config):
         ensure_v05_schema()
         ensure_v06_schema()
         ensure_v07_schema()
+        ensure_v09_tracking_schema()
+        ensure_v08_crm_schema()
         ensure_qc_schema()
         ensure_handover_schema()
         seed_initial_data()
+        seed_default_whatsapp_templates()
+        backfill_crm_data()
+        db.session.commit()
 
     return app
 
@@ -516,6 +663,20 @@ def ensure_v05_schema():
             db.session.execute(text(statement))
     db.session.commit()
 
+    refreshed_columns = {column["name"] for column in inspect(db.engine).get_columns("sales_orders")}
+    if "tanggal_finish_produksi" in refreshed_columns:
+        db.session.execute(
+            text(
+                """
+                UPDATE sales_orders
+                SET tanggal_finish_produksi = COALESCE(production_status_updated_at, updated_at, created_at)
+                WHERE production_status IN ('Finish', 'Selesai')
+                  AND tanggal_finish_produksi IS NULL
+                """
+            )
+        )
+        db.session.commit()
+
 
 def ensure_v06_schema():
     inspector = inspect(db.engine)
@@ -551,6 +712,27 @@ def ensure_v07_schema():
     )
     db.session.execute(text("CREATE INDEX ix_sales_order_production_photos_sales_order_id ON sales_order_production_photos (sales_order_id)"))
     db.session.commit()
+
+
+def ensure_v09_tracking_schema():
+    inspector = inspect(db.engine)
+    if "sales_orders" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("sales_orders")}
+    if "tracking_code" not in columns:
+        db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN tracking_code VARCHAR(20)"))
+        db.session.commit()
+
+    for order in SalesOrder.query.filter((SalesOrder.tracking_code.is_(None)) | (SalesOrder.tracking_code == "")).all():
+        order.tracking_code = generate_tracking_code()
+    db.session.commit()
+
+    indexes = inspector.get_indexes("sales_orders")
+    index_names = {index["name"] for index in indexes}
+    if "ix_sales_orders_tracking_code" not in index_names:
+        db.session.execute(text("CREATE UNIQUE INDEX ix_sales_orders_tracking_code ON sales_orders (tracking_code)"))
+        db.session.commit()
 
 
 def ensure_qc_schema():
@@ -626,19 +808,241 @@ def ensure_handover_schema():
             db.session.execute(text(statement))
     db.session.commit()
 
-    refreshed_columns = {column["name"] for column in inspect(db.engine).get_columns("sales_orders")}
-    if "tanggal_finish_produksi" in refreshed_columns:
+
+def ensure_v08_crm_schema():
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+
+    if "customers" not in tables:
         db.session.execute(
             text(
                 """
-                UPDATE sales_orders
-                SET tanggal_finish_produksi = COALESCE(production_status_updated_at, updated_at, created_at)
-                WHERE production_status IN ('Finish', 'Selesai')
-                  AND tanggal_finish_produksi IS NULL
+                CREATE TABLE customers (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    name VARCHAR(150) NOT NULL,
+                    whatsapp VARCHAR(50),
+                    address TEXT,
+                    source VARCHAR(50) NOT NULL DEFAULT 'Ahmad',
+                    source_name VARCHAR(150),
+                    first_order_date DATE,
+                    total_sales_orders INTEGER NOT NULL DEFAULT 0,
+                    total_notas INTEGER NOT NULL DEFAULT 0,
+                    status VARCHAR(30) NOT NULL DEFAULT 'Baru',
+                    character_notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
                 """
             )
         )
+        db.session.execute(text("CREATE INDEX ix_customers_name ON customers (name)"))
+        db.session.execute(text("CREATE INDEX ix_customers_whatsapp ON customers (whatsapp)"))
+        db.session.execute(text("CREATE INDEX ix_customers_source ON customers (source)"))
+        db.session.execute(text("CREATE INDEX ix_customers_status ON customers (status)"))
+        db.session.execute(text("CREATE INDEX ix_customers_first_order_date ON customers (first_order_date)"))
+
+    if "follow_ups" not in tables:
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE follow_ups (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    follow_up_type VARCHAR(20) NOT NULL DEFAULT 'Customer',
+                    lead_id INTEGER,
+                    customer_id INTEGER NOT NULL,
+                    follow_up_date DATE NOT NULL,
+                    admin_id INTEGER,
+                    admin_name VARCHAR(120),
+                    content TEXT NOT NULL,
+                    customer_response TEXT,
+                    status VARCHAR(50) NOT NULL DEFAULT 'Belum dihubungi',
+                    next_follow_up_date DATE,
+                    notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(lead_id) REFERENCES leads (id),
+                    FOREIGN KEY(customer_id) REFERENCES customers (id),
+                    FOREIGN KEY(admin_id) REFERENCES users (id)
+                )
+                """
+            )
+        )
+        db.session.execute(text("CREATE INDEX ix_follow_ups_customer_id ON follow_ups (customer_id)"))
+        db.session.execute(text("CREATE INDEX ix_follow_ups_lead_id ON follow_ups (lead_id)"))
+        db.session.execute(text("CREATE INDEX ix_follow_ups_follow_up_type ON follow_ups (follow_up_type)"))
+        db.session.execute(text("CREATE INDEX ix_follow_ups_admin_id ON follow_ups (admin_id)"))
+        db.session.execute(text("CREATE INDEX ix_follow_ups_follow_up_date ON follow_ups (follow_up_date)"))
+        db.session.execute(text("CREATE INDEX ix_follow_ups_next_follow_up_date ON follow_ups (next_follow_up_date)"))
+        db.session.execute(text("CREATE INDEX ix_follow_ups_status ON follow_ups (status)"))
+
+    if "leads" not in tables:
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE leads (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    name VARCHAR(150) NOT NULL,
+                    whatsapp VARCHAR(50),
+                    source VARCHAR(50) NOT NULL DEFAULT 'WhatsApp',
+                    source_detail VARCHAR(150),
+                    need_type VARCHAR(150),
+                    estimated_qty INTEGER,
+                    notes TEXT,
+                    status VARCHAR(50) NOT NULL DEFAULT 'Baru masuk',
+                    next_follow_up_date DATE,
+                    assigned_to INTEGER,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    converted_customer_id INTEGER,
+                    converted_so_id INTEGER,
+                    FOREIGN KEY(assigned_to) REFERENCES users (id),
+                    FOREIGN KEY(converted_customer_id) REFERENCES customers (id),
+                    FOREIGN KEY(converted_so_id) REFERENCES sales_orders (id)
+                )
+                """
+            )
+        )
+        db.session.execute(text("CREATE INDEX ix_leads_name ON leads (name)"))
+        db.session.execute(text("CREATE INDEX ix_leads_whatsapp ON leads (whatsapp)"))
+        db.session.execute(text("CREATE INDEX ix_leads_source ON leads (source)"))
+        db.session.execute(text("CREATE INDEX ix_leads_status ON leads (status)"))
+        db.session.execute(text("CREATE INDEX ix_leads_next_follow_up_date ON leads (next_follow_up_date)"))
+        db.session.execute(text("CREATE INDEX ix_leads_assigned_to ON leads (assigned_to)"))
+        db.session.execute(text("CREATE INDEX ix_leads_converted_customer_id ON leads (converted_customer_id)"))
+        db.session.execute(text("CREATE INDEX ix_leads_converted_so_id ON leads (converted_so_id)"))
+
+    if "whatsapp_templates" not in inspector.get_table_names():
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE whatsapp_templates (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    key VARCHAR(80) NOT NULL UNIQUE,
+                    name VARCHAR(150) NOT NULL,
+                    category VARCHAR(80) NOT NULL,
+                    content TEXT NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        db.session.execute(text("CREATE INDEX ix_whatsapp_templates_key ON whatsapp_templates (key)"))
+        db.session.execute(text("CREATE INDEX ix_whatsapp_templates_category ON whatsapp_templates (category)"))
+        db.session.execute(text("CREATE INDEX ix_whatsapp_templates_is_active ON whatsapp_templates (is_active)"))
+
+    if "follow_ups" in inspector.get_table_names():
+        follow_up_columns = {column["name"]: column for column in inspector.get_columns("follow_ups")}
+        if "follow_up_type" not in follow_up_columns:
+            db.session.execute(text("ALTER TABLE follow_ups ADD COLUMN follow_up_type VARCHAR(20) NOT NULL DEFAULT 'Customer'"))
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_follow_ups_follow_up_type ON follow_ups (follow_up_type)"))
+        if "lead_id" not in follow_up_columns:
+            db.session.execute(text("ALTER TABLE follow_ups ADD COLUMN lead_id INTEGER"))
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_follow_ups_lead_id ON follow_ups (lead_id)"))
+        db.session.execute(text("UPDATE follow_ups SET follow_up_type = 'Customer' WHERE follow_up_type IS NULL OR follow_up_type = ''"))
         db.session.commit()
+        _ensure_follow_ups_customer_nullable()
+
+    if "sales_orders" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("sales_orders")}
+        if "crm_customer_id" not in columns:
+            db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN crm_customer_id INTEGER"))
+            db.session.execute(text("CREATE INDEX ix_sales_orders_crm_customer_id ON sales_orders (crm_customer_id)"))
+
+    if "notas" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("notas")}
+        if "crm_customer_id" not in columns:
+            db.session.execute(text("ALTER TABLE notas ADD COLUMN crm_customer_id INTEGER"))
+            db.session.execute(text("CREATE INDEX ix_notas_crm_customer_id ON notas (crm_customer_id)"))
+
+    db.session.commit()
+
+
+def _ensure_follow_ups_customer_nullable():
+    inspector = inspect(db.engine)
+    if db.engine.dialect.name != "sqlite" or "follow_ups" not in inspector.get_table_names():
+        return
+    columns = inspector.get_columns("follow_ups")
+    customer_column = next((column for column in columns if column["name"] == "customer_id"), None)
+    if not customer_column or customer_column.get("nullable", True):
+        return
+    db.session.execute(text("ALTER TABLE follow_ups RENAME TO follow_ups_old"))
+    db.session.execute(
+        text(
+            """
+            CREATE TABLE follow_ups (
+                id INTEGER NOT NULL PRIMARY KEY,
+                follow_up_type VARCHAR(20) NOT NULL DEFAULT 'Customer',
+                lead_id INTEGER,
+                customer_id INTEGER,
+                follow_up_date DATE NOT NULL,
+                admin_id INTEGER,
+                admin_name VARCHAR(120),
+                content TEXT NOT NULL,
+                customer_response TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'Belum dihubungi',
+                next_follow_up_date DATE,
+                notes TEXT,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                FOREIGN KEY(lead_id) REFERENCES leads (id),
+                FOREIGN KEY(customer_id) REFERENCES customers (id),
+                FOREIGN KEY(admin_id) REFERENCES users (id)
+            )
+            """
+        )
+    )
+    db.session.execute(
+        text(
+            """
+            INSERT INTO follow_ups (
+                id, follow_up_type, lead_id, customer_id, follow_up_date, admin_id, admin_name,
+                content, customer_response, status, next_follow_up_date, notes, created_at, updated_at
+            )
+            SELECT
+                id,
+                COALESCE(NULLIF(follow_up_type, ''), 'Customer'),
+                lead_id,
+                customer_id,
+                follow_up_date,
+                admin_id,
+                admin_name,
+                content,
+                customer_response,
+                status,
+                next_follow_up_date,
+                notes,
+                created_at,
+                updated_at
+            FROM follow_ups_old
+            """
+        )
+    )
+    db.session.execute(text("DROP TABLE follow_ups_old"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_customer_id ON follow_ups (customer_id)"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_lead_id ON follow_ups (lead_id)"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_follow_up_type ON follow_ups (follow_up_type)"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_admin_id ON follow_ups (admin_id)"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_follow_up_date ON follow_ups (follow_up_date)"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_next_follow_up_date ON follow_ups (next_follow_up_date)"))
+    db.session.execute(text("CREATE INDEX ix_follow_ups_status ON follow_ups (status)"))
+    db.session.commit()
+
+
+def backfill_crm_data():
+    from models import Nota, SalesOrder
+
+    marker = Setting.query.filter_by(key="erp_v08_crm_backfilled").first()
+    if marker:
+        return
+    for order in SalesOrder.query.filter_by(is_deleted=False).order_by(SalesOrder.created_at.asc()).all():
+        sync_sales_order_customer(order)
+    for nota in Nota.query.order_by(Nota.order_date.asc(), Nota.id.asc()).all():
+        sync_nota_customer(nota)
+    refresh_all_customer_stats()
+    db.session.add(Setting(key="erp_v08_crm_backfilled", value="1"))
+    db.session.commit()
 
 
 def _seed_master_items():

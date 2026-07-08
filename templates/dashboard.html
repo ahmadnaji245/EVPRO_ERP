@@ -27,5 +27,14 @@
             </div>
         </a>
     {% endif %}
+    {% if has_permission('crm.view') %}
+        <a class="module-card" href="{{ url_for('crm.dashboard') }}">
+            <div class="module-card-icon"><i class="bi bi-people"></i></div>
+            <div>
+                <h2>CRM</h2>
+                <p>Kelola database customer, follow up, sumber order, dan riwayat order.</p>
+            </div>
+        </a>
+    {% endif %}
 </div>
 {% endblock %}

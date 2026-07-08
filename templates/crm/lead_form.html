@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Lead' if lead else 'Lead Baru' }} - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">{{ 'Edit Lead' if lead else 'Lead Baru' }}</h1>
+        <p class="text-muted mb-0">Catat calon customer dari WhatsApp, Instagram, Facebook, atau Website.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('crm.leads') }}">Kembali</a>
+</div>
+
+<section class="panel">
+    <form method="post" class="row g-3">
+        <div class="col-md-6"><label class="form-label">Nama lead</label><input class="form-control" name="name" value="{{ form.get('name', lead.name if lead else '') }}" required></div>
+        <div class="col-md-6"><label class="form-label">No WhatsApp</label><input class="form-control" name="whatsapp" value="{{ form.get('whatsapp', lead.whatsapp if lead else '') }}"></div>
+        <div class="col-md-4"><label class="form-label">Sumber</label><select class="form-select" name="source">{% set selected_source = form.get('source', lead.source if lead else 'WhatsApp') %}{% for source in sources %}<option value="{{ source }}" {% if selected_source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><label class="form-label">Detail sumber</label><input class="form-control" name="source_detail" value="{{ form.get('source_detail', lead.source_detail if lead else '') }}" placeholder="IG ads, WA Ahmad, website form"></div>
+        <div class="col-md-4"><label class="form-label">Admin/CS</label><select class="form-select" name="assigned_to"><option value="">Belum ditentukan</option>{% set selected_user = form.get('assigned_to', lead.assigned_to if lead else current_user.id)|string %}{% for user in users %}<option value="{{ user.id }}" {% if selected_user == user.id|string %}selected{% endif %}>{{ user.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-5"><label class="form-label">Jenis kebutuhan</label><input class="form-control" name="need_type" value="{{ form.get('need_type', lead.need_type if lead else '') }}" placeholder="Jersey, jaket, seragam"></div>
+        <div class="col-md-3"><label class="form-label">Estimasi qty</label><input class="form-control" type="number" min="1" name="estimated_qty" value="{{ form.get('estimated_qty', lead.estimated_qty if lead else '') }}"></div>
+        <div class="col-md-4"><label class="form-label">Status</label><select class="form-select" name="status">{% set selected_status = form.get('status', lead.status if lead else 'Baru masuk') %}{% for status in statuses %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><label class="form-label">Tanggal follow up berikutnya</label><input class="form-control" type="date" name="next_follow_up_date" value="{{ form.get('next_follow_up_date', lead.next_follow_up_date.isoformat() if lead and lead.next_follow_up_date else '') }}"></div>
+        <div class="col-12"><label class="form-label">Catatan</label><textarea class="form-control" name="notes" rows="4">{{ form.get('notes', lead.notes if lead else '') }}</textarea></div>
+        <div class="col-12"><button class="btn btn-rdr">Simpan Lead</button></div>
+    </form>
+</section>
+{% endblock %}

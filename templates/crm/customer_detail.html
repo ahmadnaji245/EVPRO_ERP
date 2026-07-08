@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} - CRM EVPRO ERP{% endblock %}
+{% block content %}
+<div class="crm-detail-header mb-4">
+    <div class="crm-detail-main">
+        <h1 class="page-title">{{ customer.name }}</h1>
+        <p class="text-muted mb-0">{{ customer.source }}{% if customer.source_name %} - {{ customer.source_name }}{% endif %}</p>
+        <div class="crm-detail-summary">
+            <div><span>No WhatsApp</span><strong>{{ customer.whatsapp or '-' }}</strong></div>
+            <div><span>Status</span><strong>{{ customer.status }}</strong></div>
+            <div><span>Total SO</span><strong>{{ customer.total_sales_orders }}</strong></div>
+            <div><span>Total Nota</span><strong>{{ customer.total_notas }}</strong></div>
+        </div>
+    </div>
+    <div class="crm-detail-actions">
+        <div class="d-flex flex-wrap justify-content-lg-end gap-2 mb-3">
+            <a class="btn btn-outline-dark" href="{{ url_for('crm.customers') }}">Kembali</a>
+            <a class="btn btn-outline-dark" href="{{ url_for('crm.customer_edit', customer_id=customer.id) }}">Edit Customer</a>
+        </div>
+        <section class="panel crm-wa-panel">
+            <h2 class="section-title">Kirim WhatsApp</h2>
+            <form class="d-grid gap-2" method="post" target="_blank" action="{{ url_for('crm.customer_send_whatsapp', customer_id=customer.id) }}" data-wa-form>
+            <select class="form-select" name="template_id" aria-label="Template WhatsApp" data-wa-select>
+                {% for template in wa_templates %}
+                    {% set rendered = template.content|replace('{name}', customer.name)|replace('{status}', customer.status or '-')|replace('{need_type}', 'jersey')|replace('{estimated_qty}', '') %}
+                    <option value="{{ template.id }}" data-message="{{ rendered|e }}">{{ template.name }}</option>
+                {% endfor %}
+            </select>
+            <textarea class="form-control crm-wa-message" name="message" rows="6" data-wa-message></textarea>
+            <button class="btn btn-rdr" type="submit" {% if not customer.whatsapp %}disabled{% endif %}>Kirim WA</button>
+        </form>
+        </section>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <section class="panel mb-4">
+            <h2 class="section-title">Profil Customer</h2>
+            <div class="summary-row"><span>No WhatsApp</span><strong>{{ customer.whatsapp or '-' }}</strong></div>
+            <div class="summary-row"><span>Alamat</span><strong>{{ customer.address or '-' }}</strong></div>
+            <div class="summary-row"><span>Pertama order</span><strong>{{ customer.first_order_date|pretty_date if customer.first_order_date else '-' }}</strong></div>
+            <div class="summary-row"><span>Total SO</span><strong>{{ customer.total_sales_orders }}</strong></div>
+            <div class="summary-row"><span>Total Nota</span><strong>{{ customer.total_notas }}</strong></div>
+            <div class="summary-row highlight"><span>Status</span><strong>{{ customer.status }}</strong></div>
+        </section>
+        <section class="panel mb-4">
+            <h2 class="section-title">Catatan Karakter</h2>
+            <div class="text-muted">{{ customer.character_notes or 'Belum ada catatan.' }}</div>
+        </section>
+        <section class="panel">
+            <h2 class="section-title">Tambah Follow Up</h2>
+            <form method="post" action="{{ url_for('crm.add_customer_follow_up', customer_id=customer.id) }}" class="row g-3">
+                <div class="col-12"><label class="form-label">Tanggal follow up</label><input class="form-control" type="date" name="follow_up_date" value="{{ today }}" required></div>
+                <div class="col-12"><label class="form-label">Isi follow up</label><textarea class="form-control" name="content" rows="3" required></textarea></div>
+                <div class="col-12"><label class="form-label">Respon customer</label><textarea class="form-control" name="customer_response" rows="2"></textarea></div>
+                <div class="col-12"><label class="form-label">Status follow up</label><select class="form-select" name="status">{% for status in follow_up_statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}</select></div>
+                <div class="col-12"><label class="form-label">Tanggal follow up berikutnya</label><input class="form-control" type="date" name="next_follow_up_date"></div>
+                <div class="col-12"><label class="form-label">Catatan tambahan</label><textarea class="form-control" name="notes" rows="2"></textarea></div>
+                <div class="col-12 d-grid"><button class="btn btn-rdr">Tambah Follow Up</button></div>
+            </form>
+        </section>
+    </div>
+    <div class="col-lg-8">
+        <section class="panel table-panel mb-4">
+            <h2 class="section-title">Riwayat Surat Order</h2>
+            <div class="table-responsive"><table class="table align-middle">
+                <thead><tr><th>Nomor SO</th><th>Tim</th><th>Brand</th><th>Tanggal</th><th>Status</th></tr></thead>
+                <tbody>{% for so in customer.sales_orders|sort(attribute='created_at', reverse=true) if not so.is_deleted %}
+                    <tr><td><a href="{{ url_for('sales_orders.detail', sales_order_id=so.id) }}">{{ so.so_number }}</a></td><td>{{ so.team_name }}</td><td>{{ so.brand.name if so.brand else '-' }}</td><td>{{ so.created_at|pretty_date }}</td><td>{{ so.production_status_label }}</td></tr>
+                {% else %}<tr><td colspan="5" class="text-center text-muted py-4">Belum ada Surat Order.</td></tr>{% endfor %}</tbody>
+            </table></div>
+        </section>
+        <section class="panel table-panel mb-4">
+            <h2 class="section-title">Riwayat Nota</h2>
+            <div class="table-responsive"><table class="table align-middle">
+                <thead><tr><th>Nomor Nota</th><th>Tim</th><th>Tanggal</th><th class="text-end">Total</th></tr></thead>
+                <tbody>{% for nota in customer.notas|sort(attribute='order_date', reverse=true) %}
+                    <tr><td><a href="{{ url_for('nota.detail', nota_id=nota.id) }}">{{ display_nota_number(nota) }}</a></td><td>{{ nota.team_name }}</td><td>{{ nota.order_date|pretty_date }}</td><td class="text-end">{{ nota.total|rupiah }}</td></tr>
+                {% else %}<tr><td colspan="4" class="text-center text-muted py-4">Belum ada Nota.</td></tr>{% endfor %}</tbody>
+            </table></div>
+        </section>
+        <section class="panel table-panel">
+            <h2 class="section-title">Riwayat Follow Up</h2>
+            <div class="table-responsive"><table class="table align-middle">
+                <thead><tr><th>Tanggal</th><th>Admin/CS</th><th>Isi</th><th>Respon</th><th>Status</th><th>Follow up berikutnya</th><th>Catatan</th></tr></thead>
+                <tbody>{% for item in customer.follow_ups|sort(attribute='follow_up_date', reverse=true) %}
+                    <tr><td>{{ item.follow_up_date|pretty_date }}</td><td>{{ item.admin.name if item.admin else item.admin_name or '-' }}</td><td>{{ item.content }}</td><td>{{ item.customer_response or '-' }}</td><td>{{ item.status }}</td><td>{{ item.next_follow_up_date|pretty_date if item.next_follow_up_date else '-' }}</td><td>{{ item.notes or '-' }}</td></tr>
+                {% else %}<tr><td colspan="7" class="text-center text-muted py-4">Belum ada follow up.</td></tr>{% endfor %}</tbody>
+            </table></div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-wa-form]").forEach((form) => {
+    const select = form.querySelector("[data-wa-select]");
+    const message = form.querySelector("[data-wa-message]");
+    const sync = () => {
+        const option = select.options[select.selectedIndex];
+        message.value = option ? option.dataset.message || "" : "";
+    };
+    select.addEventListener("change", sync);
+    sync();
+});
+</script>
+{% endblock %}

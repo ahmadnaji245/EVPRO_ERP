@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Dashboard CRM - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Dashboard CRM</h1>
+        <p class="text-muted mb-0">Ringkasan customer, sumber order, dan follow up.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-dark" href="{{ url_for('crm.leads') }}">Lead</a>
+        <a class="btn btn-outline-dark" href="{{ url_for('crm.customers') }}">Customer</a>
+        <a class="btn btn-rdr" href="{{ url_for('crm.follow_ups') }}">Follow Up</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md"><div class="metric"><span>Lead baru bulan ini</span><strong>{{ summary.lead_new_this_month }}</strong></div></div>
+    <div class="col-md"><div class="metric"><span>Lead belum dibalas</span><strong>{{ summary.lead_unreplied }}</strong></div></div>
+    <div class="col-md"><div class="metric"><span>Lead follow up hari ini</span><strong>{{ summary.lead_follow_up_today }}</strong></div></div>
+    <div class="col-md"><div class="metric"><span>Lead closing bulan ini</span><strong>{{ summary.lead_closing_this_month }}</strong></div></div>
+    <div class="col-md"><div class="metric"><span>Conversion rate lead ke SO</span><strong>{{ summary.lead_conversion_rate }}%</strong></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="metric"><span>Customer baru bulan ini</span><strong>{{ summary.new_this_month }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Customer repeat bulan ini</span><strong>{{ summary.repeat_this_month }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Follow up jatuh tempo hari ini</span><strong>{{ summary.due_today }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Follow up belum selesai</span><strong>{{ summary.open_follow_ups }}</strong></div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <section class="panel">
+            <h2 class="section-title">Sumber Order Terbanyak</h2>
+            {% if summary.top_source %}
+                <div class="summary-row highlight"><span>{{ summary.top_source[0] }}</span><strong>{{ summary.top_source[1] }} customer</strong></div>
+            {% else %}
+                <div class="text-muted">Belum ada data customer.</div>
+            {% endif %}
+        </section>
+    </div>
+    <div class="col-lg-7">
+        <section class="panel table-panel">
+            <h2 class="section-title">Customer Dengan Order Terbanyak</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Customer</th><th>Sumber</th><th class="text-end">SO</th><th class="text-end">Nota</th></tr></thead>
+                    <tbody>
+                    {% for customer in summary.top_customers %}
+                        <tr>
+                            <td><a href="{{ url_for('crm.customer_detail', customer_id=customer.id) }}">{{ customer.name }}</a></td>
+                            <td>{{ customer.source }}{% if customer.source_name %} - {{ customer.source_name }}{% endif %}</td>
+                            <td class="text-end">{{ customer.total_sales_orders }}</td>
+                            <td class="text-end">{{ customer.total_notas }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data customer.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
