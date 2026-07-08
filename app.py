@@ -24,7 +24,7 @@ from services.nota_pdf_ff_apparel_service import build_ff_apparel_pdf
 from services.nota_pdf_service import build_customer_invoice_pdf
 from services.sales_order_service import set_production_stage
 from utils.formatters import register_filters
-from utils.helpers import active_class, ensure_upload_folders, sales_order_pdf_download_name
+from utils.helpers import active_class, ensure_upload_folders, nota_pdf_download_name, sales_order_pdf_download_name
 from utils.permissions import has_permission, permission_required
 from utils.constants import normalize_size_key, sort_size_rows
 
@@ -196,7 +196,7 @@ def nota_download(access_code):
         pdf,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"{display_nota_number(nota).replace('/', '-')}.pdf",
+        download_name=nota_pdf_download_name(nota),
     )
 
 

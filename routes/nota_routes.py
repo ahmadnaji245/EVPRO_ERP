@@ -47,6 +47,7 @@ from services.nota_service import (
 from services.nota_pdf_ff_apparel_service import build_ff_apparel_pdf
 from services.nota_pdf_service import build_customer_invoice_pdf, build_internal_note_pdf
 from services.sales_order_service import get_sales_order
+from utils.helpers import nota_pdf_download_name
 
 
 nota_bp = Blueprint("nota", __name__, url_prefix="/nota")
@@ -348,7 +349,7 @@ def internal_pdf(nota_id):
         pdf,
         mimetype="application/pdf",
         as_attachment=False,
-        download_name=f"nota-internal-{display_nota_number(nota).replace('/', '-')}.pdf",
+        download_name=nota_pdf_download_name(nota),
     )
 
 
@@ -365,7 +366,7 @@ def customer_pdf(nota_id):
         pdf,
         mimetype="application/pdf",
         as_attachment=False,
-        download_name=f"invoice-customer-{nota.id}.pdf",
+        download_name=nota_pdf_download_name(nota),
     )
 
 
