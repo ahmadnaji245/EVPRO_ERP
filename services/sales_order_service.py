@@ -4,7 +4,8 @@ from database.db import db
 from models import Brand, CustomerAccess, ProductionChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
 from models.master_data import MasterInstruction
 from services.history_service import record_history
-from services.number_generator import generate_access_code, generate_customer_code, generate_so_number
+from services.crm_service import mark_lead_converted_for_order, sync_sales_order_customer
+from services.number_generator import generate_access_code, generate_customer_code, generate_so_number, generate_tracking_code
 from services.upload_service import save_upload
 from utils.constants import PRODUCTION_STATUSES, normalize_production_status
 
@@ -271,6 +272,13 @@ def get_sales_order(sales_order_id):
     )
 
 
+def get_sales_order_by_tracking_code(tracking_code):
+    normalized_code = str(tracking_code or "").strip().upper()
+    if not normalized_code:
+        return None
+    return SalesOrder.query.filter_by(tracking_code=normalized_code, is_deleted=False).populate_existing().first()
+
+
 def validate_sales_order_form(form):
     errors = []
     if not form.get("team_name", "").strip():
@@ -314,6 +322,7 @@ def create_sales_order(form, user, files=None):
     brand = _fill_sales_order(order, form)
     order.so_number = generate_so_number(brand.code, order.created_at.date() if order.created_at else None)
     order.access_code = generate_access_code(brand.code)
+    order.tracking_code = generate_tracking_code()
     order.customer_portal_status = "Approval Customer"
     _sync_designs(order, form, files)
     order.customer_access = CustomerAccess(
@@ -322,6 +331,8 @@ def create_sales_order(form, user, files=None):
         customer_phone=form.get("customer_phone", "").strip() or None,
     )
     db.session.add(order)
+    sync_sales_order_customer(order, form)
+    mark_lead_converted_for_order(order, form)
     db.session.commit()
     return order
 
@@ -367,6 +378,7 @@ def update_sales_order(order, form, files=None, user=None):
     if order.customer_access:
         order.customer_access.customer_name = form.get("customer_name", "").strip() or order.team_name
         order.customer_access.customer_phone = form.get("customer_phone", "").strip() or None
+    sync_sales_order_customer(order, form)
     db.session.commit()
     return order
 

@@ -1,7 +1,9 @@
 from datetime import date
-from secrets import token_urlsafe
+from secrets import choice, token_urlsafe
 
 from models.sales_order import SalesOrder
+
+TRACKING_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 
 def generate_so_number(brand_code, order_date=None):
@@ -30,6 +32,18 @@ def generate_access_code(brand_code, order_date=None):
         if not SalesOrder.query.filter_by(access_code=access_code).first():
             return access_code
     raise RuntimeError("Gagal membuat token customer portal yang unik.")
+
+
+def generate_tracking_code(length=6):
+    if length not in (6, 8):
+        length = 6
+    for attempt in range(30):
+        token_length = length if attempt < 20 else 8
+        token = "".join(choice(TRACKING_CODE_ALPHABET) for _ in range(token_length))
+        tracking_code = f"EVP-{token}"
+        if not SalesOrder.query.filter_by(tracking_code=tracking_code).first():
+            return tracking_code
+    raise RuntimeError("Gagal membuat tracking code yang unik.")
 
 
 def generate_nota_number(order_date=None):

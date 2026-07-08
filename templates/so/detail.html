@@ -32,13 +32,8 @@
                     <button class="btn btn-success">Approve Admin</button>
                 </form>
             {% endif %}
-            <button
-                class="btn btn-outline-dark"
-                type="button"
-                data-copy-tracking
-                data-tracking-url="{{ url_for('tracking.detail', access_code=sales_order.access_code, _external=True) }}">
-                Copy Customer Portal Link
-            </button>
+            <button class="btn btn-outline-dark" type="button" data-copy-text="{{ sales_order.tracking_code }}" data-copy-label="Salin Kode">Salin Kode</button>
+            <button class="btn btn-outline-dark" type="button" data-copy-text="https://erp.evprotextile.com/t/{{ sales_order.tracking_code }}" data-copy-label="Salin Link Tracking">Salin Link Tracking</button>
             <a
                 class="btn btn-rdr"
                 href="{{ url_for('sales_orders.edit', sales_order_id=sales_order.id) }}"
@@ -62,7 +57,8 @@
                     <dt class="col-5">Seller</dt><dd class="col-7">{{ sales_order.seller_name }}</dd>
                 {% endif %}
                 <dt class="col-5">Customer</dt><dd class="col-7">{{ sales_order.customer_access.customer_name if sales_order.customer_access else '-' }}</dd>
-                <dt class="col-5">Kode Akses</dt><dd class="col-7">{{ sales_order.access_code }}</dd>
+                <dt class="col-5">Tracking Code</dt><dd class="col-7">{{ sales_order.tracking_code }}</dd>
+                <dt class="col-5">Kode Akses Lama</dt><dd class="col-7">{{ sales_order.access_code }}</dd>
                 <dt class="col-5">Tanggal Masuk</dt><dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
                 <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
                 <dt class="col-5">Penagihan</dt><dd class="col-7">{{ billing_status }}</dd>
@@ -369,23 +365,24 @@
 {% endblock %}
 {% block scripts %}
 <script>
-document.querySelectorAll("[data-copy-tracking]").forEach((button) => {
+document.querySelectorAll("[data-copy-text]").forEach((button) => {
     button.addEventListener("click", async () => {
-        const trackingUrl = button.dataset.trackingUrl;
+        const copyText = button.dataset.copyText;
+        const label = button.dataset.copyLabel || button.textContent;
         try {
-            await navigator.clipboard.writeText(trackingUrl);
-            button.textContent = "Link Tersalin";
+            await navigator.clipboard.writeText(copyText);
+            button.textContent = "Tersalin";
         } catch (error) {
             const fallbackInput = document.createElement("input");
-            fallbackInput.value = trackingUrl;
+            fallbackInput.value = copyText;
             document.body.appendChild(fallbackInput);
             fallbackInput.select();
             document.execCommand("copy");
             fallbackInput.remove();
-            button.textContent = "Link Tersalin";
+            button.textContent = "Tersalin";
         }
         window.setTimeout(() => {
-            button.textContent = "Copy Customer Portal Link";
+            button.textContent = label;
         }, 1800);
     });
 });

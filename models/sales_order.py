@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from sqlalchemy import event, inspect
+
 from database.db import db
 from utils.constants import normalize_production_status
 
@@ -9,6 +11,7 @@ class SalesOrder(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     so_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    tracking_code = db.Column(db.String(20), unique=True, nullable=False, index=True)
     team_name = db.Column(db.String(150), nullable=False)
     brand_id = db.Column(db.Integer, db.ForeignKey("brands.id"), nullable=False)
     seller_name = db.Column(db.String(150))
@@ -46,11 +49,13 @@ class SalesOrder(db.Model):
     is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
     deleted_at = db.Column(db.DateTime)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    crm_customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     brand = db.relationship("Brand", back_populates="sales_orders")
     created_by = db.relationship("User", back_populates="sales_orders", foreign_keys=[created_by_id])
+    crm_customer = db.relationship("Customer", back_populates="sales_orders")
     serah_terima_admin = db.relationship("User", foreign_keys=[serah_terima_admin_id])
     designs = db.relationship("SalesOrderDesign", back_populates="sales_order", cascade="all, delete-orphan")
     revision_histories = db.relationship("RevisionHistory", back_populates="sales_order", cascade="all, delete-orphan")
@@ -97,3 +102,10 @@ class SalesOrder(db.Model):
         if self.approval_status != "approved":
             return "Approval Customer"
         return normalize_production_status(self.customer_portal_status or self.production_status or "Approval Customer")
+
+
+@event.listens_for(SalesOrder, "before_update")
+def _prevent_tracking_code_change(mapper, connection, target):
+    history = inspect(target).attrs.tracking_code.history
+    if history.has_changes() and history.deleted and history.deleted[0]:
+        raise ValueError("Tracking code tidak boleh diubah setelah dibuat.")

@@ -8,6 +8,7 @@ from models import Brand, ProductionSizeChecklist, SalesOrderPlayer
 from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
 from services.history_service import record_history
 from services.brand_service import list_active_brands
+from services.crm_service import get_lead, lead_form_data_for_sales_order
 from services.dashboard_service import dashboard_stats, monthly_point_chart, monthly_setting_point_progress
 from services.master_data_service import list_active_rows
 from services.nota_service import billing_status_for_sales_order, get_nota_by_so_id
@@ -126,7 +127,11 @@ def create():
         order = create_sales_order(request.form, current_user, request.files)
         flash(f"Surat Order {order.so_number} berhasil dibuat.", "success")
         return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
-    return render_template("so/create.html", **_form_context(form={}))
+    lead_id = request.args.get("lead_id")
+    if str(lead_id or "").isdigit():
+        lead = get_lead(int(lead_id))
+        return render_template("so/create.html", **_form_context(form=lead_form_data_for_sales_order(lead), source_lead=lead))
+    return render_template("so/create.html", **_form_context(form={}, source_lead=None))
 
 
 @sales_orders_bp.route("/<int:sales_order_id>")
