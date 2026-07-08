@@ -257,13 +257,18 @@ def ensure_player_checklist(player):
 def list_sales_orders():
     return (
         SalesOrder.query.filter_by(is_deleted=False)
+        .populate_existing()
         .order_by(SalesOrder.created_at.desc(), SalesOrder.id.desc())
         .all()
     )
 
 
 def get_sales_order(sales_order_id):
-    return SalesOrder.query.filter_by(id=sales_order_id, is_deleted=False).first_or_404()
+    return (
+        SalesOrder.query.filter_by(id=sales_order_id, is_deleted=False)
+        .populate_existing()
+        .first_or_404()
+    )
 
 
 def validate_sales_order_form(form):

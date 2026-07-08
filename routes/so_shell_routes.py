@@ -97,7 +97,11 @@ def _production_access_required():
 
 
 def _get_production_order(sales_order_id):
-    return SalesOrder.query.filter_by(id=sales_order_id, is_deleted=False, approval_status="approved").first_or_404()
+    return (
+        SalesOrder.query.filter_by(id=sales_order_id, is_deleted=False, approval_status="approved")
+        .populate_existing()
+        .first_or_404()
+    )
 
 
 @production_bp.route("/", endpoint="index")
@@ -235,6 +239,8 @@ def production_vendor_print(vendor_name):
         download_name=filename,
     )
     response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     return response
 
 
@@ -248,12 +254,15 @@ def production_vendor_print_jpg(vendor_name):
     pdf_buffer = _build_vendor_print_pdf(vendor)
     jpg_buffer = render_first_pdf_page_to_jpg(pdf_buffer)
     filename = f"vendor_{vendor.casefold().replace(' ', '_')}_{datetime.utcnow().date().isoformat()}.jpg"
-    return send_file(
+    response = send_file(
         jpg_buffer,
         mimetype="image/jpeg",
         as_attachment=True,
         download_name=filename,
     )
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 def _build_vendor_print_pdf(vendor):

@@ -861,7 +861,7 @@ def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
             [
                 row["assigned_at"].strftime("%d/%m/%Y") if row["assigned_at"] else "-",
                 row["deadline"].strftime("%d/%m/%Y") if row["deadline"] else "-",
-                _safe_paragraph(row["shortage_note"] or "-", styles["SOText"]),
+                _safe_paragraph(row.get("vendor_note") or row.get("shortage_note") or "-", styles["SOText"]),
             ]
         )
         data.append(line)

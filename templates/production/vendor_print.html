@@ -201,7 +201,7 @@
                         {% endfor %}
                         <td class="col-date">{{ row.assigned_at|pretty_date if row.assigned_at else '-' }}</td>
                         <td class="col-date {{ deadline_class(row.deadline) }}">{{ row.deadline|pretty_date if row.deadline else '-' }}</td>
-                        <td class="col-note">{{ row.shortage_note or '-' }}</td>
+                        <td class="col-note">{{ row.vendor_note or row.shortage_note or '-' }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>

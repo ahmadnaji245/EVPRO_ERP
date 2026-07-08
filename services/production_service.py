@@ -19,6 +19,7 @@ VENDOR_RETURNED_STATUSES = {"Terkirim dari Vendor", "Barang Masuk", "QC"}
 def list_production_orders(search=None):
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
+        .populate_existing()
         .order_by(SalesOrder.deadline.asc().nullslast(), SalesOrder.created_at.asc(), SalesOrder.so_number.desc(), SalesOrder.id.desc())
         .all()
     )
@@ -67,8 +68,10 @@ def vendor_summary(orders):
 
 def vendor_print_rows(vendor):
     vendor = validate_vendor(vendor)
+    db.session.expire_all()
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved", production_vendor=vendor)
+        .populate_existing()
         .all()
     )
     active_orders = [order for order in orders if _include_in_vendor_print(order)]
@@ -147,6 +150,7 @@ def qc_checklist_rows_from_form(order, form):
 
 
 def save_qc_checklist(order, form):
+    db.session.refresh(order)
     checklist_by_player = prepare_qc_checklists(order)
     checked = {
         component: set(form.getlist(f"qc_{component_key(component)}"))
@@ -174,6 +178,7 @@ def save_qc_checklist(order, form):
     order.qc_note = qc_note or None
     _set_stage(order, "QC" if shortage_note else "Packing")
     db.session.commit()
+    db.session.refresh(order)
     return order.shortage_note
 
 
@@ -432,6 +437,7 @@ def _matches_search(order, search_value):
 def list_vendor_production_rows(active_only=False):
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
+        .populate_existing()
         .all()
     )
     if active_only:
@@ -499,7 +505,7 @@ def _vendor_print_row(order):
         "qty": _order_qty_by_component(order),
         "assigned_at": order.production_assigned_at,
         "deadline": order.production_vendor_deadline,
-        "shortage_note": vendor_shortage_note(order),
+        "vendor_note": vendor_shortage_note(order),
     }
 
 
