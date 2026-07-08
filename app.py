@@ -571,20 +571,25 @@ def create_app(config_class=Config):
     with app.app_context():
         ensure_upload_folders()
         db.create_all()
-        ensure_v04_schema()
-        ensure_v05_schema()
-        ensure_v06_schema()
-        ensure_v07_schema()
-        ensure_v09_tracking_schema()
-        ensure_v08_crm_schema()
-        ensure_qc_schema()
-        ensure_handover_schema()
+        ensure_database_schema_migrations()
+        ensure_tracking_codes()
         seed_initial_data()
         seed_default_whatsapp_templates()
         backfill_crm_data()
         db.session.commit()
 
     return app
+
+
+def ensure_database_schema_migrations():
+    ensure_v04_schema()
+    ensure_v05_schema()
+    ensure_v06_schema()
+    ensure_v07_schema()
+    ensure_v08_crm_schema()
+    ensure_v08_tracking_schema()
+    ensure_qc_schema()
+    ensure_handover_schema()
 
 
 def seed_initial_data():
@@ -714,25 +719,23 @@ def ensure_v07_schema():
     db.session.commit()
 
 
-def ensure_v09_tracking_schema():
-    inspector = inspect(db.engine)
-    if "sales_orders" not in inspector.get_table_names():
+def ensure_v08_tracking_schema():
+    if not _table_exists("sales_orders"):
         return
+    _add_column_if_missing("sales_orders", "tracking_code", "VARCHAR(20)")
 
-    columns = {column["name"] for column in inspector.get_columns("sales_orders")}
-    if "tracking_code" not in columns:
-        db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN tracking_code VARCHAR(20)"))
-        db.session.commit()
 
+def ensure_v09_tracking_schema():
+    ensure_v08_tracking_schema()
+
+
+def ensure_tracking_codes():
+    if not _table_exists("sales_orders") or "tracking_code" not in _table_columns("sales_orders"):
+        return
     for order in SalesOrder.query.filter((SalesOrder.tracking_code.is_(None)) | (SalesOrder.tracking_code == "")).all():
         order.tracking_code = generate_tracking_code()
     db.session.commit()
-
-    indexes = inspector.get_indexes("sales_orders")
-    index_names = {index["name"] for index in indexes}
-    if "ix_sales_orders_tracking_code" not in index_names:
-        db.session.execute(text("CREATE UNIQUE INDEX ix_sales_orders_tracking_code ON sales_orders (tracking_code)"))
-        db.session.commit()
+    _create_index_if_missing("ix_sales_orders_tracking_code", "sales_orders", "tracking_code", unique=True)
 
 
 def ensure_qc_schema():
@@ -809,11 +812,63 @@ def ensure_handover_schema():
     db.session.commit()
 
 
-def ensure_v08_crm_schema():
-    inspector = inspect(db.engine)
-    tables = inspector.get_table_names()
+def _quote_identifier(identifier):
+    return '"' + str(identifier).replace('"', '""') + '"'
 
-    if "customers" not in tables:
+
+def _table_exists(table_name):
+    result = db.session.execute(
+        text("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :table_name"),
+        {"table_name": table_name},
+    ).first()
+    return bool(result)
+
+
+def _table_columns(table_name):
+    if not _table_exists(table_name):
+        return set()
+    quoted_table = _quote_identifier(table_name)
+    rows = db.session.execute(text(f"PRAGMA table_info({quoted_table})")).mappings().all()
+    return {row["name"] for row in rows}
+
+
+def _add_column_if_missing(table_name, column_name, column_definition):
+    if not _table_exists(table_name):
+        return
+    if column_name in _table_columns(table_name):
+        return
+    db.session.execute(
+        text(
+            f"ALTER TABLE {_quote_identifier(table_name)} "
+            f"ADD COLUMN {_quote_identifier(column_name)} {column_definition}"
+        )
+    )
+    db.session.commit()
+
+
+def _create_index_if_missing(index_name, table_name, columns, unique=False):
+    if not _table_exists(table_name):
+        return
+    column_list = columns if isinstance(columns, (list, tuple)) else [columns]
+    existing = db.session.execute(
+        text("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = :index_name"),
+        {"index_name": index_name},
+    ).first()
+    if existing:
+        return
+    unique_sql = "UNIQUE " if unique else ""
+    quoted_columns = ", ".join(_quote_identifier(column) for column in column_list)
+    db.session.execute(
+        text(
+            f"CREATE {unique_sql}INDEX {_quote_identifier(index_name)} "
+            f"ON {_quote_identifier(table_name)} ({quoted_columns})"
+        )
+    )
+    db.session.commit()
+
+
+def ensure_v08_crm_schema():
+    if not _table_exists("customers"):
         db.session.execute(
             text(
                 """
@@ -840,42 +895,27 @@ def ensure_v08_crm_schema():
         db.session.execute(text("CREATE INDEX ix_customers_source ON customers (source)"))
         db.session.execute(text("CREATE INDEX ix_customers_status ON customers (status)"))
         db.session.execute(text("CREATE INDEX ix_customers_first_order_date ON customers (first_order_date)"))
+        db.session.commit()
+    else:
+        _add_column_if_missing("customers", "name", "VARCHAR(150)")
+        _add_column_if_missing("customers", "whatsapp", "VARCHAR(50)")
+        _add_column_if_missing("customers", "address", "TEXT")
+        _add_column_if_missing("customers", "source", "VARCHAR(50) NOT NULL DEFAULT 'Ahmad'")
+        _add_column_if_missing("customers", "source_name", "VARCHAR(150)")
+        _add_column_if_missing("customers", "first_order_date", "DATE")
+        _add_column_if_missing("customers", "total_sales_orders", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing("customers", "total_notas", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing("customers", "status", "VARCHAR(30) NOT NULL DEFAULT 'Baru'")
+        _add_column_if_missing("customers", "character_notes", "TEXT")
+        _add_column_if_missing("customers", "created_at", "DATETIME")
+        _add_column_if_missing("customers", "updated_at", "DATETIME")
+    _create_index_if_missing("ix_customers_name", "customers", "name")
+    _create_index_if_missing("ix_customers_whatsapp", "customers", "whatsapp")
+    _create_index_if_missing("ix_customers_source", "customers", "source")
+    _create_index_if_missing("ix_customers_status", "customers", "status")
+    _create_index_if_missing("ix_customers_first_order_date", "customers", "first_order_date")
 
-    if "follow_ups" not in tables:
-        db.session.execute(
-            text(
-                """
-                CREATE TABLE follow_ups (
-                    id INTEGER NOT NULL PRIMARY KEY,
-                    follow_up_type VARCHAR(20) NOT NULL DEFAULT 'Customer',
-                    lead_id INTEGER,
-                    customer_id INTEGER NOT NULL,
-                    follow_up_date DATE NOT NULL,
-                    admin_id INTEGER,
-                    admin_name VARCHAR(120),
-                    content TEXT NOT NULL,
-                    customer_response TEXT,
-                    status VARCHAR(50) NOT NULL DEFAULT 'Belum dihubungi',
-                    next_follow_up_date DATE,
-                    notes TEXT,
-                    created_at DATETIME NOT NULL,
-                    updated_at DATETIME NOT NULL,
-                    FOREIGN KEY(lead_id) REFERENCES leads (id),
-                    FOREIGN KEY(customer_id) REFERENCES customers (id),
-                    FOREIGN KEY(admin_id) REFERENCES users (id)
-                )
-                """
-            )
-        )
-        db.session.execute(text("CREATE INDEX ix_follow_ups_customer_id ON follow_ups (customer_id)"))
-        db.session.execute(text("CREATE INDEX ix_follow_ups_lead_id ON follow_ups (lead_id)"))
-        db.session.execute(text("CREATE INDEX ix_follow_ups_follow_up_type ON follow_ups (follow_up_type)"))
-        db.session.execute(text("CREATE INDEX ix_follow_ups_admin_id ON follow_ups (admin_id)"))
-        db.session.execute(text("CREATE INDEX ix_follow_ups_follow_up_date ON follow_ups (follow_up_date)"))
-        db.session.execute(text("CREATE INDEX ix_follow_ups_next_follow_up_date ON follow_ups (next_follow_up_date)"))
-        db.session.execute(text("CREATE INDEX ix_follow_ups_status ON follow_ups (status)"))
-
-    if "leads" not in tables:
+    if not _table_exists("leads"):
         db.session.execute(
             text(
                 """
@@ -902,16 +942,84 @@ def ensure_v08_crm_schema():
                 """
             )
         )
-        db.session.execute(text("CREATE INDEX ix_leads_name ON leads (name)"))
-        db.session.execute(text("CREATE INDEX ix_leads_whatsapp ON leads (whatsapp)"))
-        db.session.execute(text("CREATE INDEX ix_leads_source ON leads (source)"))
-        db.session.execute(text("CREATE INDEX ix_leads_status ON leads (status)"))
-        db.session.execute(text("CREATE INDEX ix_leads_next_follow_up_date ON leads (next_follow_up_date)"))
-        db.session.execute(text("CREATE INDEX ix_leads_assigned_to ON leads (assigned_to)"))
-        db.session.execute(text("CREATE INDEX ix_leads_converted_customer_id ON leads (converted_customer_id)"))
-        db.session.execute(text("CREATE INDEX ix_leads_converted_so_id ON leads (converted_so_id)"))
+        db.session.commit()
+    else:
+        _add_column_if_missing("leads", "name", "VARCHAR(150)")
+        _add_column_if_missing("leads", "whatsapp", "VARCHAR(50)")
+        _add_column_if_missing("leads", "source", "VARCHAR(50) NOT NULL DEFAULT 'WhatsApp'")
+        _add_column_if_missing("leads", "source_detail", "VARCHAR(150)")
+        _add_column_if_missing("leads", "need_type", "VARCHAR(150)")
+        _add_column_if_missing("leads", "estimated_qty", "INTEGER")
+        _add_column_if_missing("leads", "notes", "TEXT")
+        _add_column_if_missing("leads", "status", "VARCHAR(50) NOT NULL DEFAULT 'Baru masuk'")
+        _add_column_if_missing("leads", "next_follow_up_date", "DATE")
+        _add_column_if_missing("leads", "assigned_to", "INTEGER")
+        _add_column_if_missing("leads", "created_at", "DATETIME")
+        _add_column_if_missing("leads", "updated_at", "DATETIME")
+        _add_column_if_missing("leads", "converted_customer_id", "INTEGER")
+        _add_column_if_missing("leads", "converted_so_id", "INTEGER")
+    _create_index_if_missing("ix_leads_name", "leads", "name")
+    _create_index_if_missing("ix_leads_whatsapp", "leads", "whatsapp")
+    _create_index_if_missing("ix_leads_source", "leads", "source")
+    _create_index_if_missing("ix_leads_status", "leads", "status")
+    _create_index_if_missing("ix_leads_next_follow_up_date", "leads", "next_follow_up_date")
+    _create_index_if_missing("ix_leads_assigned_to", "leads", "assigned_to")
+    _create_index_if_missing("ix_leads_converted_customer_id", "leads", "converted_customer_id")
+    _create_index_if_missing("ix_leads_converted_so_id", "leads", "converted_so_id")
 
-    if "whatsapp_templates" not in inspector.get_table_names():
+    if not _table_exists("follow_ups"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE follow_ups (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    follow_up_type VARCHAR(20) NOT NULL DEFAULT 'Customer',
+                    lead_id INTEGER,
+                    customer_id INTEGER,
+                    follow_up_date DATE NOT NULL,
+                    admin_id INTEGER,
+                    admin_name VARCHAR(120),
+                    content TEXT NOT NULL,
+                    customer_response TEXT,
+                    status VARCHAR(50) NOT NULL DEFAULT 'Belum dihubungi',
+                    next_follow_up_date DATE,
+                    notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(lead_id) REFERENCES leads (id),
+                    FOREIGN KEY(customer_id) REFERENCES customers (id),
+                    FOREIGN KEY(admin_id) REFERENCES users (id)
+                )
+                """
+            )
+        )
+        db.session.commit()
+    else:
+        _add_column_if_missing("follow_ups", "follow_up_type", "VARCHAR(20) NOT NULL DEFAULT 'Customer'")
+        _add_column_if_missing("follow_ups", "lead_id", "INTEGER")
+        _add_column_if_missing("follow_ups", "customer_id", "INTEGER")
+        _add_column_if_missing("follow_ups", "follow_up_date", "DATE")
+        _add_column_if_missing("follow_ups", "admin_id", "INTEGER")
+        _add_column_if_missing("follow_ups", "admin_name", "VARCHAR(120)")
+        _add_column_if_missing("follow_ups", "content", "TEXT")
+        _add_column_if_missing("follow_ups", "customer_response", "TEXT")
+        _add_column_if_missing("follow_ups", "status", "VARCHAR(50) NOT NULL DEFAULT 'Belum dihubungi'")
+        _add_column_if_missing("follow_ups", "next_follow_up_date", "DATE")
+        _add_column_if_missing("follow_ups", "notes", "TEXT")
+        _add_column_if_missing("follow_ups", "created_at", "DATETIME")
+        _add_column_if_missing("follow_ups", "updated_at", "DATETIME")
+        db.session.execute(text("UPDATE follow_ups SET follow_up_type = 'Customer' WHERE follow_up_type IS NULL OR follow_up_type = ''"))
+        db.session.commit()
+        _ensure_follow_ups_customer_nullable()
+    _create_index_if_missing("ix_follow_ups_customer_id", "follow_ups", "customer_id")
+    _create_index_if_missing("ix_follow_ups_lead_id", "follow_ups", "lead_id")
+    _create_index_if_missing("ix_follow_ups_follow_up_type", "follow_ups", "follow_up_type")
+    _create_index_if_missing("ix_follow_ups_admin_id", "follow_ups", "admin_id")
+    _create_index_if_missing("ix_follow_ups_follow_up_date", "follow_ups", "follow_up_date")
+    _create_index_if_missing("ix_follow_ups_next_follow_up_date", "follow_ups", "next_follow_up_date")
+    _create_index_if_missing("ix_follow_ups_status", "follow_ups", "status")
+
+    if not _table_exists("whatsapp_templates"):
         db.session.execute(
             text(
                 """
@@ -931,30 +1039,26 @@ def ensure_v08_crm_schema():
         db.session.execute(text("CREATE INDEX ix_whatsapp_templates_key ON whatsapp_templates (key)"))
         db.session.execute(text("CREATE INDEX ix_whatsapp_templates_category ON whatsapp_templates (category)"))
         db.session.execute(text("CREATE INDEX ix_whatsapp_templates_is_active ON whatsapp_templates (is_active)"))
-
-    if "follow_ups" in inspector.get_table_names():
-        follow_up_columns = {column["name"]: column for column in inspector.get_columns("follow_ups")}
-        if "follow_up_type" not in follow_up_columns:
-            db.session.execute(text("ALTER TABLE follow_ups ADD COLUMN follow_up_type VARCHAR(20) NOT NULL DEFAULT 'Customer'"))
-            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_follow_ups_follow_up_type ON follow_ups (follow_up_type)"))
-        if "lead_id" not in follow_up_columns:
-            db.session.execute(text("ALTER TABLE follow_ups ADD COLUMN lead_id INTEGER"))
-            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_follow_ups_lead_id ON follow_ups (lead_id)"))
-        db.session.execute(text("UPDATE follow_ups SET follow_up_type = 'Customer' WHERE follow_up_type IS NULL OR follow_up_type = ''"))
         db.session.commit()
-        _ensure_follow_ups_customer_nullable()
+    else:
+        _add_column_if_missing("whatsapp_templates", "key", "VARCHAR(80)")
+        _add_column_if_missing("whatsapp_templates", "name", "VARCHAR(150)")
+        _add_column_if_missing("whatsapp_templates", "category", "VARCHAR(80)")
+        _add_column_if_missing("whatsapp_templates", "content", "TEXT")
+        _add_column_if_missing("whatsapp_templates", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+        _add_column_if_missing("whatsapp_templates", "created_at", "DATETIME")
+        _add_column_if_missing("whatsapp_templates", "updated_at", "DATETIME")
+    _create_index_if_missing("ix_whatsapp_templates_key", "whatsapp_templates", "key")
+    _create_index_if_missing("ix_whatsapp_templates_category", "whatsapp_templates", "category")
+    _create_index_if_missing("ix_whatsapp_templates_is_active", "whatsapp_templates", "is_active")
 
-    if "sales_orders" in inspector.get_table_names():
-        columns = {column["name"] for column in inspector.get_columns("sales_orders")}
-        if "crm_customer_id" not in columns:
-            db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN crm_customer_id INTEGER"))
-            db.session.execute(text("CREATE INDEX ix_sales_orders_crm_customer_id ON sales_orders (crm_customer_id)"))
+    if _table_exists("sales_orders"):
+        _add_column_if_missing("sales_orders", "crm_customer_id", "INTEGER")
+        _create_index_if_missing("ix_sales_orders_crm_customer_id", "sales_orders", "crm_customer_id")
 
-    if "notas" in inspector.get_table_names():
-        columns = {column["name"] for column in inspector.get_columns("notas")}
-        if "crm_customer_id" not in columns:
-            db.session.execute(text("ALTER TABLE notas ADD COLUMN crm_customer_id INTEGER"))
-            db.session.execute(text("CREATE INDEX ix_notas_crm_customer_id ON notas (crm_customer_id)"))
+    if _table_exists("notas"):
+        _add_column_if_missing("notas", "crm_customer_id", "INTEGER")
+        _create_index_if_missing("ix_notas_crm_customer_id", "notas", "crm_customer_id")
 
     db.session.commit()
 
