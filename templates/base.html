@@ -30,10 +30,10 @@
                         <a class="nav-link {{ active_class('dashboard.') }}" href="{{ url_for('dashboard.index') }}">Dashboard</a>
                     {% endif %}
                     {% if has_permission('sales_order.view') %}
-                        <a class="nav-link {{ 'active' if is_so_module else '' }}" href="{{ url_for('sales_orders.dashboard') }}">Surat Order</a>
+                        <a class="nav-link {{ 'active' if is_so_module else '' }}" href="{{ url_for('sales_orders.index') }}">Surat Order</a>
                     {% endif %}
                     {% if has_permission('nota.view') %}
-                        <a class="nav-link {{ 'active' if is_nota_module else '' }}" href="{{ url_for('nota.dashboard') }}">Nota</a>
+                        <a class="nav-link {{ 'active' if is_nota_module else '' }}" href="{{ url_for('nota.index') }}">Nota</a>
                     {% endif %}
                     <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 {% else %}
