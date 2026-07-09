@@ -59,8 +59,10 @@
                         <form class="d-grid gap-1 mt-1" method="post" target="_blank" action="{{ url_for('crm.customer_send_whatsapp', customer_id=customer.id) }}" data-wa-form>
                             <select class="form-select form-select-sm" name="template_id" aria-label="Template WhatsApp {{ customer.name }}" data-wa-select>
                                 {% for template in wa_templates %}
-                                    {% set rendered = template.content|replace('{name}', customer.name)|replace('{status}', customer.status or '-')|replace('{need_type}', 'jersey')|replace('{estimated_qty}', '') %}
+                                    {% set rendered = template.content|replace('{name}', customer.name)|replace('{brand}', customer.source_name or 'EVPRO')|replace('{cs_name}', current_user.name or 'Admin')|replace('{today}', today)|replace('{status}', customer.status or '-')|replace('{need_type}', 'jersey')|replace('{estimated_qty}', '') %}
                                     <option value="{{ template.id }}" data-message="{{ rendered|e }}">{{ template.name }}</option>
+                                {% else %}
+                                    <option value="">Belum ada template aktif</option>
                                 {% endfor %}
                             </select>
                             <textarea class="form-control form-control-sm" name="message" rows="3" data-wa-message></textarea>

@@ -137,6 +137,74 @@ def _parse_players(raw_players):
     return players
 
 
+def _player_signature(player):
+    return (
+        str(player.player_name or "").strip(),
+        str(player.player_number or "").strip(),
+        str(player.size or "").strip(),
+        str(player.notes or "").strip(),
+    )
+
+
+def _reset_player_setting_checklist(player):
+    checklist = player.checklist
+    if not checklist:
+        return
+    checklist.setting_done = False
+    checklist.setting_user_id = None
+    checklist.setting_at = None
+    checklist.setting_done_by_user_id = None
+    checklist.setting_done_by_name = None
+    checklist.setting_done_at = None
+
+
+def _copy_player_values(target, source):
+    target.player_name = source.player_name
+    target.player_number = source.player_number
+    target.size = source.size
+    target.notes = source.notes
+    target.sort_order = source.sort_order
+
+
+def _sync_players_for_design(design, raw_players):
+    parsed_players = _parse_players(raw_players)
+    existing_players = sorted(
+        list(design.players),
+        key=lambda player: (player.sort_order or 0, player.id or 0),
+    )
+    unused_existing = list(existing_players)
+    synced_players = [None] * len(parsed_players)
+
+    for index, parsed_player in enumerate(parsed_players):
+        parsed_signature = _player_signature(parsed_player)
+        matched_player = next(
+            (player for player in unused_existing if _player_signature(player) == parsed_signature),
+            None,
+        )
+        if matched_player:
+            matched_player.sort_order = parsed_player.sort_order
+            unused_existing.remove(matched_player)
+            synced_players[index] = matched_player
+
+    for index, parsed_player in enumerate(parsed_players):
+        if synced_players[index]:
+            continue
+        same_position_player = next(
+            (player for player in unused_existing if player.sort_order == parsed_player.sort_order),
+            None,
+        )
+        if same_position_player:
+            _copy_player_values(same_position_player, parsed_player)
+            _reset_player_setting_checklist(same_position_player)
+            unused_existing.remove(same_position_player)
+            synced_players[index] = same_position_player
+            continue
+
+        synced_players[index] = parsed_player
+
+    design.players = synced_players
+
+
 def _validate_players(raw_players, design_index):
     errors = []
     for line_number, line in enumerate(str(raw_players or "").splitlines(), start=1):
@@ -237,8 +305,7 @@ def _sync_designs(order, form, files=None):
         elif not design.bottom_image_path and index < len(existing_bottom_images):
             design.bottom_image_path = existing_bottom_images[index] or None
 
-        design.players.clear()
-        design.players = _parse_players(players_list[index] if index < len(players_list) else "")
+        _sync_players_for_design(design, players_list[index] if index < len(players_list) else "")
         kept_designs.append(design)
         if design not in order.designs:
             order.designs.append(design)

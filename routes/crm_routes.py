@@ -5,10 +5,13 @@ from flask_login import current_user, login_required
 
 from models.crm import CUSTOMER_SOURCES, CUSTOMER_STATUSES, FOLLOW_UP_STATUSES, LEAD_SOURCES, LEAD_STATUSES
 from services.crm_service import (
+    WA_TEMPLATE_CATEGORIES,
+    create_whatsapp_template,
     create_lead,
     create_follow_up,
     crm_summary,
     customer_options,
+    delete_whatsapp_template,
     get_customer,
     get_lead,
     get_whatsapp_template,
@@ -18,8 +21,10 @@ from services.crm_service import (
     list_customers,
     list_follow_ups,
     list_leads,
+    next_whatsapp_template_order,
     send_lead_whatsapp,
     send_customer_whatsapp,
+    toggle_whatsapp_template,
     update_lead,
     update_customer,
     update_whatsapp_template,
@@ -65,6 +70,7 @@ def customers():
         sources=CUSTOMER_SOURCES,
         statuses=CUSTOMER_STATUSES,
         search=search,
+        today=date.today().isoformat(),
     )
 
 
@@ -272,7 +278,36 @@ def create_follow_up_route():
 
 @crm_bp.route("/wa-templates")
 def wa_templates():
-    return render_template("crm/wa_templates.html", templates=list_whatsapp_templates())
+    search = {
+        "q": request.args.get("q", "").strip(),
+        "category": request.args.get("category", "").strip(),
+        "status": request.args.get("status", "").strip(),
+    }
+    return render_template(
+        "crm/wa_templates.html",
+        templates=list_whatsapp_templates(search),
+        categories=WA_TEMPLATE_CATEGORIES,
+        search=search,
+    )
+
+
+@crm_bp.route("/wa-templates/new", methods=["GET", "POST"])
+def wa_template_new():
+    if request.method == "POST":
+        try:
+            create_whatsapp_template(request.form)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Template WA berhasil ditambahkan.", "success")
+            return redirect(url_for("crm.wa_templates"))
+    return render_template(
+        "crm/wa_template_form.html",
+        template=None,
+        form=request.form if request.method == "POST" else {},
+        categories=WA_TEMPLATE_CATEGORIES,
+        default_sort_order=next_whatsapp_template_order(),
+    )
 
 
 @crm_bp.route("/wa-templates/<int:template_id>/edit", methods=["GET", "POST"])
@@ -286,4 +321,26 @@ def wa_template_edit(template_id):
         else:
             flash("Template WA berhasil diperbarui.", "success")
             return redirect(url_for("crm.wa_templates"))
-    return render_template("crm/wa_template_edit.html", template=template)
+    return render_template(
+        "crm/wa_template_form.html",
+        template=template,
+        form=request.form if request.method == "POST" else {},
+        categories=WA_TEMPLATE_CATEGORIES,
+        default_sort_order=template.sort_order,
+    )
+
+
+@crm_bp.route("/wa-templates/<int:template_id>/toggle", methods=["POST"])
+def wa_template_toggle(template_id):
+    template = get_whatsapp_template(template_id)
+    toggle_whatsapp_template(template)
+    flash("Status template WA berhasil diperbarui.", "success")
+    return redirect(url_for("crm.wa_templates"))
+
+
+@crm_bp.route("/wa-templates/<int:template_id>/delete", methods=["POST"])
+def wa_template_delete(template_id):
+    template = get_whatsapp_template(template_id)
+    delete_whatsapp_template(template)
+    flash("Template WA berhasil dihapus.", "success")
+    return redirect(url_for("crm.wa_templates"))

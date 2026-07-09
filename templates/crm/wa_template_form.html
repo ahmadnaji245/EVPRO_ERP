@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% set is_edit = template is not none %}
+{% block title %}{{ 'Edit' if is_edit else 'Tambah' }} Template WA - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">{{ 'Edit' if is_edit else 'Tambah' }} Template WA</h1>
+        <p class="text-muted mb-0">{{ template.name if is_edit else 'Master data template WhatsApp baru.' }}</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('crm.wa_templates') }}">Kembali</a>
+</div>
+
+<section class="panel">
+    <form method="post" class="row g-3" data-wa-template-form>
+        <div class="col-md-6">
+            <label class="form-label">Nama Template *</label>
+            <input class="form-control" name="name" value="{{ form.name if form.name is defined else (template.name if template else '') }}" required>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Kategori *</label>
+            {% set selected_category = form.category if form.category is defined else (template.category if template else '') %}
+            <select class="form-select" name="category" required>
+                <option value="">Pilih kategori</option>
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Urutan</label>
+            <input class="form-control" type="number" min="1" name="sort_order" value="{{ form.sort_order if form.sort_order is defined else default_sort_order }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Status</label>
+            {% set selected_status = form.status if form.status is defined else ('active' if not template or template.is_active else 'inactive') %}
+            <select class="form-select" name="status">
+                <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Aktif</option>
+                <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Nonaktif</option>
+            </select>
+        </div>
+        <div class="col-12">
+            <label class="form-label">Isi Pesan *</label>
+            <textarea class="form-control" name="content" rows="12" required data-template-content>{{ form.content if form.content is defined else (template.content if template else '') }}</textarea>
+            <div class="row g-2 mt-2 text-muted small">
+                <div class="col-md-3"><strong>{name}</strong><br>Nama customer</div>
+                <div class="col-md-3"><strong>{brand}</strong><br>Nama brand (EVPRO / RDR Apparel)</div>
+                <div class="col-md-3"><strong>{cs_name}</strong><br>Nama admin / CS yang login</div>
+                <div class="col-md-3"><strong>{today}</strong><br>Tanggal hari ini</div>
+            </div>
+        </div>
+        <div class="col-12 d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-dark" type="button" data-preview-template>Preview</button>
+            <button class="btn btn-rdr">Simpan Template</button>
+        </div>
+        <div class="col-12">
+            <div class="border rounded p-3 bg-light d-none" data-template-preview style="white-space: pre-wrap;"></div>
+        </div>
+    </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-wa-template-form]").forEach((form) => {
+    const content = form.querySelector("[data-template-content]");
+    const preview = form.querySelector("[data-template-preview]");
+    const button = form.querySelector("[data-preview-template]");
+    button.addEventListener("click", () => {
+        const rendered = (content.value || "")
+            .replaceAll("{name}", "Ahmad")
+            .replaceAll("{brand}", "EVPRO")
+            .replaceAll("{cs_name}", "Dimas")
+            .replaceAll("{today}", new Date().toLocaleDateString("id-ID"));
+        preview.textContent = rendered || "Isi pesan masih kosong.";
+        preview.classList.remove("d-none");
+    });
+});
+</script>
+{% endblock %}

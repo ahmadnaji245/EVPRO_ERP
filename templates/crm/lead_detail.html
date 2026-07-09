@@ -29,8 +29,17 @@
             <select class="form-select" name="template_id" aria-label="Template WhatsApp" data-wa-select>
                 {% for template in wa_templates %}
                     {% set estimated_qty = lead.estimated_qty|string if lead.estimated_qty else '' %}
-                    {% set rendered = template.content|replace('{name}', lead.name)|replace('{status}', lead.status or '-')|replace('{need_type}', lead.need_type or 'jersey')|replace('{estimated_qty}', estimated_qty) %}
+                    {% set rendered = template.content
+                        |replace('{name}', lead.name)
+                        |replace('{brand}', lead.source_detail or 'EVPRO')
+                        |replace('{cs_name}', current_user.name or 'Admin')
+                        |replace('{today}', today)
+                        |replace('{status}', lead.status or '-')
+                        |replace('{need_type}', lead.need_type or 'jersey')
+                        |replace('{estimated_qty}', estimated_qty) %}
                     <option value="{{ template.id }}" data-message="{{ rendered|e }}">{{ template.name }}</option>
+                {% else %}
+                    <option value="">Belum ada template aktif</option>
                 {% endfor %}
             </select>
             <textarea class="form-control crm-wa-message" name="message" rows="6" data-wa-message></textarea>

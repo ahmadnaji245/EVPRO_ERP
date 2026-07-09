@@ -32,8 +32,49 @@
                     <button class="btn btn-success">Approve Admin</button>
                 </form>
             {% endif %}
-            <button class="btn btn-outline-dark" type="button" data-copy-text="{{ sales_order.tracking_code }}" data-copy-label="Salin Kode">Salin Kode</button>
-            <button class="btn btn-outline-dark" type="button" data-copy-text="https://erp.evprotextile.com/t/{{ sales_order.tracking_code }}" data-copy-label="Salin Link Tracking">Salin Link Tracking</button>
+            {% set confirmation_customer_name = sales_order.customer_access.customer_name if sales_order.customer_access else '-' %}
+            {% set confirmation_tracking_link = 'https://erp.evprotextile.com/t/' ~ sales_order.tracking_code %}
+            {% if sales_order.approved %}
+                {% set confirmation_message %}Halo kak 😊
+
+Terima kasih, pesanan kakak sudah kami terima dan approval sudah berhasil.
+
+Progress produksi dapat dipantau secara real-time melalui link berikut:
+
+{{ confirmation_tracking_link }}
+
+Melalui halaman tersebut kakak dapat melihat perkembangan proses produksi hingga pesanan selesai.
+
+Terima kasih sudah mempercayakan pembuatan jersey kepada kami. 🙏{% endset %}
+            {% else %}
+                {% set confirmation_message %}Halo kak 😊
+
+Kami ingin mengonfirmasi kembali detail pesanan kakak.
+
+Nama Customer : {{ confirmation_customer_name }}
+Nomor SO : {{ sales_order.so_number }}
+
+Mohon dicek kembali apakah:
+
+✅ Bahan
+✅ Spesifikasi pesanan
+✅ Desain
+✅ Data player
+
+sudah sesuai dengan yang diinginkan.
+
+Silakan lakukan pengecekan dan approval melalui link berikut:
+
+{{ confirmation_tracking_link }}
+
+Setelah approval dilakukan, pesanan akan segera kami lanjutkan ke proses produksi sesuai jadwal.
+
+Apabila masih ada revisi atau data yang perlu diperbaiki, silakan balas WhatsApp ini sebelum melakukan approval.
+
+Terima kasih 🙏{% endset %}
+            {% endif %}
+            <button class="btn btn-outline-dark" type="button" data-copy-text="{{ confirmation_message|e }}" data-copy-label="Salin Pesan" data-copy-success-message="Pesan berhasil disalin.">Salin Pesan</button>
+            <button class="btn btn-outline-dark" type="button" data-copy-text="{{ confirmation_tracking_link }}" data-copy-label="Salin Link Tracking">Salin Link Tracking</button>
             <a
                 class="btn btn-rdr"
                 href="{{ url_for('sales_orders.edit', sales_order_id=sales_order.id) }}"
@@ -369,17 +410,40 @@ document.querySelectorAll("[data-copy-text]").forEach((button) => {
     button.addEventListener("click", async () => {
         const copyText = button.dataset.copyText;
         const label = button.dataset.copyLabel || button.textContent;
+        const successMessage = button.dataset.copySuccessMessage;
         try {
             await navigator.clipboard.writeText(copyText);
             button.textContent = "Tersalin";
         } catch (error) {
-            const fallbackInput = document.createElement("input");
+            const fallbackInput = document.createElement("textarea");
             fallbackInput.value = copyText;
+            fallbackInput.setAttribute("readonly", "");
+            fallbackInput.style.position = "fixed";
+            fallbackInput.style.opacity = "0";
             document.body.appendChild(fallbackInput);
             fallbackInput.select();
             document.execCommand("copy");
             fallbackInput.remove();
             button.textContent = "Tersalin";
+        }
+        if (successMessage) {
+            const alert = document.createElement("div");
+            alert.className = "alert alert-success alert-dismissible fade show";
+            alert.setAttribute("role", "alert");
+            alert.textContent = successMessage;
+
+            const closeButton = document.createElement("button");
+            closeButton.type = "button";
+            closeButton.className = "btn-close";
+            closeButton.setAttribute("data-bs-dismiss", "alert");
+            closeButton.setAttribute("aria-label", "Close");
+            alert.appendChild(closeButton);
+
+            const pageShell = document.querySelector(".page-shell");
+            pageShell.insertBefore(alert, pageShell.firstChild);
+            window.setTimeout(() => {
+                bootstrap.Alert.getOrCreateInstance(alert).close();
+            }, 3000);
         }
         window.setTimeout(() => {
             button.textContent = label;

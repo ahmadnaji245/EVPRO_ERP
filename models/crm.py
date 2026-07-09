@@ -123,6 +123,8 @@ class WhatsAppTemplate(db.Model):
     name = db.Column(db.String(150), nullable=False)
     category = db.Column(db.String(80), nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=1, index=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

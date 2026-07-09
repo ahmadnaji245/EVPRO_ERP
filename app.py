@@ -1029,7 +1029,9 @@ def ensure_v08_crm_schema():
                     name VARCHAR(150) NOT NULL,
                     category VARCHAR(80) NOT NULL,
                     content TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 1,
                     is_active BOOLEAN NOT NULL DEFAULT 1,
+                    is_deleted BOOLEAN NOT NULL DEFAULT 0,
                     created_at DATETIME NOT NULL,
                     updated_at DATETIME NOT NULL
                 )
@@ -1038,19 +1040,33 @@ def ensure_v08_crm_schema():
         )
         db.session.execute(text("CREATE INDEX ix_whatsapp_templates_key ON whatsapp_templates (key)"))
         db.session.execute(text("CREATE INDEX ix_whatsapp_templates_category ON whatsapp_templates (category)"))
+        db.session.execute(text("CREATE INDEX ix_whatsapp_templates_sort_order ON whatsapp_templates (sort_order)"))
         db.session.execute(text("CREATE INDEX ix_whatsapp_templates_is_active ON whatsapp_templates (is_active)"))
+        db.session.execute(text("CREATE INDEX ix_whatsapp_templates_is_deleted ON whatsapp_templates (is_deleted)"))
         db.session.commit()
     else:
         _add_column_if_missing("whatsapp_templates", "key", "VARCHAR(80)")
         _add_column_if_missing("whatsapp_templates", "name", "VARCHAR(150)")
         _add_column_if_missing("whatsapp_templates", "category", "VARCHAR(80)")
         _add_column_if_missing("whatsapp_templates", "content", "TEXT")
+        _add_column_if_missing("whatsapp_templates", "sort_order", "INTEGER NOT NULL DEFAULT 1")
         _add_column_if_missing("whatsapp_templates", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+        _add_column_if_missing("whatsapp_templates", "is_deleted", "BOOLEAN NOT NULL DEFAULT 0")
         _add_column_if_missing("whatsapp_templates", "created_at", "DATETIME")
         _add_column_if_missing("whatsapp_templates", "updated_at", "DATETIME")
+        db.session.execute(text("UPDATE whatsapp_templates SET sort_order = id WHERE sort_order IS NULL OR sort_order = 0"))
+        db.session.execute(text("UPDATE whatsapp_templates SET is_deleted = 0 WHERE is_deleted IS NULL"))
+        sort_stats = db.session.execute(
+            text("SELECT COUNT(*) AS total, COUNT(DISTINCT sort_order) AS distinct_total FROM whatsapp_templates WHERE is_deleted = 0")
+        ).mappings().first()
+        if sort_stats and sort_stats["total"] > 1 and sort_stats["distinct_total"] <= 1:
+            db.session.execute(text("UPDATE whatsapp_templates SET sort_order = id WHERE is_deleted = 0"))
+        db.session.commit()
     _create_index_if_missing("ix_whatsapp_templates_key", "whatsapp_templates", "key")
     _create_index_if_missing("ix_whatsapp_templates_category", "whatsapp_templates", "category")
+    _create_index_if_missing("ix_whatsapp_templates_sort_order", "whatsapp_templates", "sort_order")
     _create_index_if_missing("ix_whatsapp_templates_is_active", "whatsapp_templates", "is_active")
+    _create_index_if_missing("ix_whatsapp_templates_is_deleted", "whatsapp_templates", "is_deleted")
 
     if _table_exists("sales_orders"):
         _add_column_if_missing("sales_orders", "crm_customer_id", "INTEGER")

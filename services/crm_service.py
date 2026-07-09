@@ -8,6 +8,9 @@ from models import Brand, Customer, FollowUp, Lead, Nota, SalesOrder, User, What
 from models.crm import CUSTOMER_SOURCES, FOLLOW_UP_STATUSES, LEAD_SOURCES, LEAD_STATUSES
 
 
+WA_TEMPLATE_CATEGORIES = ("Awal", "Harga", "Desain", "DP", "Follow Up", "Repeat", "After Sales", "Reminder", "Lainnya")
+
+
 DEFAULT_WA_TEMPLATES = (
     (
         "baru",
@@ -188,30 +191,99 @@ def lead_whatsapp_template_options():
 
 
 def whatsapp_template_options():
-    return WhatsAppTemplate.query.filter_by(is_active=True).order_by(WhatsAppTemplate.category.asc(), WhatsAppTemplate.name.asc()).all()
+    return (
+        WhatsAppTemplate.query.filter_by(is_active=True, is_deleted=False)
+        .order_by(WhatsAppTemplate.sort_order.asc(), WhatsAppTemplate.category.asc(), WhatsAppTemplate.name.asc())
+        .all()
+    )
 
 
-def list_whatsapp_templates():
-    return WhatsAppTemplate.query.order_by(WhatsAppTemplate.category.asc(), WhatsAppTemplate.name.asc()).all()
+def list_whatsapp_templates(search=None):
+    search = search or {}
+    query = WhatsAppTemplate.query.filter_by(is_deleted=False)
+    q = str(search.get("q") or "").strip()
+    category = str(search.get("category") or "").strip()
+    status = str(search.get("status") or "").strip()
+    if q:
+        query = query.filter(WhatsAppTemplate.name.ilike(f"%{q}%"))
+    if category:
+        query = query.filter(WhatsAppTemplate.category == category)
+    if status == "active":
+        query = query.filter(WhatsAppTemplate.is_active.is_(True))
+    elif status == "inactive":
+        query = query.filter(WhatsAppTemplate.is_active.is_(False))
+    return query.order_by(WhatsAppTemplate.sort_order.asc(), WhatsAppTemplate.category.asc(), WhatsAppTemplate.name.asc()).all()
 
 
 def get_whatsapp_template(template_id):
-    return WhatsAppTemplate.query.get_or_404(template_id)
+    return WhatsAppTemplate.query.filter_by(id=template_id, is_deleted=False).first_or_404()
+
+
+def create_whatsapp_template(form):
+    template = WhatsAppTemplate()
+    _fill_whatsapp_template(template, form)
+    template.key = _generate_whatsapp_template_key(template.name)
+    db.session.add(template)
+    db.session.commit()
+    return template
 
 
 def update_whatsapp_template(template, form):
-    name = str(form.get("name") or "").strip()
-    category = str(form.get("category") or "").strip()
-    content = str(form.get("content") or "").strip()
-    if not name or not category or not content:
-        raise ValueError("Nama, kategori, dan isi pesan wajib diisi.")
-    template.name = name
-    template.category = category
-    template.content = content
-    template.is_active = bool(form.get("is_active"))
+    _fill_whatsapp_template(template, form)
+    db.session.commit()
+    return template
+
+
+def toggle_whatsapp_template(template):
+    template.is_active = not template.is_active
     template.updated_at = datetime.utcnow()
     db.session.commit()
     return template
+
+
+def delete_whatsapp_template(template):
+    template.is_deleted = True
+    template.is_active = False
+    template.updated_at = datetime.utcnow()
+    db.session.commit()
+    return template
+
+
+def _fill_whatsapp_template(template, form):
+    name = str(form.get("name") or "").strip()
+    category = str(form.get("category") or "").strip()
+    content = str(form.get("content") or "").strip()
+    is_active = str(form.get("status") or "").strip() != "inactive"
+    if not name or not category or not content:
+        raise ValueError("Nama, kategori, dan isi pesan wajib diisi.")
+    if category not in WA_TEMPLATE_CATEGORIES:
+        raise ValueError("Kategori template tidak valid.")
+    template.name = name
+    template.category = category
+    template.content = content
+    template.sort_order = _parse_int(form.get("sort_order")) or _next_whatsapp_template_order()
+    template.is_active = is_active
+    template.updated_at = datetime.utcnow()
+
+
+def next_whatsapp_template_order():
+    max_order = db.session.query(func.max(WhatsAppTemplate.sort_order)).filter_by(is_deleted=False).scalar() or 0
+    return max_order + 1
+
+
+def _next_whatsapp_template_order():
+    return next_whatsapp_template_order()
+
+
+def _generate_whatsapp_template_key(name):
+    base = "".join(ch.lower() if ch.isalnum() else "_" for ch in str(name or "template"))
+    base = "_".join(part for part in base.split("_") if part)[:50] or "template"
+    key = base
+    suffix = 2
+    while WhatsAppTemplate.query.filter_by(key=key).first():
+        key = f"{base}_{suffix}"
+        suffix += 1
+    return key
 
 
 def send_lead_whatsapp(lead, template_id=None, message=None, user=None):
@@ -232,10 +304,10 @@ def send_whatsapp_follow_up(target_type, target, template_id=None, message=None,
         raise ValueError("Nomor WhatsApp tidak valid.")
     template = None
     if str(template_id or "").isdigit():
-        template = WhatsAppTemplate.query.get(int(template_id))
+        template = WhatsAppTemplate.query.filter_by(id=int(template_id), is_active=True, is_deleted=False).first()
     final_message = str(message or "").strip()
     if not final_message and template:
-        final_message = render_whatsapp_template(template, target, target_type)
+        final_message = render_whatsapp_template(template, target, target_type, user)
     if not final_message:
         raise ValueError("Isi pesan WhatsApp wajib diisi.")
     follow_up = FollowUp(
@@ -257,9 +329,12 @@ def send_whatsapp_follow_up(target_type, target, template_id=None, message=None,
     return f"https://wa.me/{phone}?text={quote(final_message)}"
 
 
-def render_whatsapp_template(template, target, target_type):
+def render_whatsapp_template(template, target, target_type, user=None):
     values = {
         "name": getattr(target, "name", "") or "Kak",
+        "brand": _target_brand_name(target),
+        "cs_name": (user.name if user else None) or "Admin",
+        "today": date.today().strftime("%d/%m/%Y"),
         "status": getattr(target, "status", "") or "-",
         "type": target_type,
         "need_type": getattr(target, "need_type", "") or "jersey",
@@ -272,11 +347,13 @@ def render_whatsapp_template(template, target, target_type):
 
 
 def seed_default_whatsapp_templates():
-    existing = {template.key: template for template in WhatsAppTemplate.query.all()}
-    for key, name, category, content in DEFAULT_WA_TEMPLATES:
+    existing = {template.key: template for template in WhatsAppTemplate.query.filter_by(is_deleted=False).all()}
+    for index, (key, name, category, content) in enumerate(DEFAULT_WA_TEMPLATES, start=1):
         template = existing.get(key)
         if not template:
-            db.session.add(WhatsAppTemplate(key=key, name=name, category=category, content=content, is_active=True))
+            db.session.add(WhatsAppTemplate(key=key, name=name, category=category, content=content, sort_order=index, is_active=True))
+        elif not template.sort_order:
+            template.sort_order = index
 
 
 def users_for_assignment():
@@ -575,6 +652,13 @@ def _parse_int(value):
         return int(value)
     except ValueError:
         return None
+
+
+def _target_brand_name(target):
+    source_name = str(getattr(target, "source_name", "") or getattr(target, "source_detail", "") or "").strip()
+    if source_name:
+        return source_name
+    return "EVPRO"
 
 
 def _parse_date(value):
