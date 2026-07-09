@@ -27,20 +27,29 @@
                     <button class="btn btn-success">Approve Admin</button>
                 </form>
             {% endif %}
+            {% set confirmation_team_name = sales_order.team_name or '-' %}
             {% set confirmation_customer_name = sales_order.customer_access.customer_name if sales_order.customer_access else '-' %}
             {% set confirmation_tracking_link = 'https://erp.evprotextile.com/t/' ~ sales_order.tracking_code %}
             {% if sales_order.approved %}
                 {% set confirmation_message %}Halo kak 😊
 
-Terima kasih, pesanan kakak sudah kami terima dan approval sudah berhasil.
+Terima kasih, konfirmasi pesanan sudah kami terima.
 
-Progress produksi dapat dipantau secara real-time melalui link berikut:
+Nama Tim : {{ confirmation_team_name }}
+Nama Customer : {{ confirmation_customer_name }}
+Nomor SO : {{ sales_order.so_number }}
+
+Saat ini pesanan kakak sudah masuk ke tahap proses produksi.
+
+Progress pengerjaan dapat dipantau secara real-time melalui link berikut:
 
 {{ confirmation_tracking_link }}
 
-Melalui halaman tersebut kakak dapat melihat perkembangan proses produksi hingga pesanan selesai.
+Melalui halaman tersebut kakak dapat melihat perkembangan status pesanan hingga proses selesai.
 
-Terima kasih sudah mempercayakan pembuatan jersey kepada kami. 🙏{% endset %}
+Apabila ada pertanyaan atau informasi yang ingin disampaikan selama proses produksi berlangsung, silakan hubungi kami melalui WhatsApp ini ya kak.
+
+Terima kasih atas kepercayaan kakak kepada tim kami. 🙏{% endset %}
             {% else %}
                 {% set confirmation_message %}Halo kak 😊
 
