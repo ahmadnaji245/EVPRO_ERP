@@ -167,7 +167,7 @@ def production_detail(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/assign-vendor", methods=["POST"], endpoint="assign_vendor")
-@permission_required("production.manage")
+@permission_required("production.assign_vendor")
 def production_assign_vendor(sales_order_id):
     order = _get_production_order(sales_order_id)
     try:
@@ -180,7 +180,7 @@ def production_assign_vendor(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/deadline-vendor", methods=["POST"], endpoint="set_deadline")
-@permission_required("production.manage")
+@permission_required("production.set_deadline")
 def production_set_deadline(sales_order_id):
     order = _get_production_order(sales_order_id)
     try:
@@ -193,7 +193,7 @@ def production_set_deadline(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/finish", methods=["POST"], endpoint="finish")
-@permission_required("production.manage")
+@permission_required("production.finish")
 def production_finish(sales_order_id):
     order = _get_production_order(sales_order_id)
     try:
@@ -206,7 +206,7 @@ def production_finish(sales_order_id):
 
 
 @production_bp.route("/<int:sales_order_id>/qc-checklist", methods=["GET", "POST"], endpoint="qc_checklist")
-@permission_required("production.manage")
+@permission_required("production.update_qc")
 def production_qc_checklist(sales_order_id):
     order = _get_production_order(sales_order_id)
     if request.method == "POST":

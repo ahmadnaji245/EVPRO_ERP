@@ -28,7 +28,7 @@ from services.sales_order_service import (
 )
 from utils.constants import user_is_admin, user_is_desain, user_is_produksi
 from utils.helpers import sales_order_pdf_download_name
-from utils.permissions import permission_required
+from utils.permissions import has_permission, permission_required
 
 
 sales_orders_bp = Blueprint("sales_orders", __name__, url_prefix="/sales-order")
@@ -256,40 +256,45 @@ def pdf(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/production-checklist", methods=["POST"])
-@permission_required("sales_order.setting_checklist")
+@permission_required("sales_order.view")
 def update_production_checklist(sales_order_id):
     _sales_order_access_required()
+    can_update_setting = has_permission("sales_order.setting_checklist")
+    can_update_checking = has_permission("production.update_checking")
+    if not (can_update_setting or can_update_checking):
+        abort(403)
     order = get_sales_order(sales_order_id)
     player_ids = [player.id for design in order.designs for player in design.players]
-    requested_setting = set(request.form.getlist("setting_done"))
-    requested_size_setting = set(request.form.getlist("size_setting_done"))
-    requested_qc = set(request.form.getlist("qc_done"))
+    requested_setting = set(request.form.getlist("setting_done")) if can_update_setting else set()
+    requested_size_setting = set(request.form.getlist("size_setting_done")) if can_update_setting else set()
+    requested_qc = set(request.form.getlist("qc_done")) if can_update_checking else set()
     now = datetime.utcnow()
     current_user_name = current_user.name or current_user.username
 
     for player_id in player_ids:
         player = SalesOrderPlayer.query.get(player_id)
         checklist = ensure_player_checklist(player)
-        setting_done = str(player_id) in requested_setting
-        qc_done = str(player_id) in requested_qc
-        setting_owner_id = checklist.setting_done_by_user_id or checklist.setting_user_id
-        if checklist.setting_done:
-            if not setting_done and setting_owner_id == current_user.id:
-                checklist.setting_done = False
-                checklist.setting_user_id = None
-                checklist.setting_at = None
-                checklist.setting_done_by_user_id = None
-                checklist.setting_done_by_name = None
-                checklist.setting_done_at = None
-        elif setting_done:
-            checklist.setting_done = setting_done
-            checklist.setting_user_id = current_user.id
-            checklist.setting_at = now
-            checklist.setting_done_by_user_id = current_user.id
-            checklist.setting_done_by_name = current_user_name
-            checklist.setting_done_at = now
+        if can_update_setting:
+            setting_done = str(player_id) in requested_setting
+            setting_owner_id = checklist.setting_done_by_user_id or checklist.setting_user_id
+            if checklist.setting_done:
+                if not setting_done and setting_owner_id == current_user.id:
+                    checklist.setting_done = False
+                    checklist.setting_user_id = None
+                    checklist.setting_at = None
+                    checklist.setting_done_by_user_id = None
+                    checklist.setting_done_by_name = None
+                    checklist.setting_done_at = None
+            elif setting_done:
+                checklist.setting_done = setting_done
+                checklist.setting_user_id = current_user.id
+                checklist.setting_at = now
+                checklist.setting_done_by_user_id = current_user.id
+                checklist.setting_done_by_name = current_user_name
+                checklist.setting_done_at = now
 
-        if user_is_admin(current_user) or user_is_produksi(current_user):
+        if can_update_checking:
+            qc_done = str(player_id) in requested_qc
             qc_owner_id = checklist.qc_done_by_user_id or checklist.qc_user_id
             if checklist.qc_done:
                 if not qc_done and qc_owner_id == current_user.id:
@@ -307,35 +312,36 @@ def update_production_checklist(sales_order_id):
                 checklist.qc_done_by_name = current_user_name
                 checklist.qc_done_at = now
 
-    for design in order.designs:
-        rows = []
-        recap = design.size_recap
-        for group_rows in recap["groups"].values():
-            rows.extend(group_rows)
-        rows.extend(recap["long_sleeve"])
+    if can_update_setting:
+        for design in order.designs:
+            rows = []
+            recap = design.size_recap
+            for group_rows in recap["groups"].values():
+                rows.extend(group_rows)
+            rows.extend(recap["long_sleeve"])
 
-        existing = {
-            checklist.size: checklist
-            for checklist in design.size_checklists
-        }
-        for row in rows:
-            size = " ".join((row["size"] or "").split())
-            key = f"{design.id}|{size}"
-            checklist = existing.get(size)
-            if not checklist:
-                checklist = ProductionSizeChecklist(design=design, size=size)
-                db.session.add(checklist)
-            setting_done = key in requested_size_setting
-            if checklist.setting_done != setting_done:
-                checklist.setting_done = setting_done
-                checklist.setting_user_id = current_user.id if setting_done else None
-                checklist.setting_at = now if setting_done else None
+            existing = {
+                checklist.size: checklist
+                for checklist in design.size_checklists
+            }
+            for row in rows:
+                size = " ".join((row["size"] or "").split())
+                key = f"{design.id}|{size}"
+                checklist = existing.get(size)
+                if not checklist:
+                    checklist = ProductionSizeChecklist(design=design, size=size)
+                    db.session.add(checklist)
+                setting_done = key in requested_size_setting
+                if checklist.setting_done != setting_done:
+                    checklist.setting_done = setting_done
+                    checklist.setting_user_id = current_user.id if setting_done else None
+                    checklist.setting_at = now if setting_done else None
 
-    if order.approved and _setting_checklist_complete(order) and _production_stage_index(order.production_status_label) < _production_stage_index("Printing"):
+    if can_update_setting and order.approved and _setting_checklist_complete(order) and _production_stage_index(order.production_status_label) < _production_stage_index("Printing"):
         order.setting_by_name = current_user_name
         set_production_stage(order, "Printing")
 
-    if order.approved and _final_packing_checklist_complete(order):
+    if can_update_checking and order.approved and _final_packing_checklist_complete(order):
         set_production_stage(order, "Finish")
 
     db.session.commit()

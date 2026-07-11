@@ -9,6 +9,7 @@ from utils.constants import PRODUCTION_STATUSES, PRODUCTION_VENDORS, normalize_p
 
 
 ACTIVE_PRODUCTION_STATUSES = [status for status in PRODUCTION_STATUSES if status != "Finish"]
+FINISHED_PRODUCTION_STATUSES = {"Finish", "Selesai"}
 VENDOR_PRINT_EXCLUDED_STATUSES = {
     "Terkirim dari Vendor",
     "Packing",
@@ -20,10 +21,12 @@ VENDOR_RETURNED_STATUSES = {"Terkirim dari Vendor", "Barang Masuk", "QC"}
 def list_production_orders(search=None):
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
+        .filter(SalesOrder.production_status.notin_(FINISHED_PRODUCTION_STATUSES))
         .populate_existing()
         .order_by(SalesOrder.deadline.asc().nullslast(), SalesOrder.created_at.asc(), SalesOrder.so_number.desc(), SalesOrder.id.desc())
         .all()
     )
+    orders = [order for order in orders if is_active_production_order(order)]
     search_value = str(search or "").strip().casefold()
     if not search_value:
         return orders
@@ -37,7 +40,7 @@ def production_summary(orders):
         "in_progress": sum(1 for order in orders if production_status(order) in {"Setting", "Printing", "Jahit"}),
         "deadline_today": sum(1 for order in orders if effective_deadline(order) == today and production_status(order) != "Finish"),
         "warehouse_qc": sum(1 for order in orders if production_status(order) in {"QC", "Packing"}),
-        "done": sum(1 for order in orders if production_status(order) == "Finish"),
+        "done": finished_production_count(),
         "late": sum(1 for order in orders if is_late(order, today)),
     }
 
@@ -46,7 +49,7 @@ def vendor_summary(orders):
     today = datetime.utcnow().date()
     rows = []
     for vendor in PRODUCTION_VENDORS:
-        vendor_orders = [order for order in orders if order.production_vendor == vendor and production_status(order) != "Finish"]
+        vendor_orders = [order for order in orders if order.production_vendor == vendor and is_active_production_order(order)]
         rows.append(
             {
                 "name": vendor,
@@ -353,6 +356,20 @@ def production_status(order):
     return normalize_production_status(order.production_status)
 
 
+def is_active_production_order(order):
+    return production_status(order) != "Finish"
+
+
+def finished_production_count():
+    orders = (
+        SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
+        .filter(SalesOrder.production_status.in_(FINISHED_PRODUCTION_STATUSES))
+        .populate_existing()
+        .all()
+    )
+    return sum(1 for order in orders if production_status(order) == "Finish")
+
+
 def effective_deadline(order):
     return order.production_vendor_deadline or order.deadline
 
@@ -436,14 +453,15 @@ def _matches_search(order, search_value):
     return any(search_value in str(value or "").casefold() for value in values)
 
 
-def list_vendor_production_rows(active_only=False):
+def list_vendor_production_rows(active_only=True):
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
+        .filter(SalesOrder.production_status.notin_(FINISHED_PRODUCTION_STATUSES))
         .populate_existing()
         .all()
     )
     if active_only:
-        orders = [order for order in orders if production_status(order) not in {"Finish", "Selesai"}]
+        orders = [order for order in orders if is_active_production_order(order)]
     orders = sorted(
         orders,
         key=lambda order: (

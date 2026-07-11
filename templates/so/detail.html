@@ -229,6 +229,8 @@ Terima kasih 🙏{% endset %}
 {% endif %}
 
 <form method="post" action="{{ url_for('sales_orders.update_production_checklist', sales_order_id=sales_order.id) }}">
+    {% set can_update_setting_checklist = has_permission('sales_order.setting_checklist') %}
+    {% set can_update_checking = has_permission('production.update_checking') %}
     {% for design in sales_order.designs %}
         {% set recap = design.size_recap %}
         <div class="panel mb-4">
@@ -313,7 +315,7 @@ Terima kasih 🙏{% endset %}
                                                 <td>{{ row.size }}</td>
                                                 <td class="text-center fw-semibold">{{ row.qty }}</td>
                                                 <td class="text-center">
-                                                    <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %} {% if not can_update_setting_checklist %}disabled{% endif %}>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -380,7 +382,7 @@ Terima kasih 🙏{% endset %}
                         <th class="text-center">
                             <div class="d-inline-flex align-items-center gap-2">
                                 <span>Cek</span>
-                                <input class="form-check-input m-0" type="checkbox" aria-label="Centang semua CEK" data-checklist-cek-master>
+                                <input class="form-check-input m-0" type="checkbox" aria-label="Centang semua CEK" data-checklist-cek-master {% if not can_update_checking %}disabled{% endif %}>
                             </div>
                         </th>
                     </tr>
@@ -394,10 +396,10 @@ Terima kasih 🙏{% endset %}
                             <td>{{ player.size }}</td>
                             <td>{{ player.notes or '-' }}</td>
                             <td class="text-center">
-                                <input class="form-check-input" type="checkbox" name="setting_done" value="{{ player.id }}" {% if player.checklist and player.checklist.setting_done %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" name="setting_done" value="{{ player.id }}" {% if player.checklist and player.checklist.setting_done %}checked{% endif %} {% if not can_update_setting_checklist %}disabled{% endif %}>
                             </td>
                             <td class="text-center">
-                                <input class="form-check-input" type="checkbox" name="qc_done" value="{{ player.id }}" data-checklist-cek-item {% if player.checklist and player.checklist.qc_done %}checked{% endif %} {% if not has_permission('sales_order.production_checklist') %}disabled{% endif %}>
+                                <input class="form-check-input" type="checkbox" name="qc_done" value="{{ player.id }}" data-checklist-cek-item {% if player.checklist and player.checklist.qc_done %}checked{% endif %} {% if not can_update_checking %}disabled{% endif %}>
                             </td>
                         </tr>
                     {% else %}
@@ -409,7 +411,7 @@ Terima kasih 🙏{% endset %}
         </div>
     {% endfor %}
     <div class="d-flex justify-content-end mb-4">
-        <button class="btn btn-rdr">Simpan Checklist Produksi</button>
+        <button class="btn btn-rdr" {% if not can_update_setting_checklist and not can_update_checking %}disabled{% endif %}>Simpan Checklist Produksi</button>
     </div>
 </form>
 {% endblock %}

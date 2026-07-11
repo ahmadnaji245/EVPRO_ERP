@@ -99,6 +99,7 @@ SIZE_GROUPS = {
     "Women": {"WS", "WM", "WL", "WXL"},
 }
 LONG_SLEEVE_MARKERS = ("LENGAN PANJANG", "LONG SLEEVE", "LP")
+LONG_SLEEVE_THREE_QUARTER_MARKERS = ("3/4", "3 / 4", "¾")
 
 
 def normalize_production_status(status):
@@ -118,6 +119,8 @@ def normalize_size_key(size):
     value = " ".join(value.split())
     for marker in LONG_SLEEVE_MARKERS:
         value = value.replace(marker, " ")
+    for marker in LONG_SLEEVE_THREE_QUARTER_MARKERS:
+        value = value.replace(marker, " ")
     value = " ".join(value.replace("-", " ").replace("_", " ").split())
     return SIZE_ALIASES.get(value, value)
 
@@ -127,8 +130,17 @@ def has_long_sleeve_marker(*values):
     return any(marker in combined for marker in LONG_SLEEVE_MARKERS)
 
 
+def long_sleeve_type_label(*values):
+    combined = " ".join(str(value or "").upper().replace("¾", "3/4") for value in values)
+    if not any(marker in combined for marker in LONG_SLEEVE_MARKERS):
+        return ""
+    if any(marker in combined for marker in LONG_SLEEVE_THREE_QUARTER_MARKERS):
+        return "Lengan Panjang 3/4"
+    return "Lengan Panjang"
+
+
 def long_sleeve_size_label(size):
-    value = " ".join(str(size or "").strip().split())
+    value = " ".join(str(size or "").strip().replace("¾", "3/4").split())
     if not value:
         return ""
     cleaned = value
@@ -136,8 +148,14 @@ def long_sleeve_size_label(size):
         cleaned = cleaned.replace(marker.title(), " ")
         cleaned = cleaned.replace(marker, " ")
         cleaned = cleaned.replace(marker.lower(), " ")
+    for marker in LONG_SLEEVE_THREE_QUARTER_MARKERS:
+        cleaned = cleaned.replace(marker, " ")
     cleaned = cleaned.replace("(", " ").replace(")", " ")
     return " ".join(cleaned.split())
+
+
+def long_sleeve_sort_rank(sleeve_type):
+    return 1 if sleeve_type == "Lengan Panjang 3/4" else 0
 
 
 def size_sort_rank(size):
@@ -168,6 +186,17 @@ def sort_size_rows(rows):
         list(rows or []),
         key=lambda row: (
             size_sort_rank(row.get("size") if isinstance(row, dict) else getattr(row, "size", "")),
+            row.get("_first_index", 0) if isinstance(row, dict) else getattr(row, "_first_index", 0),
+        ),
+    )
+
+
+def sort_long_sleeve_rows(rows):
+    return sorted(
+        list(rows or []),
+        key=lambda row: (
+            long_sleeve_sort_rank(row.get("sleeve_type") if isinstance(row, dict) else getattr(row, "sleeve_type", "")),
+            size_sort_rank(row.get("base_size") if isinstance(row, dict) else getattr(row, "base_size", "")),
             row.get("_first_index", 0) if isinstance(row, dict) else getattr(row, "_first_index", 0),
         ),
     )

@@ -32,7 +32,7 @@ def dashboard_stats():
         "total_point": total_point,
         "approval_pending": sum(1 for order in orders if order.approval_status == "pending"),
         "approval_done": sum(1 for order in orders if order.approval_status == "approved"),
-        "production_running": sum(1 for order in orders if normalize_production_status(order.production_status) != "Selesai"),
+        "production_running": sum(1 for order in orders if normalize_production_status(order.production_status) != "Finish"),
         "production_finish": sum(1 for order in orders if normalize_production_status(order.production_status) == "Finish"),
     }
 

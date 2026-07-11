@@ -36,6 +36,9 @@ VALID_PLAYER_SIZES = [
     "L Women Lengan Panjang",
     "XL Lengan Panjang",
     "L Lengan Panjang",
+    "M Lengan Panjang 3/4",
+    "L Lengan Panjang 3/4",
+    "XL Lengan Panjang 3/4",
 ]
 PLAYER_SIZE_LOOKUP = {size.casefold(): size for size in VALID_PLAYER_SIZES}
 

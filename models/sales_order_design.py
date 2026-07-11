@@ -1,7 +1,16 @@
 from datetime import datetime
 
 from database.db import db
-from utils.constants import has_long_sleeve_marker, long_sleeve_size_label, normalize_size_key, size_group_name, sort_players_by_size, sort_size_rows
+from utils.constants import (
+    has_long_sleeve_marker,
+    long_sleeve_size_label,
+    long_sleeve_type_label,
+    normalize_size_key,
+    size_group_name,
+    sort_long_sleeve_rows,
+    sort_players_by_size,
+    sort_size_rows,
+)
 
 
 class SalesOrderDesign(db.Model):
@@ -98,13 +107,24 @@ class SalesOrderDesign(db.Model):
         for index, player in enumerate(self.players):
             if not has_long_sleeve_marker(player.size, player.notes):
                 continue
-            display_size = long_sleeve_size_label(player.size) or " ".join((player.size or "").split())
-            if not display_size:
+            base_size = long_sleeve_size_label(player.size) or " ".join((player.size or "").split())
+            sleeve_type = long_sleeve_type_label(player.size, player.notes)
+            if not base_size or not sleeve_type:
                 continue
-            key = normalize_size_key(display_size) or display_size.casefold()
-            row = rows.setdefault(key, {"size": display_size, "qty": 0, "_first_index": index})
+            size_key = normalize_size_key(base_size) or base_size.casefold()
+            key = (size_key, sleeve_type)
+            row = rows.setdefault(
+                key,
+                {
+                    "size": f"{base_size} {sleeve_type}",
+                    "base_size": base_size,
+                    "sleeve_type": sleeve_type,
+                    "qty": 0,
+                    "_first_index": index,
+                },
+            )
             row["qty"] += 1
-        return [{"size": row["size"], "qty": row["qty"]} for row in sort_size_rows(rows.values())]
+        return [{"size": row["size"], "qty": row["qty"]} for row in sort_long_sleeve_rows(rows.values())]
 
     def size_setting_done(self, size):
         normalized = " ".join((size or "").split())

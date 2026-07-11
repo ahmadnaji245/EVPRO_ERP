@@ -29,7 +29,7 @@ from services.sales_order_service import get_sales_order_by_tracking_code, set_p
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders, nota_pdf_download_name, sales_order_pdf_download_name
 from utils.permissions import has_permission, permission_required
-from utils.constants import normalize_size_key, sort_size_rows
+from utils.constants import long_sleeve_size_label, long_sleeve_type_label, normalize_size_key, sort_long_sleeve_rows, sort_size_rows
 
 
 login_manager = LoginManager()
@@ -419,13 +419,21 @@ def customer_portal_long_sleeve_recap(order):
     for design in sorted(order.designs, key=lambda item: (item.sort_order, item.id)):
         for row in design.long_sleeve_recap:
             first_index += 1
-            key = normalize_size_key(row["size"]) or str(row["size"]).casefold()
+            base_size = long_sleeve_size_label(row["size"]) or str(row["size"]).strip()
+            sleeve_type = long_sleeve_type_label(row["size"])
+            key = (normalize_size_key(base_size) or base_size.casefold(), sleeve_type)
             target = rows_by_size.setdefault(
                 key,
-                {"size": row["size"], "qty": 0, "_first_index": first_index},
+                {
+                    "size": row["size"],
+                    "base_size": base_size,
+                    "sleeve_type": sleeve_type,
+                    "qty": 0,
+                    "_first_index": first_index,
+                },
             )
             target["qty"] += row["qty"]
-    return [{"size": row["size"], "qty": row["qty"]} for row in sort_size_rows(rows_by_size.values())]
+    return [{"size": row["size"], "qty": row["qty"]} for row in sort_long_sleeve_rows(rows_by_size.values())]
 
 
 def _send_production_photo_file(photo, as_attachment):
