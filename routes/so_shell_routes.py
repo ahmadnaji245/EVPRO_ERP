@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
@@ -111,7 +111,16 @@ def production_index():
     search = request.args.get("q", "").strip()
     sales_orders = list_production_orders(search)
     unassigned_orders = [order for order in sales_orders if not vendor_assignment_complete(order)]
-    active_orders = [order for order in sales_orders if vendor_assignment_complete(order)]
+    active_orders = sorted(
+        [order for order in sales_orders if vendor_assignment_complete(order)],
+        key=lambda order: (
+            order.production_vendor_deadline or date.max,
+            order.deadline or date.max,
+            order.created_at or datetime.min,
+            order.so_number or "",
+            order.id or 0,
+        ),
+    )
     return render_template(
         "production/index.html",
         sales_orders=sales_orders,
