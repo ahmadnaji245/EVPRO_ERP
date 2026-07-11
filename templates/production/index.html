@@ -27,23 +27,92 @@
     {% endfor %}
 </div>
 
-<div class="panel table-panel">
-    <form class="row g-2 align-items-center mb-3" method="get" action="{{ url_for('production.index') }}">
-        <div class="col-12 col-lg">
-            <input
-                class="form-control"
-                type="text"
-                name="q"
-                value="{{ search or '' }}"
-                placeholder="Cari nomor SO, tim, brand, vendor, status, atau prioritas"
-            >
-        </div>
-        <div class="col-12 col-sm-auto d-flex gap-2">
-            <button class="btn btn-outline-dark" type="submit">Filter</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('production.index') }}">Reset</a>
-        </div>
-    </form>
+<form class="row g-2 align-items-center mb-3" method="get" action="{{ url_for('production.index') }}">
+    <div class="col-12 col-lg">
+        <input
+            class="form-control"
+            type="text"
+            name="q"
+            value="{{ search or '' }}"
+            placeholder="Cari nomor SO, tim, brand, vendor, status, atau prioritas"
+        >
+    </div>
+    <div class="col-12 col-sm-auto d-flex gap-2">
+        <button class="btn btn-outline-dark" type="submit">Filter</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('production.index') }}">Reset</a>
+    </div>
+</form>
 
+<div class="panel table-panel mb-4">
+    <div class="section-title mb-3">Belum Assign Vendor</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle production-table">
+            <thead>
+            <tr>
+                <th>No SO / Surat Order</th>
+                <th>Nama Tim</th>
+                <th>Brand</th>
+                <th>Deadline Customer</th>
+                <th>Vendor Produksi</th>
+                <th>Deadline Vendor</th>
+                <th>Aksi Simpan</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for so in unassigned_orders %}
+                <tr>
+                    <td class="fw-semibold">{{ so.so_number }}</td>
+                    <td>{{ so.team_name }}</td>
+                    <td>{{ so.brand.code if so.brand else '-' }}</td>
+                    <td>{{ so.deadline|pretty_date if so.deadline else '-' }}</td>
+                    <td>
+                        {% if has_permission('production.assign_vendor') %}
+                            <form id="vendor-assignment-pending-{{ so.id }}" method="post" action="{{ url_for('production.assign_vendor', sales_order_id=so.id) }}">
+                                <input type="hidden" name="q" value="{{ search or '' }}">
+                                <select class="form-select form-select-sm" name="production_vendor">
+                                    <option value="">Pilih vendor</option>
+                                    {% for vendor in vendors %}
+                                        <option value="{{ vendor }}" {% if so.production_vendor == vendor %}selected{% endif %}>{{ vendor }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        {% else %}
+                            {{ so.production_vendor or '-' }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if has_permission('production.set_deadline') %}
+                            <input class="form-control form-control-sm" type="date" name="production_vendor_deadline" value="{{ so.production_vendor_deadline.isoformat() if so.production_vendor_deadline else '' }}" form="vendor-assignment-pending-{{ so.id }}">
+                        {% else %}
+                            {{ so.production_vendor_deadline|pretty_date if so.production_vendor_deadline else '-' }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if has_permission('production.assign_vendor') and has_permission('production.set_deadline') %}
+                            <button class="btn btn-sm btn-outline-dark" type="submit" form="vendor-assignment-pending-{{ so.id }}">Simpan</button>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        {% if search %}
+                            Tidak ada Surat Order belum assign vendor yang sesuai filter.
+                        {% else %}
+                            Semua Surat Order aktif sudah memiliki vendor dan deadline vendor.
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel table-panel">
+    <div class="section-title mb-3">Produksi Aktif</div>
     <div class="table-responsive">
         <table class="table table-hover align-middle production-table">
             <thead>
@@ -60,7 +129,7 @@
             </tr>
             </thead>
             <tbody>
-            {% for so in sales_orders %}
+            {% for so in active_orders %}
                 {% set row_status = production_status(so) %}
                 {% set row_priority = production_priority(so) %}
                 <tr>
@@ -70,7 +139,7 @@
                     <td>{{ so.deadline|pretty_date if so.deadline else '-' }}</td>
                     <td>
                         {% if has_permission('production.assign_vendor') %}
-                            <form method="post" action="{{ url_for('production.assign_vendor', sales_order_id=so.id) }}" class="production-inline-form">
+                            <form id="vendor-assignment-active-{{ so.id }}" method="post" action="{{ url_for('production.assign_vendor', sales_order_id=so.id) }}">
                                 <input type="hidden" name="q" value="{{ search or '' }}">
                                 <select class="form-select form-select-sm" name="production_vendor">
                                     <option value="">Pilih vendor</option>
@@ -78,7 +147,6 @@
                                         <option value="{{ vendor }}" {% if so.production_vendor == vendor %}selected{% endif %}>{{ vendor }}</option>
                                     {% endfor %}
                                 </select>
-                                <button class="btn btn-sm btn-outline-dark" type="submit">Assign</button>
                             </form>
                         {% else %}
                             {{ so.production_vendor or '-' }}
@@ -86,11 +154,10 @@
                     </td>
                     <td>
                         {% if has_permission('production.set_deadline') %}
-                            <form method="post" action="{{ url_for('production.set_deadline', sales_order_id=so.id) }}" class="production-inline-form">
-                                <input type="hidden" name="q" value="{{ search or '' }}">
-                                <input class="form-control form-control-sm" type="date" name="production_vendor_deadline" value="{{ so.production_vendor_deadline.isoformat() if so.production_vendor_deadline else '' }}">
-                                <button class="btn btn-sm btn-outline-dark" type="submit">Set</button>
-                            </form>
+                            <div class="d-flex flex-nowrap gap-2">
+                                <input class="form-control form-control-sm" type="date" name="production_vendor_deadline" value="{{ so.production_vendor_deadline.isoformat() if so.production_vendor_deadline else '' }}" form="vendor-assignment-active-{{ so.id }}">
+                                <button class="btn btn-sm btn-outline-dark" type="submit" form="vendor-assignment-active-{{ so.id }}">Ubah</button>
+                            </div>
                         {% else %}
                             {{ so.production_vendor_deadline|pretty_date if so.production_vendor_deadline else '-' }}
                         {% endif %}
@@ -120,9 +187,9 @@
                 <tr>
                     <td colspan="9" class="text-center text-muted py-4">
                         {% if search %}
-                            Tidak ada Surat Order produksi yang sesuai filter.
+                            Tidak ada Surat Order produksi aktif yang sesuai filter.
                         {% else %}
-                            Belum ada Surat Order approved untuk produksi.
+                            Belum ada Surat Order aktif yang sudah memiliki vendor dan deadline vendor.
                         {% endif %}
                     </td>
                 </tr>

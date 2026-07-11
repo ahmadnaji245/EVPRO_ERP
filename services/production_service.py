@@ -23,10 +23,12 @@ def list_production_orders(search=None):
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
         .filter(SalesOrder.production_status.notin_(FINISHED_PRODUCTION_STATUSES))
         .populate_existing()
-        .order_by(SalesOrder.deadline.asc().nullslast(), SalesOrder.created_at.asc(), SalesOrder.so_number.desc(), SalesOrder.id.desc())
         .all()
     )
-    orders = [order for order in orders if is_active_production_order(order)]
+    orders = sorted(
+        [order for order in orders if is_active_production_order(order)],
+        key=_production_order_sort_key,
+    )
     search_value = str(search or "").strip().casefold()
     if not search_value:
         return orders
@@ -397,16 +399,31 @@ def assign_vendor(order, vendor):
     vendor = validate_vendor(vendor)
     order.production_vendor = vendor
     order.production_assigned_at = datetime.utcnow()
-    if order.production_vendor_deadline:
-        _advance_stage(order, "Jahit")
+    db.session.commit()
+    return order
+
+
+def vendor_assignment_complete(order):
+    return bool(str(order.production_vendor or "").strip() and order.production_vendor_deadline)
+
+
+def save_vendor_assignment(order, vendor, deadline):
+    vendor = str(vendor or "").strip()
+    deadline = str(deadline or "").strip()
+    if not vendor:
+        raise ValueError("Silakan pilih vendor terlebih dahulu.")
+    if not deadline:
+        raise ValueError("Silakan tentukan deadline vendor.")
+    vendor = validate_vendor(vendor)
+    order.production_vendor = vendor
+    order.production_vendor_deadline = _parse_date(deadline)
+    order.production_assigned_at = datetime.utcnow()
     db.session.commit()
     return order
 
 
 def set_vendor_deadline(order, deadline):
     order.production_vendor_deadline = _parse_date(deadline)
-    if order.production_vendor and order.production_vendor_deadline:
-        _advance_stage(order, "Jahit")
     db.session.commit()
     return order
 
@@ -451,6 +468,16 @@ def _matches_search(order, search_value):
         production_priority(order),
     ]
     return any(search_value in str(value or "").casefold() for value in values)
+
+
+def _production_order_sort_key(order):
+    return (
+        1 if vendor_assignment_complete(order) else 0,
+        order.deadline or date.max,
+        order.created_at or datetime.min,
+        order.so_number or "",
+        order.id or 0,
+    )
 
 
 def list_vendor_production_rows(active_only=True):

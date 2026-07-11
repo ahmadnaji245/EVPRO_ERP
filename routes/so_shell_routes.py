@@ -16,7 +16,6 @@ from models.sales_order import SalesOrder
 from services.production_service import (
     PRODUCTION_STATUSES,
     PRODUCTION_VENDORS,
-    assign_vendor,
     can_finish_order,
     finish_production,
     list_production_orders,
@@ -28,8 +27,10 @@ from services.production_service import (
     qc_checklist_rows,
     qc_checklist_rows_from_form,
     save_qc_checklist,
+    save_vendor_assignment,
     set_vendor_deadline,
     validate_vendor,
+    vendor_assignment_complete,
     vendor_print_rows,
     vendor_print_quantity_columns,
     vendor_summary,
@@ -109,9 +110,13 @@ def _get_production_order(sales_order_id):
 def production_index():
     search = request.args.get("q", "").strip()
     sales_orders = list_production_orders(search)
+    unassigned_orders = [order for order in sales_orders if not vendor_assignment_complete(order)]
+    active_orders = [order for order in sales_orders if vendor_assignment_complete(order)]
     return render_template(
         "production/index.html",
         sales_orders=sales_orders,
+        unassigned_orders=unassigned_orders,
+        active_orders=active_orders,
         search=search,
         vendors=PRODUCTION_VENDORS,
         summary=production_summary(sales_orders),
@@ -171,11 +176,15 @@ def production_detail(sales_order_id):
 def production_assign_vendor(sales_order_id):
     order = _get_production_order(sales_order_id)
     try:
-        assign_vendor(order, request.form.get("production_vendor"))
+        save_vendor_assignment(
+            order,
+            request.form.get("production_vendor"),
+            request.form.get("production_vendor_deadline"),
+        )
     except ValueError as exc:
         flash(str(exc), "danger")
     else:
-        flash(f"{order.so_number} berhasil di-assign ke {order.production_vendor}.", "success")
+        flash(f"Vendor dan deadline {order.so_number} berhasil disimpan.", "success")
     return redirect(url_for("production.index", q=request.form.get("q", "")))
 
 
