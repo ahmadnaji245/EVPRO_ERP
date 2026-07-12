@@ -29,7 +29,6 @@
                 <thead>
                 <tr>
                     <th>NO</th>
-                    <th>ITEM</th>
                     <th>NAMA</th>
                     <th>NP</th>
                     <th>SIZE</th>
@@ -48,7 +47,6 @@
                 {% for row in qc_rows %}
                     <tr>
                         <td>{{ loop.index }}</td>
-                        <td>{{ row.item }}</td>
                         <td>{{ row.name or '-' }}</td>
                         <td>{{ row.number or '-' }}</td>
                         <td>{{ row.size }}</td>
@@ -61,7 +59,7 @@
                         {% endfor %}
                     </tr>
                 {% else %}
-                    <tr><td colspan="{{ 6 + qc_components|length }}" class="text-center text-muted py-4">Belum ada data player.</td></tr>
+                    <tr><td colspan="{{ 5 + qc_components|length }}" class="text-center text-muted py-4">Belum ada data player.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

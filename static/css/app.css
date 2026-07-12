@@ -434,6 +434,32 @@ a {
     min-width: 640px;
 }
 
+.qc-checklist-table {
+    min-width: 780px;
+}
+
+.qc-checklist-table th:nth-child(1),
+.qc-checklist-table td:nth-child(1) {
+    width: 64px;
+}
+
+.qc-checklist-table th:nth-child(2),
+.qc-checklist-table td:nth-child(2) {
+    min-width: 220px;
+}
+
+.qc-checklist-table th:nth-child(3),
+.qc-checklist-table td:nth-child(3),
+.qc-checklist-table th:nth-child(4),
+.qc-checklist-table td:nth-child(4) {
+    width: 96px;
+}
+
+.qc-checklist-table th:nth-child(5),
+.qc-checklist-table td:nth-child(5) {
+    min-width: 260px;
+}
+
 .report-table {
     min-width: 860px;
 }
