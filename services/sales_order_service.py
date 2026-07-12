@@ -245,7 +245,8 @@ def _fill_sales_order(order, form):
     order.brand_id = brand.id
     order.seller_name = form.get("seller_name", "").strip() if _brand_is_evpro(brand) else None
     order.customer_code = form.get("customer_code", "").strip() or generate_customer_code(brand.code)
-    order.material = form.get("material", "").strip() or None
+    if "material" in form:
+        order.material = form.get("material", "").strip() or None
     order.pattern = form.get("pattern", "").strip() or None
     order.grade = form.get("grade", "").strip() or None
     order.production_days = _parse_int(form.get("production_days"))
@@ -260,6 +261,8 @@ def _sync_designs(order, form, files=None):
     design_ids = _get_list(form, "design_id[]")
     design_names = _get_list(form, "design_name[]", "design_name")
     item_names = _get_list(form, "item_name[]", "item_name")
+    top_materials = _get_list(form, "top_material[]")
+    bottom_materials = _get_list(form, "bottom_material[]")
     top_notes = _get_list(form, "top_notes[]", "design_instruction")
     bottom_notes = _get_list(form, "bottom_notes[]")
     players_list = _get_list(form, "players[]", "players")
@@ -281,7 +284,9 @@ def _sync_designs(order, form, files=None):
         design = existing_designs.get(str(design_id)) or SalesOrderDesign()
         design.design_name = design_name
         design.item_name = (item_names[index] if index < len(item_names) else "").strip() or "Jersey"
-        design.material = order.material
+        design.top_material = (top_materials[index] if index < len(top_materials) else "").strip() or None
+        design.bottom_material = (bottom_materials[index] if index < len(bottom_materials) else "").strip() or None
+        design.material = design.top_material or design.bottom_material or design.material or order.material
         design.pattern = order.pattern
         design.grade = order.grade
         design.production_days = order.production_days
@@ -372,6 +377,9 @@ def validate_sales_order_form(form):
     elif not MasterInstruction.query.filter_by(name=instruction, status="active").first():
         errors.append("Instruksi Khusus tidak valid.")
     design_names = _get_list(form, "design_name[]", "design_name")
+    item_names = _get_list(form, "item_name[]", "item_name")
+    top_materials = _get_list(form, "top_material[]")
+    bottom_materials = _get_list(form, "bottom_material[]")
     players_list = _get_list(form, "players[]", "players")
     valid_designs = [name for name in design_names if str(name or "").strip()]
     if not valid_designs:
@@ -379,12 +387,45 @@ def validate_sales_order_form(form):
     for index, name in enumerate(design_names, start=1):
         if not str(name or "").strip():
             continue
+        item_name = (item_names[index - 1] if index - 1 < len(item_names) else "").strip() or "Jersey"
+        top_material = (top_materials[index - 1] if index - 1 < len(top_materials) else "").strip()
+        bottom_material = (bottom_materials[index - 1] if index - 1 < len(bottom_materials) else "").strip()
+        if item_needs_top_material(item_name) and not top_material:
+            errors.append("Silakan pilih material atasan.")
+        if item_needs_bottom_material(item_name) and not bottom_material:
+            errors.append("Silakan pilih material celana.")
         players = players_list[index - 1] if index - 1 < len(players_list) else ""
         if not str(players or "").strip():
             errors.append(f"Minimal satu player wajib diisi untuk desain {index}.")
         else:
             errors.extend(_validate_players(players, index))
     return errors
+
+
+def _is_bottom_item(value):
+    text = str(value or "").strip().casefold()
+    bottom_markers = ("celana", "bawahan", "bottom", "short", "pants", "rok")
+    return any(marker in text for marker in bottom_markers)
+
+
+def _is_set_item(value):
+    text = str(value or "").strip().casefold()
+    set_markers = (" set", "set ", "stel", "jersey celana", "jersey + celana", "atasan + celana")
+    return "+" in text or any(marker in f" {text} " for marker in set_markers)
+
+
+def item_needs_bottom_material(item_name):
+    components = [part.strip() for part in str(item_name or "").split("+") if part.strip()]
+    if len(components) > 1 or _is_set_item(item_name):
+        return any(_is_bottom_item(component) for component in components) or _is_bottom_item(item_name)
+    return _is_bottom_item(item_name)
+
+
+def item_needs_top_material(item_name):
+    components = [part.strip() for part in str(item_name or "").split("+") if part.strip()]
+    if len(components) > 1 or _is_set_item(item_name):
+        return any(not _is_bottom_item(component) for component in components) or not _is_bottom_item(item_name)
+    return not _is_bottom_item(item_name)
 
 
 def create_sales_order(form, user, files=None):

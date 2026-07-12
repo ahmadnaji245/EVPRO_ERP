@@ -212,13 +212,15 @@ def _info_table(order, design, styles):
         ("No SO", order.so_number),
         ("Tanggal", _date(order.created_at)),
         ("Item", design.item_name),
-        ("Bahan", design.material or order.material or "-"),
+    ]
+    rows.extend(design.material_display_rows)
+    rows.extend([
         ("Pola", design.pattern or order.pattern or "-"),
         ("Deadline", _date(design.deadline or order.deadline)),
-    ]
+    ])
     table = Table(
         [[_paragraph(label, styles["SOLabel"]), _paragraph(value, styles["SOTextBold"])] for label, value in rows],
-        colWidths=[22 * mm, 56 * mm],
+        colWidths=[28 * mm, 50 * mm],
     )
     table.setStyle(
         TableStyle(

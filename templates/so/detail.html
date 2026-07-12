@@ -121,9 +121,23 @@ Terima kasih 🙏{% endset %}
         <div class="panel h-100 so-summary">
             <div class="section-title">Info Produksi</div>
             <div class="row g-3">
-                <div class="col-md-4"><div class="text-muted small">Material</div><strong>{{ sales_order.material or '-' }}</strong></div>
                 <div class="col-md-4"><div class="text-muted small">Pattern/Pola</div><strong>{{ sales_order.pattern or '-' }}</strong></div>
                 <div class="col-md-4"><div class="text-muted small">Grade</div><strong>{{ sales_order.grade or '-' }}</strong></div>
+                <div class="col-12">
+                    <div class="text-muted small">Material</div>
+                    <div class="d-grid gap-2">
+                        {% for design in sales_order.designs %}
+                            <div>
+                                {% if sales_order.designs|length > 1 %}<div class="fw-semibold">{{ design.design_name }}</div>{% endif %}
+                                {% for label, value in design.material_display_rows %}
+                                    <div>{{ label }}: <strong>{{ value }}</strong></div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <strong>-</strong>
+                        {% endfor %}
+                    </div>
+                </div>
                 <div class="col-12"><div class="text-muted small">Instruksi Khusus</div><div style="white-space: pre-line;">{{ sales_order.instructions or '-' }}</div></div>
             </div>
         </div>
@@ -238,6 +252,11 @@ Terima kasih 🙏{% endset %}
                 <div>
                     <div class="section-title mb-1">{{ design.design_name }}</div>
                     <p class="text-muted mb-0">{{ design.item_name }} · {{ design.total_size }} size</p>
+                    <div class="mt-2">
+                        {% for label, value in design.material_display_rows %}
+                            <div class="small">{{ label }}: <strong>{{ value }}</strong></div>
+                        {% endfor %}
+                    </div>
                 </div>
                 <span class="badge {{ 'text-bg-success' if display_status.is_taken else 'text-bg-light border' }}">{{ display_status.short_status }}</span>
             </div>

@@ -107,29 +107,19 @@ def prepare_qc_checklists(order):
 def qc_checklist_rows(order):
     checklists = prepare_qc_checklists(order)
     qc_components = qc_enabled_components_for_order(order)
-    rows = {}
+    rows = []
     for player in _order_players(order):
-        key = _player_group_key(player)
-        row = rows.setdefault(
-            key,
-            {
-                "item": [],
-                "name": player.player_name,
-                "number": player.player_number,
-                "size": player.size,
-                "notes": [],
-                "checks": {
-                    component: {"player_id": None, "checked": False}
-                    for component in qc_components
-                },
+        row = {
+            "item": player.design.item_name or "-",
+            "name": player.player_name or "-",
+            "number": player.player_number or "-",
+            "size": player.size or "-",
+            "notes": player.notes or "-",
+            "checks": {
+                component: {"player_id": None, "checked": False}
+                for component in qc_components
             },
-        )
-        item_name = player.design.item_name or "-"
-        if item_name not in row["item"]:
-            row["item"].append(item_name)
-        if player.notes and player.notes != "-" and player.notes not in row["notes"]:
-            row["notes"].append(player.notes)
-
+        }
         checklist = checklists.get(player.id)
         qc_data = _checklist_qc_data(checklist)
         for component in design_components(player.design):
@@ -137,8 +127,9 @@ def qc_checklist_rows(order):
                 continue
             row["checks"][component]["player_id"] = player.id
             row["checks"][component]["checked"] = bool(qc_data.get(component_key(component)))
+        rows.append(row)
 
-    return list(rows.values()), qc_components
+    return rows, qc_components
 
 
 def qc_checklist_rows_from_form(order, form):
@@ -594,14 +585,6 @@ def _setting_by_name(order):
 
 def _player_has_item(player, keyword):
     return any(component_key(component) == component_key(keyword) for component in design_components(player.design))
-
-
-def _player_group_key(player):
-    return (
-        str(player.player_name or "").strip().casefold(),
-        str(player.player_number or "").strip().casefold(),
-        str(player.size or "").strip().casefold(),
-    )
 
 
 def vendor_shortage_note(order):

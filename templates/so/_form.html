@@ -1,4 +1,7 @@
 {% set form_designs = sales_order.designs if sales_order and sales_order.designs else [none] %}
+{% set form_top_materials = form.getlist('top_material[]') if form.getlist is defined else [] %}
+{% set form_bottom_materials = form.getlist('bottom_material[]') if form.getlist is defined else [] %}
+{% set material_names = materials|map(attribute='name')|list %}
 <div class="row g-4">
     <div class="col-12">
         <div class="panel">
@@ -41,10 +44,6 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Nama Reseller / Brand</label>
-                    <input class="form-control" name="source_name" value="{{ form.get('source_name', sales_order.crm_customer.source_name if sales_order and sales_order.crm_customer else '') }}">
-                </div>
                 <div class="col-md-8">
                     <label class="form-label">Alamat Customer</label>
                     <input class="form-control" name="customer_address" value="{{ form.get('customer_address', sales_order.crm_customer.address if sales_order and sales_order.crm_customer else '') }}">
@@ -60,16 +59,6 @@
                 <div class="col-md-3">
                     <label class="form-label">Deadline</label>
                     <input class="form-control" name="deadline_display" type="date" value="{{ sales_order.deadline.isoformat() if sales_order and sales_order.deadline else '' }}" data-deadline readonly>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Material</label>
-                    <select class="form-select" name="material">
-                        <option value="">Pilih material</option>
-                        {% set selected_material = form.get('material', sales_order.material if sales_order else '') %}
-                        {% for material in materials %}
-                            <option value="{{ material.name }}" {% if selected_material == material.name %}selected{% endif %}>{{ material.name }}</option>
-                        {% endfor %}
-                    </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Pattern</label>
@@ -159,6 +148,32 @@
                                 </div>
                             {% endif %}
                         </div>
+                        <div class="col-md-6" data-top-material-wrap>
+                            <label class="form-label">Material Atasan</label>
+                            {% set selected_top_material = form_top_materials[loop.index0] if loop.index0 < form_top_materials|length else (design.display_top_material if design else '') %}
+                            <select class="form-select" name="top_material[]" data-top-material-select>
+                                <option value="">Pilih material atasan</option>
+                                {% if selected_top_material and selected_top_material not in material_names %}
+                                    <option value="{{ selected_top_material }}" selected>{{ selected_top_material }}</option>
+                                {% endif %}
+                                {% for material in materials %}
+                                    <option value="{{ material.name }}" {% if selected_top_material == material.name %}selected{% endif %}>{{ material.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6" data-bottom-material-wrap>
+                            <label class="form-label">Material Celana</label>
+                            {% set selected_bottom_material = form_bottom_materials[loop.index0] if loop.index0 < form_bottom_materials|length else (design.display_bottom_material if design else '') %}
+                            <select class="form-select" name="bottom_material[]" data-bottom-material-select>
+                                <option value="">Pilih material celana</option>
+                                {% if selected_bottom_material and selected_bottom_material not in material_names %}
+                                    <option value="{{ selected_bottom_material }}" selected>{{ selected_bottom_material }}</option>
+                                {% endif %}
+                                {% for material in materials %}
+                                    <option value="{{ material.name }}" {% if selected_bottom_material == material.name %}selected{% endif %}>{{ material.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <div class="col-md-6" data-note-primary-wrap>
                             <label class="form-label" data-note-primary-label>Catatan Item</label>
                             <textarea class="form-control" name="top_notes[]" rows="4">{{ design.display_top_notes if design else '' }}</textarea>
@@ -223,6 +238,24 @@
                         <label class="form-label" data-upload-secondary-label>Upload Gambar Item 2</label>
                         <input class="form-control" name="bottom_image[]" type="file" accept="image/*">
                     </div>
+                    <div class="col-md-6" data-top-material-wrap>
+                        <label class="form-label">Material Atasan</label>
+                        <select class="form-select" name="top_material[]" data-top-material-select>
+                            <option value="">Pilih material atasan</option>
+                            {% for material in materials %}
+                                <option value="{{ material.name }}">{{ material.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6" data-bottom-material-wrap>
+                        <label class="form-label">Material Celana</label>
+                        <select class="form-select" name="bottom_material[]" data-bottom-material-select>
+                            <option value="">Pilih material celana</option>
+                            {% for material in materials %}
+                                <option value="{{ material.name }}">{{ material.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="col-md-6" data-note-primary-wrap>
                         <label class="form-label" data-note-primary-label>Catatan Item</label>
                         <textarea class="form-control" name="top_notes[]" rows="4"></textarea>
@@ -266,6 +299,28 @@
 <script>
 (() => {
     const componentsFor = (value) => String(value || "").split("+").map((part) => part.trim()).filter(Boolean);
+    const isBottomItem = (value) => {
+        const text = String(value || "").toLowerCase();
+        return ["celana", "bawahan", "bottom", "short", "pants", "rok"].some((marker) => text.includes(marker));
+    };
+    const isSetItem = (value) => {
+        const text = ` ${String(value || "").toLowerCase()} `;
+        return text.includes("+") || [" set", "set ", "stel", "jersey celana", "jersey + celana", "atasan + celana"].some((marker) => text.includes(marker));
+    };
+    const needsTopMaterial = (value) => {
+        const components = componentsFor(value);
+        if (components.length > 1 || isSetItem(value)) {
+            return components.some((component) => !isBottomItem(component)) || !isBottomItem(value);
+        }
+        return !isBottomItem(value);
+    };
+    const needsBottomMaterial = (value) => {
+        const components = componentsFor(value);
+        if (components.length > 1 || isSetItem(value)) {
+            return components.some(isBottomItem) || isBottomItem(value);
+        }
+        return isBottomItem(value);
+    };
 
     const syncUploadFields = (section) => {
         const select = section.querySelector("[data-item-select]");
@@ -281,6 +336,13 @@
         const secondaryNoteWrap = section.querySelector("[data-note-secondary-wrap]");
         const primaryNoteLabel = section.querySelector("[data-note-primary-label]");
         const secondaryNoteLabel = section.querySelector("[data-note-secondary-label]");
+        const topMaterialWrap = section.querySelector("[data-top-material-wrap]");
+        const bottomMaterialWrap = section.querySelector("[data-bottom-material-wrap]");
+        const topMaterialSelect = section.querySelector("[data-top-material-select]");
+        const bottomMaterialSelect = section.querySelector("[data-bottom-material-select]");
+        const itemValue = option?.dataset.components || select.value;
+        const showTopMaterial = needsTopMaterial(itemValue);
+        const showBottomMaterial = needsBottomMaterial(itemValue);
 
         if (primaryWrap) primaryWrap.classList.toggle("d-none", !needsUpload);
         if (secondaryWrap) secondaryWrap.classList.toggle("d-none", !needsUpload || components.length < 2);
@@ -290,6 +352,20 @@
         if (secondaryNoteWrap) secondaryNoteWrap.classList.toggle("d-none", components.length < 2);
         if (primaryNoteLabel) primaryNoteLabel.textContent = `Catatan ${components[0] || "Item"}`;
         if (secondaryNoteLabel) secondaryNoteLabel.textContent = `Catatan ${components[1] || "Item 2"}`;
+        if (topMaterialWrap) topMaterialWrap.classList.toggle("d-none", !showTopMaterial);
+        if (bottomMaterialWrap) bottomMaterialWrap.classList.toggle("d-none", !showBottomMaterial);
+        if (topMaterialSelect) {
+            topMaterialSelect.required = showTopMaterial;
+            topMaterialSelect.setCustomValidity("");
+            topMaterialSelect.oninvalid = () => topMaterialSelect.setCustomValidity("Silakan pilih material atasan.");
+            topMaterialSelect.oninput = () => topMaterialSelect.setCustomValidity("");
+        }
+        if (bottomMaterialSelect) {
+            bottomMaterialSelect.required = showBottomMaterial;
+            bottomMaterialSelect.setCustomValidity("");
+            bottomMaterialSelect.oninvalid = () => bottomMaterialSelect.setCustomValidity("Silakan pilih material celana.");
+            bottomMaterialSelect.oninput = () => bottomMaterialSelect.setCustomValidity("");
+        }
     };
 
     const syncAllUploadFields = () => {

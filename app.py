@@ -596,6 +596,7 @@ def ensure_database_schema_migrations():
     ensure_v07_schema()
     ensure_v08_crm_schema()
     ensure_v08_tracking_schema()
+    ensure_design_material_schema()
     ensure_qc_schema()
     ensure_handover_schema()
 
@@ -735,6 +736,13 @@ def ensure_v08_tracking_schema():
 
 def ensure_v09_tracking_schema():
     ensure_v08_tracking_schema()
+
+
+def ensure_design_material_schema():
+    if not _table_exists("sales_order_designs"):
+        return
+    _add_column_if_missing("sales_order_designs", "top_material", "VARCHAR(120)")
+    _add_column_if_missing("sales_order_designs", "bottom_material", "VARCHAR(120)")
 
 
 def ensure_tracking_codes():

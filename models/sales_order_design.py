@@ -21,6 +21,8 @@ class SalesOrderDesign(db.Model):
     design_name = db.Column(db.String(150), nullable=False)
     item_name = db.Column(db.String(120), nullable=False)
     material = db.Column(db.String(120))
+    top_material = db.Column(db.String(120))
+    bottom_material = db.Column(db.String(120))
     pattern = db.Column(db.String(80))
     grade = db.Column(db.String(20))
     production_days = db.Column(db.Integer, nullable=False, default=7)
@@ -56,6 +58,53 @@ class SalesOrderDesign(db.Model):
     def item_components(self):
         parts = [part.strip() for part in str(self.item_name or "").split("+")]
         return [part for part in parts if part]
+
+    @staticmethod
+    def _is_bottom_item(value):
+        text = str(value or "").strip().casefold()
+        bottom_markers = ("celana", "bawahan", "bottom", "short", "pants", "rok")
+        return any(marker in text for marker in bottom_markers)
+
+    @staticmethod
+    def _is_set_item(value):
+        text = str(value or "").strip().casefold()
+        set_markers = (" set", "set ", "stel", "jersey celana", "jersey + celana", "atasan + celana")
+        return "+" in text or any(marker in f" {text} " for marker in set_markers)
+
+    @property
+    def needs_bottom_material(self):
+        components = self.item_components
+        if len(components) > 1 or self._is_set_item(self.item_name):
+            return any(self._is_bottom_item(component) for component in components) or self._is_bottom_item(self.item_name)
+        return self._is_bottom_item(self.item_name)
+
+    @property
+    def needs_top_material(self):
+        components = self.item_components
+        if len(components) > 1 or self._is_set_item(self.item_name):
+            return any(not self._is_bottom_item(component) for component in components) or not self._is_bottom_item(self.item_name)
+        return not self._is_bottom_item(self.item_name)
+
+    @property
+    def display_top_material(self):
+        if not self.needs_top_material:
+            return None
+        return self.top_material or self.material or (self.sales_order.material if self.sales_order else None)
+
+    @property
+    def display_bottom_material(self):
+        if not self.needs_bottom_material:
+            return None
+        return self.bottom_material or self.material or (self.sales_order.material if self.sales_order else None)
+
+    @property
+    def material_display_rows(self):
+        rows = []
+        if self.needs_top_material:
+            rows.append(("Material Atasan", self.display_top_material or "-"))
+        if self.needs_bottom_material:
+            rows.append(("Material Celana", self.display_bottom_material or "-"))
+        return rows or [("Material Atasan", self.display_top_material or self.display_bottom_material or "-")]
 
     @property
     def primary_item_label(self):

@@ -266,6 +266,11 @@
         {% for design in sales_order.designs %}
             <div class="panel">
                 <div class="section-title">{{ design.design_name }}</div>
+                <div class="mb-3">
+                    {% for label, value in design.material_display_rows %}
+                        <div>{{ label }}: <strong>{{ value }}</strong></div>
+                    {% endfor %}
+                </div>
                 {% if design.has_design_image %}
                     <div class="row g-4">
                         {% if design.display_top_image_path %}

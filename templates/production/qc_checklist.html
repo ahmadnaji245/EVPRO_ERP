@@ -48,11 +48,11 @@
                 {% for row in qc_rows %}
                     <tr>
                         <td>{{ loop.index }}</td>
-                        <td>{{ row.item|join(' + ') }}</td>
-                        <td>{{ row.name }}</td>
+                        <td>{{ row.item }}</td>
+                        <td>{{ row.name or '-' }}</td>
                         <td>{{ row.number or '-' }}</td>
                         <td>{{ row.size }}</td>
-                        <td>{{ row.notes|join(', ') if row.notes else '-' }}</td>
+                        <td>{{ row.notes or '-' }}</td>
                         {% for component in qc_components %}
                             {% set check = row.checks.get(component) %}
                             <td class="text-center">
