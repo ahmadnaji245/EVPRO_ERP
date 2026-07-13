@@ -4,6 +4,7 @@ from models.customer_access import CustomerAccess
 from models.customer_revision_note import CustomerRevisionNote
 from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
 from models.nota import Nota, NotaCustomer, NotaItem, NotaPayment, NotaProduct
+from models.petty_cash import AllowanceReserve, EmployeeCashAdvance, FinancialAuditLog, PettyCashCategory, PettyCashTransaction
 from models.production_checklist import ProductionChecklist
 from models.production_size_checklist import ProductionSizeChecklist
 from models.qc_checklist import QcChecklist
@@ -35,6 +36,11 @@ __all__ = [
     "NotaItem",
     "NotaPayment",
     "NotaProduct",
+    "AllowanceReserve",
+    "EmployeeCashAdvance",
+    "FinancialAuditLog",
+    "PettyCashCategory",
+    "PettyCashTransaction",
     "FollowUp",
     "Lead",
     "WhatsAppTemplate",

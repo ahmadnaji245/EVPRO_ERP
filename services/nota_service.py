@@ -317,7 +317,7 @@ def income_payments(brand=None):
     query = NotaPayment.query.join(Nota).join(NotaCustomer)
     if brand:
         query = query.join(Brand, Nota.brand_id == Brand.id).filter(Brand.name == brand)
-    payments = query.order_by(NotaPayment.payment_date.desc(), NotaPayment.id.desc()).all()
+    payments = query.filter(NotaPayment.is_void.is_(False)).order_by(NotaPayment.payment_date.desc(), NotaPayment.id.desc()).all()
     return [
         _row(
             payment_date=payment.payment_date,
@@ -550,22 +550,82 @@ def update_nota(nota, form):
     return nota
 
 
-def add_payment(nota, form):
+def add_payment(nota, form, user=None):
     payment_date = _parse_date(form.get("payment_date"))
     amount = _parse_int(form.get("amount"))
+    payment_method = str(form.get("payment_method") or "Cash").strip().title()
     if not payment_date:
         raise ValueError("Tanggal pembayaran wajib diisi.")
     if amount <= 0:
         raise ValueError("Nominal pembayaran harus lebih dari 0.")
-    db.session.add(
-        NotaPayment(
-            nota=nota,
-            payment_date=payment_date,
-            amount=amount,
-            description=str(form.get("description") or "").strip() or None,
-        )
+    if payment_method not in ("Cash", "Transfer"):
+        raise ValueError("Metode pembayaran tidak valid.")
+    payment = NotaPayment(
+        nota=nota,
+        payment_date=payment_date,
+        amount=amount,
+        payment_method=payment_method,
+        transfer_reference=str(form.get("transfer_reference") or "").strip() or None,
+        description=str(form.get("description") or "").strip() or None,
+        notes=str(form.get("notes") or "").strip() or None,
+        created_by=user.id if user else None,
     )
+    db.session.add(payment)
+    db.session.flush()
+    from services.petty_cash_service import audit, sync_nota_payment_cash_transaction
+
+    if payment_method == "Cash":
+        sync_nota_payment_cash_transaction(payment, user)
+    audit("nota_payment", payment.id, "created", new_value=f"{payment_method} {amount}", user=user)
     db.session.commit()
+    return payment
+
+
+def update_payment(payment, form, user=None):
+    old_value = f"{payment.payment_method} {payment.amount}"
+    payment_date = _parse_date(form.get("payment_date"))
+    amount = _parse_int(form.get("amount"))
+    payment_method = str(form.get("payment_method") or "Cash").strip().title()
+    if not payment_date:
+        raise ValueError("Tanggal pembayaran wajib diisi.")
+    if amount <= 0:
+        raise ValueError("Nominal pembayaran harus lebih dari 0.")
+    if payment_method not in ("Cash", "Transfer"):
+        raise ValueError("Metode pembayaran tidak valid.")
+    payment.payment_date = payment_date
+    payment.amount = amount
+    payment.payment_method = payment_method
+    payment.transfer_reference = str(form.get("transfer_reference") or "").strip() or None
+    payment.description = str(form.get("description") or "").strip() or None
+    payment.notes = str(form.get("notes") or "").strip() or None
+    from services.petty_cash_service import audit, sync_nota_payment_cash_transaction
+
+    sync_nota_payment_cash_transaction(payment, user)
+    audit("nota_payment", payment.id, "updated", old_value=old_value, new_value=f"{payment_method} {amount}", user=user)
+    db.session.commit()
+    return payment
+
+
+def void_payment(payment, reason, user=None):
+    reason = str(reason or "").strip()
+    if not reason:
+        raise ValueError("Alasan pembatalan pembayaran wajib diisi.")
+    if payment.is_void:
+        return payment
+    payment.is_void = True
+    payment.void_reason = reason
+    payment.voided_by = user.id if user else None
+    payment.voided_at = datetime.utcnow()
+    from services.petty_cash_service import audit, sync_nota_payment_cash_transaction
+
+    sync_nota_payment_cash_transaction(payment, user)
+    audit("nota_payment", payment.id, "voided", old_value=str(payment.amount), new_value=reason, user=user)
+    db.session.commit()
+    return payment
+
+
+def get_payment(payment_id):
+    return NotaPayment.query.get_or_404(payment_id)
 
 
 def seed_default_nota_products():

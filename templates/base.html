@@ -27,6 +27,7 @@
                     {% set is_so_module = request.endpoint and request.endpoint.startswith(so_module_prefixes) %}
                     {% set is_nota_module = request.endpoint and request.endpoint.startswith('nota.') %}
                     {% set is_crm_module = request.endpoint and request.endpoint.startswith('crm.') %}
+                    {% set is_finance_module = request.endpoint and request.endpoint.startswith('finance.') %}
                     {% if has_permission('dashboard.view') %}
                         <a class="nav-link {{ active_class('dashboard.') }}" href="{{ url_for('dashboard.index') }}">Dashboard</a>
                     {% endif %}
@@ -38,6 +39,9 @@
                     {% endif %}
                     {% if has_permission('crm.view') %}
                         <a class="nav-link {{ 'active' if is_crm_module else '' }}" href="{{ url_for('crm.dashboard') }}">CRM</a>
+                    {% endif %}
+                    {% if has_permission('finance.view') %}
+                        <a class="nav-link {{ 'active' if is_finance_module else '' }}" href="{{ url_for('finance.dashboard') }}">Keuangan</a>
                     {% endif %}
                     <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
                 {% else %}
@@ -108,6 +112,20 @@
                 <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.customers', 'crm.customer_detail', 'crm.customer_edit') else '' }}" href="{{ url_for('crm.customers') }}">Customer</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.follow_ups', 'crm.create_follow_up_route') else '' }}" href="{{ url_for('crm.follow_ups') }}">Follow Up</a>
                 <a class="nota-subnav-link {{ 'active' if request.endpoint in ('crm.wa_templates', 'crm.wa_template_edit') else '' }}" href="{{ url_for('crm.wa_templates') }}">Template WA</a>
+            </div>
+        </div>
+    </nav>
+{% endif %}
+
+{% set show_finance_shell = current_user.is_authenticated and request.endpoint and request.endpoint.startswith('finance.') %}
+{% if show_finance_shell and has_permission('finance.view') %}
+    <nav class="nota-subnav" aria-label="Keuangan navigation">
+        <div class="container-fluid">
+            <div class="nota-subnav-inner">
+                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'finance.dashboard' else '' }}" href="{{ url_for('finance.dashboard') }}">Ringkasan Kas Kecil</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'finance.detail' else '' }}" href="{{ url_for('finance.detail') }}">Detail Kas Kecil</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'finance.current_month_expenses' else '' }}" href="{{ url_for('finance.current_month_expenses') }}">Pengeluaran Bulan Ini</a>
+                <a class="nota-subnav-link {{ 'active' if request.endpoint == 'finance.category_index' else '' }}" href="{{ url_for('finance.category_index') }}">Kategori Pengeluaran</a>
             </div>
         </div>
     </nav>

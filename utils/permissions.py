@@ -9,6 +9,7 @@ from utils.constants import normalize_user_role
 ROLE_ADMIN = "admin"
 ROLE_DESAIN = "desain"
 ROLE_PRODUKSI = "produksi"
+ROLE_FINANCE = "finance"
 
 
 PERMISSIONS = {
@@ -37,6 +38,8 @@ PERMISSIONS = {
     "reports.view": {ROLE_ADMIN},
     "settings.view": {ROLE_ADMIN},
     "users.manage": {ROLE_ADMIN},
+    "finance.view": {ROLE_ADMIN, ROLE_FINANCE},
+    "finance.manage": {ROLE_ADMIN, ROLE_FINANCE},
 }
 
 

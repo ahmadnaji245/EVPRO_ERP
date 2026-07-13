@@ -9,11 +9,13 @@ from config import Config
 from database.db import db
 from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, SalesOrder, Setting, User
 from routes.crm_routes import crm_bp
+from routes.finance_routes import finance_bp
 from routes.handover_routes import handover_bp
 from routes.nota_routes import _pdf_invoice, _pdf_items, _pdf_payments, nota_bp
 from routes.so_shell_routes import master_bp, production_bp, reports_bp, settings_bp
 from routes.so_routes import sales_orders_approval_bp, sales_orders_bp
 from services.nota_service import seed_default_nota_products
+from services.petty_cash_service import seed_default_petty_cash_categories
 from services.crm_service import refresh_all_customer_stats, seed_default_whatsapp_templates, sync_nota_customer, sync_sales_order_customer
 from services.customer_service import find_by_access_code
 from services.history_service import record_history
@@ -478,6 +480,7 @@ def create_app(config_class=Config):
     app.register_blueprint(reports_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(nota_bp)
+    app.register_blueprint(finance_bp)
     app.register_blueprint(crm_bp)
     app.register_blueprint(tracking_bp)
 
@@ -599,6 +602,7 @@ def ensure_database_schema_migrations():
     ensure_design_material_schema()
     ensure_qc_schema()
     ensure_handover_schema()
+    ensure_v09_finance_schema()
 
 
 def seed_initial_data():
@@ -634,6 +638,7 @@ def seed_initial_data():
     _seed_master(MasterPattern, ["Reguler", "Raglan"])
     _seed_master(MasterInstruction, ["Default"])
     seed_default_nota_products()
+    seed_default_petty_cash_categories()
     db.session.commit()
 
 
@@ -826,6 +831,177 @@ def ensure_handover_schema():
         if column_name not in columns:
             db.session.execute(text(statement))
     db.session.commit()
+
+
+def ensure_v09_finance_schema():
+    if _table_exists("nota_payments"):
+        _add_column_if_missing("nota_payments", "payment_method", "VARCHAR(20) NOT NULL DEFAULT 'Cash'")
+        _add_column_if_missing("nota_payments", "transfer_reference", "VARCHAR(120)")
+        _add_column_if_missing("nota_payments", "notes", "TEXT")
+        _add_column_if_missing("nota_payments", "created_by", "INTEGER")
+        _add_column_if_missing("nota_payments", "updated_at", "DATETIME")
+        _add_column_if_missing("nota_payments", "is_void", "BOOLEAN NOT NULL DEFAULT 0")
+        _add_column_if_missing("nota_payments", "void_reason", "TEXT")
+        _add_column_if_missing("nota_payments", "voided_by", "INTEGER")
+        _add_column_if_missing("nota_payments", "voided_at", "DATETIME")
+        db.session.execute(text("UPDATE nota_payments SET payment_method = 'Cash' WHERE payment_method IS NULL OR payment_method = ''"))
+        db.session.execute(text("UPDATE nota_payments SET is_void = 0 WHERE is_void IS NULL"))
+        db.session.execute(text("UPDATE nota_payments SET updated_at = COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)"))
+        db.session.commit()
+        _create_index_if_missing("ix_nota_payments_payment_method", "nota_payments", "payment_method")
+        _create_index_if_missing("ix_nota_payments_is_void", "nota_payments", "is_void")
+
+    if not _table_exists("petty_cash_categories"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE petty_cash_categories (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    group_name VARCHAR(120) NOT NULL,
+                    category_name VARCHAR(150) NOT NULL,
+                    category_code VARCHAR(80) NOT NULL UNIQUE,
+                    category_type VARCHAR(40) NOT NULL DEFAULT 'OPERATING_EXPENSE',
+                    is_operational_expense BOOLEAN NOT NULL DEFAULT 1,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        db.session.commit()
+    _create_index_if_missing("ix_petty_cash_categories_group_name", "petty_cash_categories", "group_name")
+    _create_index_if_missing("ix_petty_cash_categories_category_code", "petty_cash_categories", "category_code", unique=True)
+    _create_index_if_missing("ix_petty_cash_categories_category_type", "petty_cash_categories", "category_type")
+    _create_index_if_missing("ix_petty_cash_categories_is_active", "petty_cash_categories", "is_active")
+
+    if not _table_exists("petty_cash_transactions"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE petty_cash_transactions (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    transaction_number VARCHAR(50) NOT NULL UNIQUE,
+                    transaction_date DATE NOT NULL,
+                    transaction_type VARCHAR(3) NOT NULL,
+                    category_id INTEGER,
+                    amount INTEGER NOT NULL,
+                    source_type VARCHAR(50) NOT NULL,
+                    source_id INTEGER,
+                    reference_number VARCHAR(120),
+                    recipient VARCHAR(150),
+                    description TEXT,
+                    attachment_path VARCHAR(255),
+                    created_by INTEGER,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    is_void BOOLEAN NOT NULL DEFAULT 0,
+                    void_reason TEXT,
+                    voided_by INTEGER,
+                    voided_at DATETIME,
+                    FOREIGN KEY(category_id) REFERENCES petty_cash_categories (id),
+                    FOREIGN KEY(created_by) REFERENCES users (id),
+                    FOREIGN KEY(voided_by) REFERENCES users (id)
+                )
+                """
+            )
+        )
+        db.session.commit()
+    for name, column in {
+        "ix_petty_cash_transactions_transaction_number": "transaction_number",
+        "ix_petty_cash_transactions_transaction_date": "transaction_date",
+        "ix_petty_cash_transactions_transaction_type": "transaction_type",
+        "ix_petty_cash_transactions_category_id": "category_id",
+        "ix_petty_cash_transactions_source_type": "source_type",
+        "ix_petty_cash_transactions_source_id": "source_id",
+        "ix_petty_cash_transactions_reference_number": "reference_number",
+        "ix_petty_cash_transactions_created_by": "created_by",
+        "ix_petty_cash_transactions_created_at": "created_at",
+        "ix_petty_cash_transactions_is_void": "is_void",
+    }.items():
+        _create_index_if_missing(name, "petty_cash_transactions", column, unique=(column == "transaction_number"))
+    if db.engine.dialect.name == "sqlite":
+        db.session.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_petty_cash_nota_payment "
+                "ON petty_cash_transactions (source_type, source_id) "
+                "WHERE source_type = 'NOTA_PAYMENT' AND source_id IS NOT NULL"
+            )
+        )
+        db.session.commit()
+
+    if not _table_exists("employee_cash_advances"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE employee_cash_advances (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    petty_cash_transaction_id INTEGER NOT NULL UNIQUE,
+                    employee_name VARCHAR(150) NOT NULL,
+                    advance_date DATE NOT NULL,
+                    amount INTEGER NOT NULL,
+                    status VARCHAR(50) NOT NULL DEFAULT 'Belum Dipotong',
+                    settlement_date DATE,
+                    settlement_method VARCHAR(80),
+                    notes TEXT,
+                    created_by INTEGER,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(petty_cash_transaction_id) REFERENCES petty_cash_transactions (id),
+                    FOREIGN KEY(created_by) REFERENCES users (id)
+                )
+                """
+            )
+        )
+        db.session.commit()
+    _create_index_if_missing("ix_employee_cash_advances_status", "employee_cash_advances", "status")
+
+    if not _table_exists("allowance_reserves"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE allowance_reserves (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    petty_cash_transaction_id INTEGER NOT NULL UNIQUE,
+                    allowance_type VARCHAR(120) NOT NULL,
+                    allowance_period VARCHAR(80),
+                    destination_account VARCHAR(150),
+                    amount INTEGER NOT NULL,
+                    notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(petty_cash_transaction_id) REFERENCES petty_cash_transactions (id)
+                )
+                """
+            )
+        )
+        db.session.commit()
+
+    if not _table_exists("financial_audit_logs"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE financial_audit_logs (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    entity_type VARCHAR(80) NOT NULL,
+                    entity_id INTEGER,
+                    action VARCHAR(80) NOT NULL,
+                    old_value TEXT,
+                    new_value TEXT,
+                    notes TEXT,
+                    created_by INTEGER,
+                    created_at DATETIME NOT NULL,
+                    FOREIGN KEY(created_by) REFERENCES users (id)
+                )
+                """
+            )
+        )
+        db.session.commit()
+    _create_index_if_missing("ix_financial_audit_logs_entity_type", "financial_audit_logs", "entity_type")
+    _create_index_if_missing("ix_financial_audit_logs_entity_id", "financial_audit_logs", "entity_id")
+    _create_index_if_missing("ix_financial_audit_logs_action", "financial_audit_logs", "action")
+    _create_index_if_missing("ix_financial_audit_logs_created_at", "financial_audit_logs", "created_at")
 
 
 def _quote_identifier(identifier):

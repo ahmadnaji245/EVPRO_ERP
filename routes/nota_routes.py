@@ -19,6 +19,7 @@ from services.nota_service import (
     get_nota,
     get_invoice_brand,
     get_nota_by_so_id,
+    get_payment,
     income_payments,
     income_summary,
     invoice_export_rows,
@@ -38,9 +39,11 @@ from services.nota_service import (
     report_nota_rows,
     top_customers,
     totals,
+    update_payment,
     update_nota,
     upsert_product,
     validate_nota_form,
+    void_payment,
     workbook_response,
     yearly_revenue,
 )
@@ -311,11 +314,43 @@ def edit(nota_id):
 def payment(nota_id):
     nota = get_nota(nota_id)
     try:
-        add_payment(nota, request.form)
+        add_payment(nota, request.form, current_user)
     except ValueError as exc:
         flash(str(exc), "danger")
     else:
         flash("Pembayaran berhasil ditambahkan.", "success")
+    return redirect(url_for("nota.detail", nota_id=nota.id))
+
+
+@nota_bp.route("/<int:nota_id>/pembayaran/<int:payment_id>/edit", methods=["POST"])
+@permission_required("nota.manage")
+def payment_edit(nota_id, payment_id):
+    nota = get_nota(nota_id)
+    payment = get_payment(payment_id)
+    if payment.nota_id != nota.id:
+        abort(404)
+    try:
+        update_payment(payment, request.form, current_user)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Pembayaran berhasil diperbarui.", "success")
+    return redirect(url_for("nota.detail", nota_id=nota.id))
+
+
+@nota_bp.route("/<int:nota_id>/pembayaran/<int:payment_id>/void", methods=["POST"])
+@permission_required("nota.manage")
+def payment_void(nota_id, payment_id):
+    nota = get_nota(nota_id)
+    payment = get_payment(payment_id)
+    if payment.nota_id != nota.id:
+        abort(404)
+    try:
+        void_payment(payment, request.form.get("void_reason"), current_user)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Pembayaran berhasil dibatalkan.", "success")
     return redirect(url_for("nota.detail", nota_id=nota.id))
 
 

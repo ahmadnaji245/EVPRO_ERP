@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Ringkasan Kas Kecil - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Ringkasan Kas Kecil</h1>
+        <p class="text-muted mb-0">ERP v0.9-dev - Modul Keuangan Kas Kecil</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-rdr" href="{{ url_for('finance.income_create') }}"><i class="bi bi-plus-circle"></i> Tambah Cash</a>
+        <a class="btn btn-outline-dark" href="{{ url_for('finance.expense_create') }}"><i class="bi bi-dash-circle"></i> Tambah Pengeluaran</a>
+        <a class="btn btn-outline-dark" href="{{ url_for('finance.detail') }}">Lihat Detail Kas</a>
+        <a class="btn btn-outline-dark" target="_blank" href="{{ url_for('finance.report_pdf') }}">Cetak Laporan</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="metric"><span>Saldo Kas Kecil Saat Ini</span><strong>{{ data.balance|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Pemasukan Bulan Ini</span><strong>{{ data.month_income|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Pengeluaran Bulan Ini</span><strong>{{ data.month_expense|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Jumlah Transaksi Bulan Ini</span><strong>{{ data.month_count }}</strong></div></div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <section class="panel table-panel">
+            <h2 class="section-title">10 Transaksi Terbaru</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Tanggal</th><th>No Transaksi</th><th>Referensi</th><th>Keterangan</th><th class="text-end">Masuk</th><th class="text-end">Keluar</th></tr></thead>
+                    <tbody>
+                    {% for trx in data.latest %}
+                        <tr>
+                            <td>{{ trx.transaction_date|pretty_date }}</td>
+                            <td class="fw-semibold">{{ trx.transaction_number }}</td>
+                            <td>{{ trx.reference_number or '-' }}</td>
+                            <td>{{ trx.description or '-' }}</td>
+                            <td class="text-end text-success">{{ trx.amount|rupiah if trx.transaction_type == 'IN' else '-' }}</td>
+                            <td class="text-end text-danger">{{ trx.amount|rupiah if trx.transaction_type == 'OUT' else '-' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center text-muted py-4">Belum ada transaksi kas kecil.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-4">
+        <section class="panel mb-4">
+            <h2 class="section-title">Ringkasan Pengeluaran</h2>
+            <div class="summary-row"><span>Total Pengeluaran Operasional</span><strong>{{ data.expense_summary.types.OPERATING_EXPENSE|rupiah }}</strong></div>
+            <div class="summary-row"><span>Total Kasbon</span><strong>{{ data.expense_summary.types.EMPLOYEE_CASH_ADVANCE|rupiah }}</strong></div>
+            <div class="summary-row"><span>Total Penyisihan Tunjangan</span><strong>{{ data.expense_summary.types.ALLOWANCE_RESERVE|rupiah }}</strong></div>
+            <div class="summary-row"><span>Total Transfer ke Kas Besar</span><strong>{{ data.expense_summary.types.TRANSFER_TO_MAIN_CASH|rupiah }}</strong></div>
+            <div class="summary-row"><span>Total Prive</span><strong>{{ data.expense_summary.types.OWNER_WITHDRAWAL|rupiah }}</strong></div>
+        </section>
+        <section class="panel">
+            <h2 class="section-title">Berdasarkan Kelompok</h2>
+            {% for group, amount in data.expense_summary.groups.items() %}
+                <div class="summary-row"><span>{{ group }}</span><strong>{{ amount|rupiah }}</strong></div>
+            {% else %}
+                <p class="text-muted mb-0">Belum ada pengeluaran bulan ini.</p>
+            {% endfor %}
+        </section>
+    </div>
+</div>
+{% endblock %}

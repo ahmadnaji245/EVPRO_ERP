@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Kategori Pengeluaran - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div><h1 class="page-title">Kategori Pengeluaran</h1><p class="text-muted mb-0">Kategori yang pernah digunakan tidak dihapus, cukup dinonaktifkan.</p></div>
+</div>
+<section class="panel mb-4">
+    <h2 class="section-title">Tambah atau Edit Kategori</h2>
+    <form method="post" class="row g-3">
+        <input type="hidden" name="category_id" id="categoryId">
+        <div class="col-md-3"><label class="form-label">Kelompok</label><input class="form-control" name="group_name" id="groupName" required></div>
+        <div class="col-md-3"><label class="form-label">Subkategori</label><input class="form-control" name="category_name" id="categoryName" required></div>
+        <div class="col-md-2"><label class="form-label">Kode</label><input class="form-control" name="category_code" id="categoryCode" required></div>
+        <div class="col-md-2"><label class="form-label">Tipe</label><select class="form-select" name="category_type" id="categoryType">{% for code, label in type_labels.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="col-md-1"><label class="form-label">Urut</label><input type="number" class="form-control" name="sort_order" id="sortOrder" value="0"></div>
+        <div class="col-md-1 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" id="isActive" checked><label class="form-check-label" for="isActive">Aktif</label></div></div>
+        <div class="col-md-3"><div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_operational_expense" id="isOperational" checked><label class="form-check-label" for="isOperational">Biaya operasional</label></div></div>
+        <div class="col-12 d-flex justify-content-end"><button class="btn btn-rdr">Simpan Kategori</button></div>
+    </form>
+</section>
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Urut</th><th>Kelompok</th><th>Subkategori</th><th>Kode</th><th>Tipe</th><th>Operasional</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>
+            {% for category in categories %}
+                <tr>
+                    <td>{{ category.sort_order }}</td>
+                    <td>{{ category.group_name }}</td>
+                    <td>{{ category.category_name }}</td>
+                    <td class="fw-semibold">{{ category.category_code }}</td>
+                    <td>{{ type_labels.get(category.category_type, category.category_type) }}</td>
+                    <td>{{ 'Ya' if category.is_operational_expense else 'Tidak' }}</td>
+                    <td><span class="badge {{ 'text-bg-success' if category.is_active else 'text-bg-secondary' }}">{{ 'Aktif' if category.is_active else 'Nonaktif' }}</span></td>
+                    <td class="d-flex flex-wrap gap-1">
+                        <button class="btn btn-sm btn-outline-dark" type="button" data-edit='{"id":"{{ category.id }}","group":"{{ category.group_name }}","name":"{{ category.category_name }}","code":"{{ category.category_code }}","type":"{{ category.category_type }}","sort":"{{ category.sort_order }}","active":{{ 'true' if category.is_active else 'false' }},"operational":{{ 'true' if category.is_operational_expense else 'false' }}}'>Edit</button>
+                        {% if category.is_active %}
+                            <form method="post" action="{{ url_for('finance.category_deactivate', category_id=category.id) }}"><button class="btn btn-sm btn-outline-danger">Nonaktifkan</button></form>
+                        {% else %}
+                            <form method="post" action="{{ url_for('finance.category_activate', category_id=category.id) }}"><button class="btn btn-sm btn-outline-success">Aktifkan</button></form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-edit]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const row = JSON.parse(button.dataset.edit);
+        categoryId.value = row.id;
+        groupName.value = row.group;
+        categoryName.value = row.name;
+        categoryCode.value = row.code;
+        categoryType.value = row.type;
+        sortOrder.value = row.sort;
+        isActive.checked = row.active;
+        isOperational.checked = row.operational;
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    });
+});
+</script>
+{% endblock %}

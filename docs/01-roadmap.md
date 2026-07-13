@@ -1,58 +1,71 @@
 # EVPRO ERP Roadmap
 
-## Visi EVPRO ERP
-
-EVPRO ERP adalah sistem ERP modular untuk operasional garment dan custom jersey. Sistem ini dibangun agar proses dari Sales Order, approval customer, produksi, nota, pembayaran, sampai repeat order dapat berjalan dalam satu platform internal.
-
-Prinsip utama:
-
-- Sales Order menjadi pusat proses bisnis.
-- Setiap modul dikembangkan bertahap agar stabil sebelum diintegrasikan.
-- Modul internal dan customer-facing dipisahkan secara jelas.
-- Fitur yang belum tersedia harus ditandai sebagai Planned, bukan dianggap selesai.
+EVPRO ERP adalah sistem ERP modular untuk operasional garment dan custom jersey. Sales Order menjadi pusat proses bisnis, lalu modul Nota, Produksi, Customer Portal, CRM, dan Keuangan dihubungkan bertahap agar stabil.
 
 ## Release Roadmap
 
-| Version | Milestone | Status | Ringkasan |
-| --- | --- | --- | --- |
-| ERP v0.1 | Framework | Completed | Struktur Flask ERP, database layer, routing, template, auth dasar, dan modular scaffold. |
-| ERP v0.2 | Sales Order | Completed | CRUD Sales Order, detail, print/PDF, approval dasar, desain, player, revisi, dan production checklist foundation. |
-| ERP v0.2.1 | Complete Sales Order Module Migration | Completed | Dashboard SO, Produksi, Master Data, Laporan, Setting, route alias, dan menu bawah SO dimigrasikan dari ERP_SO. |
-| ERP v0.2.2 | Import Sales Order Master Data | Completed | Import master data Sales Order dari ERP_SO untuk brand, logo brand, item, material, pola, instruksi, dan user. |
-| ERP v0.3 | Invoice / Nota | Completed | CRUD Nota, item produk, customer Nota, pembayaran, status, nomor Nota otomatis, print view, dan admin-only access. |
-| ERP v0.3.1 | Complete Nota Module Migration | Completed | Dashboard keuangan, produk, laporan, piutang, pemasukan, export Excel, dan PDF customer/internal dimigrasikan dari project Nota lama. |
-| ERP v0.4 | SO ↔ Nota Integration Stable Development | Completed | Relasi aktif Sales Order ke Nota melalui `so_id`, create Nota dari SO, pencegahan Nota ganda, dan status penagihan SO. |
-| ERP v0.5 | Production Management | Completed | Dashboard produksi, assign vendor Mas Amar/Mas Syukron, deadline vendor, status produksi, barang masuk gudang, QC/checklist internal, dan prioritas otomatis. |
-| ERP v0.6 | Role & Permission | Planned | Role granular, permission per modul, dan pembatasan akses selain admin/produksi. |
-| ERP v0.7 | Customer Portal | Planned | Portal customer berbasis secure token untuk approval, progress, dan status pesanan. |
-| ERP v0.8 | CRM | Planned | Customer database umum, riwayat order, follow-up, segmentasi, dan pipeline customer. |
-| ERP v0.9 | AI Integration | Planned | AI assistant untuk CRM, dashboard, produksi, inventory, marketing, dan insight bisnis. |
-| ERP v1.0 | Stable Internal Release | Planned | Rilis internal stabil dengan modul utama terintegrasi dan dokumentasi operasional. |
+- ERP v0.1: Framework ERP - Selesai
+- ERP v0.2: Sales Order / Surat Order - Selesai
+- ERP v0.3: Nota - Selesai
+- ERP v0.4: Integrasi Surat Order dan Nota - Selesai
+- ERP v0.5: Produksi - Selesai
+- ERP v0.6: Role dan Permission - Selesai
+- ERP v0.7: Customer Portal - Selesai
+- ERP v0.8: CRM - Dalam Pengembangan
+- ERP v0.9: Keuangan Kas Kecil - Selesai
+- ERP v0.10: Integrasi AI - Belum Dimulai
+- ERP v1.0: Stable Internal Release - Belum Dimulai
 
-## Status Saat Ini
+## Current Focus
 
-EVPRO ERP sudah memiliki modul utama:
+Status terbaru:
 
-- Sales Order.
+ERP v0.9 — Modul Keuangan Kas Kecil selesai.
+
+Modul utama yang tersedia:
+
+- Sales Order / Surat Order.
 - Nota / Invoice.
-- Integrasi SO ↔ Nota.
-- Master Data Sales Order.
-- Master Data Nota.
-- Role dasar admin dan produksi.
+- Integrasi SO dan Nota.
+- Produksi.
+- Role dan Permission.
+- Customer Portal.
+- CRM dalam pengembangan.
+- Keuangan Kas Kecil.
 
-ERP v0.5 — Production Management sudah aktif pada halaman Produksi.
+## Modul Keuangan Kas Kecil
 
-Fitur ERP v0.5:
+Cakupan ERP v0.9:
 
-- Dashboard produksi.
-- Antrian produksi dari SO.
-- Status produksi.
-- Tracking pekerjaan.
-- Integrasi dengan SO dan Nota.
-- Assign vendor produksi ke Mas Amar atau Mas Syukron.
-- Deadline vendor terpisah dari deadline customer/SO.
-- Barang masuk gudang.
-- QC/checklist internal menggunakan foundation checklist Sales Order.
-- Prioritas otomatis berdasarkan deadline vendor atau deadline customer.
+- Pencatatan uang tunai Kas Kecil.
+- Tambah Cash dan pengeluaran Kas Kecil.
+- Pembayaran Nota Cash dan Transfer.
+- Pembayaran Cash otomatis masuk Kas Kecil.
+- Transfer tidak masuk Kas Kecil.
+- Kategori pengeluaran profesional.
+- Kasbon Karyawan.
+- Penyisihan Tunjangan.
+- Transfer ke Kas Besar.
+- Prive/Pengambilan Pemilik.
+- Detail Kas Kecil dan Pengeluaran Bulan Ini.
+- Laporan berdasarkan kelompok dan subkategori.
+- Cetak PDF Ringkasan dan Detail Kas Kecil.
+- Audit dan pembatalan transaksi.
+- Permission menu Keuangan.
 
-Pengembangan berikutnya adalah ERP v0.6 — Role & Permission.
+Catatan:
+
+Kasbon dan Penyisihan Tunjangan tetap mengurangi saldo Kas Kecil karena uang telah keluar dari kas fisik.
+
+## Next Milestone
+
+ERP v0.10 akan difokuskan pada Integrasi AI.
+
+Rencana:
+
+- Bantuan analisis data ERP.
+- Ringkasan operasional.
+- Analisis penjualan dan customer.
+- Rekomendasi follow-up.
+- Analisis keterlambatan produksi.
+- Deteksi anomali transaksi.

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Tambah Cash - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div><h1 class="page-title">Tambah Cash</h1><p class="text-muted mb-0">Saldo awal juga dicatat sebagai transaksi pemasukan.</p></div>
+    <a class="btn btn-outline-dark" href="{{ url_for('finance.dashboard') }}">Kembali</a>
+</div>
+<section class="panel">
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+        <div class="col-md-4"><label class="form-label">Tanggal Transaksi</label><input type="date" class="form-control" name="transaction_date" value="{{ today.isoformat() }}" required></div>
+        <div class="col-md-4"><label class="form-label">Sumber Pemasukan</label><select class="form-select" name="source_type" required>{% for code, label in income_sources.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><label class="form-label">Nominal</label><input type="number" min="1" class="form-control text-end" name="amount" required></div>
+        <div class="col-md-12"><label class="form-label">Bukti Transaksi</label><input type="file" class="form-control" name="attachment" accept=".jpg,.jpeg,.png,.pdf"></div>
+        <div class="col-12"><label class="form-label">Keterangan</label><textarea class="form-control" name="description" rows="3"></textarea></div>
+        <div class="col-12 d-flex justify-content-end gap-2"><a class="btn btn-outline-dark" href="{{ url_for('finance.dashboard') }}">Batal</a><button class="btn btn-rdr">Simpan Pemasukan</button></div>
+    </form>
+</section>
+{% endblock %}

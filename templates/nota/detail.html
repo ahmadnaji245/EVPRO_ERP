@@ -60,12 +60,40 @@
             <h2 class="section-title">Riwayat Pembayaran</h2>
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>Tanggal</th><th>Keterangan</th><th class="text-end">Nominal</th></tr></thead>
+                    <thead><tr><th>Tanggal</th><th>Metode</th><th>Referensi</th><th>Keterangan</th><th class="text-end">Nominal</th><th>Status</th><th>Aksi</th></tr></thead>
                     <tbody>
                     {% for payment in payments %}
-                        <tr><td>{{ payment.payment_date|pretty_date }}</td><td>{{ payment.description or '-' }}</td><td class="text-end">{{ payment.amount|rupiah }}</td></tr>
+                        <tr class="{{ 'table-secondary' if payment.is_void else '' }}">
+                            <td>{{ payment.payment_date|pretty_date }}</td>
+                            <td>{{ payment.payment_method or 'Cash' }}</td>
+                            <td>{{ payment.transfer_reference or '-' }}</td>
+                            <td>{{ payment.description or payment.notes or '-' }}</td>
+                            <td class="text-end">{{ payment.amount|rupiah }}</td>
+                            <td><span class="badge {{ 'text-bg-secondary' if payment.is_void else 'text-bg-success' }}">{{ 'Dibatalkan' if payment.is_void else 'Aktif' }}</span></td>
+                            <td>
+                                {% if not payment.is_void %}
+                                    <details>
+                                        <summary class="btn btn-sm btn-outline-dark">Edit</summary>
+                                        <form method="post" action="{{ url_for('nota.payment_edit', nota_id=nota.id, payment_id=payment.id) }}" class="row g-2 mt-2">
+                                            <div class="col-md-3"><input type="date" class="form-control form-control-sm" name="payment_date" value="{{ payment.payment_date.isoformat() }}" required></div>
+                                            <div class="col-md-2"><input type="number" min="1" class="form-control form-control-sm text-end" name="amount" value="{{ payment.amount }}" required></div>
+                                            <div class="col-md-2"><select class="form-select form-select-sm" name="payment_method"><option value="Cash" {% if payment.payment_method == 'Cash' %}selected{% endif %}>Cash</option><option value="Transfer" {% if payment.payment_method == 'Transfer' %}selected{% endif %}>Transfer</option></select></div>
+                                            <div class="col-md-2"><input class="form-control form-control-sm" name="transfer_reference" value="{{ payment.transfer_reference or '' }}" placeholder="Ref transfer"></div>
+                                            <div class="col-md-3"><input class="form-control form-control-sm" name="description" value="{{ payment.description or '' }}" placeholder="Catatan"></div>
+                                            <div class="col-12 d-flex gap-2">
+                                                <button class="btn btn-sm btn-rdr">Simpan</button>
+                                            </div>
+                                        </form>
+                                        <form method="post" action="{{ url_for('nota.payment_void', nota_id=nota.id, payment_id=payment.id) }}" class="d-flex gap-2 mt-2">
+                                            <input class="form-control form-control-sm" name="void_reason" placeholder="Alasan pembatalan" required>
+                                            <button class="btn btn-sm btn-outline-danger">Void</button>
+                                        </form>
+                                    </details>
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% else %}
-                        <tr><td colspan="3" class="text-center text-muted py-4">Belum ada pembayaran.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4">Belum ada pembayaran.</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
@@ -90,6 +118,17 @@
                 <div class="col-12">
                     <label class="form-label">Nominal</label>
                     <input type="number" min="1" class="form-control" name="amount" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Metode Pembayaran</label>
+                    <select class="form-select" name="payment_method" required>
+                        <option value="Cash">Cash</option>
+                        <option value="Transfer">Transfer</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Referensi Transfer</label>
+                    <input class="form-control" name="transfer_reference" placeholder="Opsional untuk transfer">
                 </div>
                 <div class="col-12">
                     <label class="form-label">Keterangan</label>

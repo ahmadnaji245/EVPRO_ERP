@@ -152,6 +152,29 @@ Fitur selesai:
 - Role produksi tetap tidak bisa mengakses Nota.
 - Modul Nota, PDF Nota, integrasi SO ↔ Nota, dan output PDF SO tidak diubah.
 
+## ERP v0.9 - Keuangan Kas Kecil
+
+Status: Completed.
+
+Fitur selesai:
+
+- Modul Kas Kecil untuk mencatat uang tunai fisik EVPRO.
+- Tambah Cash untuk saldo awal, penambahan modal, penjualan offline, pembayaran Nota Cash, pengembalian kasbon tunai, dan pemasukan lainnya.
+- Integrasi pembayaran Nota dengan metode Cash dan Transfer.
+- Pembayaran Nota Cash otomatis membuat pemasukan Kas Kecil.
+- Pembayaran Nota Transfer tidak masuk Kas Kecil.
+- Sinkronisasi perubahan pembayaran Nota ke transaksi Kas Kecil agar tidak tercatat dua kali.
+- Master kategori pengeluaran Kas Kecil yang dapat diaktifkan, dinonaktifkan, dan diurutkan.
+- Kelompok pengeluaran profesional untuk produksi, logistik, gaji/upah, konsumsi, administrasi, utilitas, pemeliharaan, kasbon, penyisihan tunjangan, transfer ke kas besar, prive, dan lainnya.
+- Kasbon Karyawan tetap mengurangi Kas Kecil saat uang fisik keluar.
+- Penyisihan Tunjangan tetap mengurangi Kas Kecil saat uang dipindahkan ke rekening tunjangan.
+- Transfer ke Kas Besar dan Prive mengurangi Kas Kecil tetapi dipisahkan dari biaya operasional.
+- Ringkasan Kas Kecil, Detail Kas Kecil, Pengeluaran Bulan Ini, dan Kategori Pengeluaran.
+- PDF Ringkasan Kas Kecil dan PDF Detail Kas Kecil.
+- Rekap pengeluaran berdasarkan kelompok dan subkategori.
+- Void transaksi dan audit dasar untuk perubahan transaksi keuangan.
+- Permission menu Keuangan dengan akses admin dan struktur role finance untuk pengembangan berikutnya.
+
 ## Next Release
 
-ERP v0.6 akan fokus pada Role & Permission granular.
+ERP v0.10 akan fokus pada Integrasi AI setelah modul utama stabil.

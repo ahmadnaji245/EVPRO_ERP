@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Tambah Pengeluaran - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div><h1 class="page-title">Tambah Pengeluaran</h1><p class="text-muted mb-0">Semua uang keluar dari kas fisik mengurangi kas kecil.</p></div>
+    <a class="btn btn-outline-dark" href="{{ url_for('finance.dashboard') }}">Kembali</a>
+</div>
+<section class="panel">
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+        <div class="col-md-3"><label class="form-label">Tanggal Pengeluaran</label><input type="date" class="form-control" name="transaction_date" value="{{ today.isoformat() }}" required></div>
+        <div class="col-md-4"><label class="form-label">Kelompok Pengeluaran</label><select class="form-select" id="groupSelect" required><option value="">Pilih kelompok</option>{% for group in groups.keys() %}<option value="{{ group }}">{{ group }}</option>{% endfor %}</select></div>
+        <div class="col-md-5"><label class="form-label">Subkategori</label><select class="form-select" name="category_id" id="categorySelect" required><option value="">Pilih subkategori</option>{% for group, items in groups.items() %}{% for category in items %}<option value="{{ category.id }}" data-group="{{ group }}" data-type="{{ category.category_type }}">{{ category.category_name }}</option>{% endfor %}{% endfor %}</select></div>
+        <div class="col-md-6"><label class="form-label">Nominal</label><input type="number" min="1" class="form-control text-end" name="amount" required></div>
+        <div class="col-md-6"><label class="form-label">Bukti Transaksi</label><input type="file" class="form-control" name="attachment" accept=".jpg,.jpeg,.png,.pdf"></div>
+        <div class="col-12"><label class="form-label">Keterangan</label><textarea class="form-control" name="description" rows="3" required></textarea></div>
+
+        <div class="col-12 d-none" id="advanceFields">
+            <div class="row g-3 border rounded p-3">
+                <div class="col-md-4"><label class="form-label">Nama Karyawan</label><input class="form-control" name="employee_name"></div>
+                <div class="col-md-4"><label class="form-label">Tanggal Kasbon</label><input type="date" class="form-control" name="advance_date"></div>
+                <div class="col-md-4"><label class="form-label">Status Kasbon</label><select class="form-select" name="advance_status"><option>Belum Dipotong</option><option>Sudah Dipotong dari Gaji</option><option>Dikembalikan Tunai</option><option>Dihapuskan</option></select></div>
+                <div class="col-md-4"><label class="form-label">Tanggal Penyelesaian</label><input type="date" class="form-control" name="settlement_date"></div>
+                <div class="col-md-4"><label class="form-label">Metode Penyelesaian</label><input class="form-control" name="settlement_method"></div>
+                <div class="col-md-4"><label class="form-label">Catatan Kasbon</label><input class="form-control" name="advance_notes"></div>
+            </div>
+        </div>
+
+        <div class="col-12 d-none" id="allowanceFields">
+            <div class="row g-3 border rounded p-3">
+                <div class="col-md-3"><label class="form-label">Jenis Tunjangan</label><input class="form-control" name="allowance_type"></div>
+                <div class="col-md-3"><label class="form-label">Periode Tunjangan</label><input class="form-control" name="allowance_period"></div>
+                <div class="col-md-3"><label class="form-label">Rekening Tujuan</label><input class="form-control" name="destination_account"></div>
+                <div class="col-md-3"><label class="form-label">Catatan</label><input class="form-control" name="allowance_notes"></div>
+            </div>
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2"><a class="btn btn-outline-dark" href="{{ url_for('finance.dashboard') }}">Batal</a><button class="btn btn-rdr">Simpan Pengeluaran</button></div>
+    </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+const groupSelect = document.getElementById('groupSelect');
+const categorySelect = document.getElementById('categorySelect');
+const advanceFields = document.getElementById('advanceFields');
+const allowanceFields = document.getElementById('allowanceFields');
+function syncCategories() {
+    const group = groupSelect.value;
+    [...categorySelect.options].forEach((option) => {
+        option.hidden = option.value && option.dataset.group !== group;
+    });
+    categorySelect.value = '';
+    syncExtraFields();
+}
+function syncExtraFields() {
+    const option = categorySelect.selectedOptions[0];
+    const type = option ? option.dataset.type : '';
+    advanceFields.classList.toggle('d-none', type !== 'EMPLOYEE_CASH_ADVANCE');
+    allowanceFields.classList.toggle('d-none', !['ALLOWANCE_RESERVE', 'TRANSFER_TO_MAIN_CASH'].includes(type));
+}
+groupSelect.addEventListener('change', syncCategories);
+categorySelect.addEventListener('change', syncExtraFields);
+syncCategories();
+</script>
+{% endblock %}

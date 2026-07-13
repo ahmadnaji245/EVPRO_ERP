@@ -39,7 +39,7 @@ LEGACY_PRODUCTION_STATUS_MAP = {
     "Selesai": "Finish",
     "Terkirim dari Vendor": "QC",
 }
-USER_ROLES = ["admin", "desain", "produksi"]
+USER_ROLES = ["admin", "desain", "produksi", "finance"]
 USER_ROLE_ALIASES = {
     "Admin": "admin",
     "Desain": "desain",
@@ -52,9 +52,13 @@ USER_ROLE_ALIASES = {
     "Production": "produksi",
     "QC": "produksi",
     "qc": "produksi",
+    "Finance": "finance",
+    "finance": "finance",
+    "Keuangan": "finance",
+    "keuangan": "finance",
 }
 
-UPLOAD_SUBFOLDERS = ["brands", "designs", "customers", "pdf", "temp"]
+UPLOAD_SUBFOLDERS = ["brands", "designs", "customers", "pdf", "temp", "petty_cash"]
 
 SIZE_ORDER = {
     "KS": 1,

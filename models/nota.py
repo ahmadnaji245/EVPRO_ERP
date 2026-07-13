@@ -65,7 +65,7 @@ class Nota(db.Model):
 
     @property
     def paid(self):
-        return sum(payment.amount for payment in self.payments)
+        return sum(payment.amount for payment in self.payments if not payment.is_void)
 
     @property
     def remaining(self):
@@ -96,7 +96,18 @@ class NotaPayment(db.Model):
     nota_id = db.Column(db.Integer, db.ForeignKey("notas.id"), nullable=False, index=True)
     payment_date = db.Column(db.Date, nullable=False, index=True)
     amount = db.Column(db.Integer, nullable=False)
+    payment_method = db.Column(db.String(20), nullable=False, default="Cash", index=True)
+    transfer_reference = db.Column(db.String(120))
     description = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_void = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    void_reason = db.Column(db.Text)
+    voided_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    voided_at = db.Column(db.DateTime)
 
     nota = db.relationship("Nota", back_populates="payments")
+    creator = db.relationship("User", foreign_keys=[created_by])
+    voider = db.relationship("User", foreign_keys=[voided_by])

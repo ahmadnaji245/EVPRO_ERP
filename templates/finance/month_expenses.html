@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Pengeluaran Bulan Ini - EVPRO ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div><h1 class="page-title">Pengeluaran Bulan Ini</h1><p class="text-muted mb-0">Total seluruh pengeluaran kas mencakup semua uang keluar dari kas kecil.</p></div>
+    <a class="btn btn-rdr" href="{{ url_for('finance.expense_create') }}">Tambah Pengeluaran</a>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="metric"><span>Total Biaya Operasional</span><strong>{{ data.summary.types.OPERATING_EXPENSE|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Total Kasbon</span><strong>{{ data.summary.types.EMPLOYEE_CASH_ADVANCE|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Total Penyisihan Tunjangan</span><strong>{{ data.summary.types.ALLOWANCE_RESERVE|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Total Transfer ke Kas Besar</span><strong>{{ data.summary.types.TRANSFER_TO_MAIN_CASH|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Total Prive</span><strong>{{ data.summary.types.OWNER_WITHDRAWAL|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Total Seluruh Pengeluaran Kas</span><strong>{{ data.total|rupiah }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Kelompok Terbesar</span><strong>{{ data.largest_group }}</strong></div></div>
+    <div class="col-md-3"><div class="metric"><span>Jumlah Transaksi</span><strong>{{ data.count }}</strong></div></div>
+</div>
+<section class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Tanggal</th><th>Nomor Transaksi</th><th>Kelompok</th><th>Subkategori</th><th>Penerima</th><th>Keterangan</th><th class="text-end">Nominal</th><th>Dicatat Oleh</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for trx in data.rows %}
+                <tr class="{{ 'table-secondary' if trx.is_void else '' }}">
+                    <td>{{ trx.transaction_date|pretty_date }}</td>
+                    <td class="fw-semibold">{{ trx.transaction_number }}</td>
+                    <td>{{ trx.category.group_name if trx.category else '-' }}</td>
+                    <td>{{ trx.category.category_name if trx.category else '-' }}</td>
+                    <td>{{ trx.recipient or '-' }}</td>
+                    <td>{{ trx.description or '-' }}</td>
+                    <td class="text-end">{{ trx.amount|rupiah }}</td>
+                    <td>{{ trx.creator.name if trx.creator else '-' }}</td>
+                    <td><span class="badge {{ 'text-bg-secondary' if trx.is_void else 'text-bg-success' }}">{{ 'Dibatalkan' if trx.is_void else 'Aktif' }}</span></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-4">Belum ada pengeluaran bulan ini.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
