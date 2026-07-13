@@ -1,6 +1,18 @@
-{% extends "base.html" %}
-{% block title %}Customer Portal - EVPRO TEXTILE ERP{% endblock %}
+{% extends "public_base.html" %}
+{% block title %}Tracking Produksi{% endblock %}
 {% block content %}
+<main class="customer-portal-page">
+    <div class="customer-portal-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 {% if access_record %}
     {% set sales_order = access_record.sales_order %}
     {% set tracking_code = public_tracking_code if public_tracking_code is defined and public_tracking_code else none %}
@@ -17,7 +29,7 @@
             {% endif %}
         </div>
         <div>
-            <div class="text-muted fw-semibold mb-1">{{ 'Tracking Produksi' if is_tracking else 'Persetujuan Surat Order' }}</div>
+            <div class="text-muted fw-semibold mb-1">Tracking Produksi</div>
             <h1 class="page-title">{{ sales_order.team_name }}</h1>
             <p class="text-muted mb-0">{{ sales_order.brand.name }} - {{ sales_order.so_number }}</p>
         </div>
@@ -369,4 +381,6 @@
         </div>
     </div>
 {% endif %}
+    </div>
+</main>
 {% endblock %}
