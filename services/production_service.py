@@ -349,8 +349,12 @@ def production_status(order):
     return normalize_production_status(order.production_status)
 
 
+def is_finished_production_order(order):
+    return production_status(order) == "Finish"
+
+
 def is_active_production_order(order):
-    return production_status(order) != "Finish"
+    return not is_finished_production_order(order)
 
 
 def finished_production_count():

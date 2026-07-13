@@ -15,6 +15,7 @@ from services.nota_service import billing_status_for_sales_order, get_nota_by_so
 from services.order_status_service import get_display_status
 from services.pdf_service import build_sales_order_pdf
 from services.production_photo_service import add_production_photos, delete_production_photo, get_photo_for_order
+from services.production_service import is_finished_production_order
 from services.sales_order_service import (
     PRODUCTION_STATUSES,
     create_sales_order,
@@ -143,6 +144,7 @@ def detail(sales_order_id):
         "so/detail.html",
         production_statuses=PRODUCTION_STATUSES,
         sales_order=sales_order,
+        is_finished_production_order=is_finished_production_order(sales_order),
         display_status=get_display_status(sales_order),
         linked_nota=get_nota_by_so_id(sales_order.id),
         billing_status=billing_status_for_sales_order(sales_order),

@@ -30,7 +30,27 @@
             {% set confirmation_team_name = sales_order.team_name or '-' %}
             {% set confirmation_customer_name = sales_order.customer_access.customer_name if sales_order.customer_access else '-' %}
             {% set confirmation_tracking_link = 'https://erp.evprotextile.com/t/' ~ sales_order.tracking_code %}
-            {% if sales_order.approved %}
+            {% if is_finished_production_order %}
+                {% set confirmation_message %}Halo kak 😊
+
+Terima kasih sudah menunggu.
+
+Nama Tim : {{ confirmation_team_name }}
+Nama Customer : {{ confirmation_customer_name }}
+Nomor SO : {{ sales_order.so_number }}
+
+Pesanan kakak sudah selesai produksi.
+
+Hasil produksi dan informasi pesanan dapat dilihat melalui link berikut:
+
+{{ confirmation_tracking_link }}
+
+Tim kami akan menghubungi kakak untuk proses pelunasan dan pengambilan/pengiriman pesanan.
+
+Apabila ada pertanyaan, silakan hubungi kami melalui WhatsApp ini ya kak.
+
+Terima kasih atas kepercayaan kakak kepada tim kami. 🙏{% endset %}
+            {% elif sales_order.approved %}
                 {% set confirmation_message %}Halo kak 😊
 
 Terima kasih, konfirmasi pesanan sudah kami terima.
