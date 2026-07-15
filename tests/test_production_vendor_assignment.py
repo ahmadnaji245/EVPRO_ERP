@@ -7,7 +7,7 @@ from app import create_app
 from config import Config
 from database.db import db
 from models import Brand, SalesOrder, User
-from services.production_service import list_vendor_production_rows, save_vendor_assignment
+from services.production_service import assign_vendor, list_vendor_production_rows, save_vendor_assignment, set_vendor_deadline
 
 
 class TestConfig(Config):
@@ -50,9 +50,51 @@ class ProductionVendorAssignmentTestCase(unittest.TestCase):
         self.assertIsNotNone(order.production_assigned_at)
         self.assertEqual(order.production_status, "Jahit")
         self.assertEqual(order.customer_portal_status, "Jahit")
-        self.assertIn("Vendor berhasil di-assign dan status produksi berubah menjadi Jahit.", html)
+        self.assertIn("Vendor berhasil diperbarui.", html)
         self.assertIn("Produksi Aktif", html)
         self.assertIn(">Jahit<", html)
+
+    def test_updating_assigned_printing_order_sets_status_to_jahit(self):
+        order = self._create_order(
+            "PRINTASSIGNED",
+            production_status="Printing",
+            production_vendor="Mas Amar",
+            production_vendor_deadline=date(2026, 7, 20),
+        )
+
+        _, status_changed = save_vendor_assignment(order, "Mas Syukron", "2026-07-21")
+
+        self.assertTrue(status_changed)
+        self.assertEqual(order.production_vendor, "Mas Syukron")
+        self.assertEqual(order.production_vendor_deadline, date(2026, 7, 21))
+        self.assertEqual(order.production_status, "Jahit")
+        self.assertEqual(order.customer_portal_status, "Jahit")
+
+    def test_deadline_update_service_uses_same_printing_to_jahit_transition(self):
+        order = self._create_order(
+            "DEADLINEONLY",
+            production_status="Printing",
+            production_vendor="Mas Amar",
+        )
+
+        _, status_changed = set_vendor_deadline(order, "2026-07-22")
+
+        self.assertTrue(status_changed)
+        self.assertEqual(order.production_vendor_deadline, date(2026, 7, 22))
+        self.assertEqual(order.production_status, "Jahit")
+
+    def test_vendor_update_service_uses_same_printing_to_jahit_transition(self):
+        order = self._create_order(
+            "VENDORONLY",
+            production_status="Printing",
+            production_vendor_deadline=date(2026, 7, 20),
+        )
+
+        _, status_changed = assign_vendor(order, "Mas Amar")
+
+        self.assertTrue(status_changed)
+        self.assertEqual(order.production_vendor, "Mas Amar")
+        self.assertEqual(order.production_status, "Jahit")
 
     def test_updating_already_assigned_jahit_order_keeps_status(self):
         order = self._create_order(

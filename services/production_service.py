@@ -392,14 +392,26 @@ def is_late(order, today=None):
 
 def assign_vendor(order, vendor):
     vendor = validate_vendor(vendor)
-    order.production_vendor = vendor
-    order.production_assigned_at = datetime.utcnow()
-    db.session.commit()
-    return order
+    try:
+        order.production_vendor = vendor
+        order.production_assigned_at = datetime.utcnow()
+        status_changed = _sync_vendor_assignment_stage(order)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return order, status_changed
 
 
 def vendor_assignment_complete(order):
     return bool(str(order.production_vendor or "").strip() and order.production_vendor_deadline)
+
+
+def _sync_vendor_assignment_stage(order):
+    if vendor_assignment_complete(order) and production_status(order) == "Printing":
+        _set_stage(order, "Jahit")
+        return True
+    return False
 
 
 def save_vendor_assignment(order, vendor, deadline):
@@ -411,25 +423,27 @@ def save_vendor_assignment(order, vendor, deadline):
         raise ValueError("Silakan tentukan deadline vendor.")
     vendor = validate_vendor(vendor)
     deadline_date = _parse_date(deadline)
-    was_unassigned = not str(order.production_vendor or "").strip() or not order.production_vendor_deadline
-    should_set_initial_stage = was_unassigned and _status_index(production_status(order)) < _status_index("Jahit")
     try:
         order.production_vendor = vendor
         order.production_vendor_deadline = deadline_date
         order.production_assigned_at = datetime.utcnow()
-        if should_set_initial_stage:
-            _set_stage(order, "Jahit")
+        status_changed = _sync_vendor_assignment_stage(order)
         db.session.commit()
     except Exception:
         db.session.rollback()
         raise
-    return order, should_set_initial_stage
+    return order, status_changed
 
 
 def set_vendor_deadline(order, deadline):
-    order.production_vendor_deadline = _parse_date(deadline)
-    db.session.commit()
-    return order
+    try:
+        order.production_vendor_deadline = _parse_date(deadline)
+        status_changed = _sync_vendor_assignment_stage(order)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return order, status_changed
 
 
 def can_finish_order(order):
