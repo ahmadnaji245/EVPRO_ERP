@@ -410,11 +410,20 @@ def save_vendor_assignment(order, vendor, deadline):
     if not deadline:
         raise ValueError("Silakan tentukan deadline vendor.")
     vendor = validate_vendor(vendor)
-    order.production_vendor = vendor
-    order.production_vendor_deadline = _parse_date(deadline)
-    order.production_assigned_at = datetime.utcnow()
-    db.session.commit()
-    return order
+    deadline_date = _parse_date(deadline)
+    was_unassigned = not str(order.production_vendor or "").strip() or not order.production_vendor_deadline
+    should_set_initial_stage = was_unassigned and _status_index(production_status(order)) < _status_index("Jahit")
+    try:
+        order.production_vendor = vendor
+        order.production_vendor_deadline = deadline_date
+        order.production_assigned_at = datetime.utcnow()
+        if should_set_initial_stage:
+            _set_stage(order, "Jahit")
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return order, should_set_initial_stage
 
 
 def set_vendor_deadline(order, deadline):

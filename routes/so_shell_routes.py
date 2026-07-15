@@ -185,7 +185,7 @@ def production_detail(sales_order_id):
 def production_assign_vendor(sales_order_id):
     order = _get_production_order(sales_order_id)
     try:
-        save_vendor_assignment(
+        _, status_changed = save_vendor_assignment(
             order,
             request.form.get("production_vendor"),
             request.form.get("production_vendor_deadline"),
@@ -193,7 +193,10 @@ def production_assign_vendor(sales_order_id):
     except ValueError as exc:
         flash(str(exc), "danger")
     else:
-        flash(f"Vendor dan deadline {order.so_number} berhasil disimpan.", "success")
+        if status_changed:
+            flash("Vendor berhasil di-assign dan status produksi berubah menjadi Jahit.", "success")
+        else:
+            flash(f"Vendor dan deadline {order.so_number} berhasil disimpan.", "success")
     return redirect(url_for("production.index", q=request.form.get("q", "")))
 
 
