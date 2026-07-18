@@ -9,7 +9,7 @@ from models.setting import Setting
 from models.user import User
 from services.brand_service import create_brand, get_brand, list_brands, set_brand_active, update_brand
 from services.dashboard_service import monthly_setting_point_progress
-from services.master_data_service import create_row, get_row, list_rows, set_row_active, update_row, validate_master_form
+from services.master_data_service import create_row, get_next_sort_order, get_row, list_rows, set_row_active, update_row, validate_master_form
 from services.pdf_service import build_order_production_list_pdf, build_production_report_pdf, build_vendor_production_table_pdf
 from services.pdf_render_service import render_first_pdf_page_to_jpg
 from models.sales_order import SalesOrder
@@ -395,6 +395,7 @@ def _render_simple_master(key, editing_row=None):
         "master/simple_master_page.html",
         rows=list_rows(config["model"]),
         editing_row=editing_row,
+        next_sort_order=get_next_sort_order(config["model"]) if not editing_row else None,
         master_key=key,
         **config,
     )

@@ -15,10 +15,12 @@ from services.petty_cash_service import (
     create_expense,
     create_income,
     dashboard_data,
+    expense_category_groups,
     ledger,
     month_expenses,
     set_category_active,
     transaction_year_options,
+    suggested_category_sort_order,
     upsert_category,
     void_transaction,
 )
@@ -30,7 +32,7 @@ finance_bp = Blueprint("finance", __name__, url_prefix="/keuangan")
 
 @finance_bp.route("/")
 @finance_bp.route("/kas-kecil")
-@permission_required("finance.view")
+@permission_required("can_access_finance")
 def dashboard():
     return render_template(
         "finance/dashboard.html",
@@ -41,7 +43,7 @@ def dashboard():
 
 
 @finance_bp.route("/kas-kecil/detail")
-@permission_required("finance.view")
+@permission_required("can_access_finance")
 def detail():
     filters = _filters()
     pagination, running_rows, totals = ledger(filters, page=request.args.get("page", 1, type=int))
@@ -102,7 +104,7 @@ def transaction_void(transaction_id):
 
 
 @finance_bp.route("/pengeluaran-bulan-ini")
-@permission_required("finance.view")
+@permission_required("can_access_finance")
 def current_month_expenses():
     return render_template("finance/month_expenses.html", data=month_expenses(), type_labels=CATEGORY_TYPE_LABELS)
 
@@ -118,7 +120,15 @@ def category_index():
         else:
             flash("Kategori berhasil disimpan.", "success")
         return redirect(url_for("finance.category_index"))
-    return render_template("finance/categories.html", categories=categories(), type_labels=CATEGORY_TYPE_LABELS)
+    category_rows = categories()
+    return render_template(
+        "finance/categories.html",
+        categories=category_rows,
+        category_order_rows=[{"group_id": row.group_id, "sort_order": row.sort_order} for row in category_rows],
+        expense_groups=expense_category_groups(),
+        next_category_sort_order=suggested_category_sort_order(request.form),
+        type_labels=CATEGORY_TYPE_LABELS,
+    )
 
 
 @finance_bp.route("/kategori/<int:category_id>/aktif", methods=["POST"])
@@ -138,7 +148,7 @@ def category_deactivate(category_id):
 
 
 @finance_bp.route("/kas-kecil/pdf")
-@permission_required("finance.view")
+@permission_required("can_access_finance")
 def report_pdf():
     pdf = build_petty_cash_pdf(_filters(), current_user)
     response = send_file(pdf, mimetype="application/pdf", as_attachment=False, download_name="laporan-kas-kecil.pdf")
@@ -147,7 +157,7 @@ def report_pdf():
 
 
 @finance_bp.route("/kas-kecil/detail/pdf")
-@permission_required("finance.view")
+@permission_required("can_access_finance")
 def detail_report_pdf():
     pdf = build_petty_cash_detail_pdf(_filters(), current_user)
     response = send_file(pdf, mimetype="application/pdf", as_attachment=False, download_name="laporan-detail-kas-kecil.pdf")

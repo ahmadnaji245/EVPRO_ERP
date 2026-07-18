@@ -1,5 +1,5 @@
 const monthlyPointChart = document.getElementById("monthlyPointChart");
-const settingTargetChart = document.getElementById("settingTargetChart");
+const dailySettingPointChart = document.getElementById("dailySettingPointChart");
 const monthlyRevenueChart = document.getElementById("monthlyRevenueChart");
 const yearlyRevenueChart = document.getElementById("yearlyRevenueChart");
 
@@ -28,35 +28,50 @@ if (monthlyPointChart && window.Chart) {
     });
 }
 
-if (settingTargetChart && window.Chart) {
-    const labels = JSON.parse(settingTargetChart.dataset.labels || "[]");
-    const values = JSON.parse(settingTargetChart.dataset.values || "[]");
-    const colors = JSON.parse(settingTargetChart.dataset.colors || "[]");
-    const userDatasets = labels.map((label, index) => ({
-        label,
-        data: values.map((value, valueIndex) => (valueIndex === index ? value : null)),
-        backgroundColor: colors[index] || "#6C757D",
-        borderRadius: 6,
-    }));
+if (dailySettingPointChart && window.Chart) {
+    const labels = JSON.parse(dailySettingPointChart.dataset.labels || "[]");
+    const values = JSON.parse(dailySettingPointChart.dataset.values || "[]");
+    const tooltips = JSON.parse(dailySettingPointChart.dataset.tooltips || "[]");
 
-    new Chart(settingTargetChart, {
+    new Chart(dailySettingPointChart, {
         type: "bar",
         data: {
             labels,
-            datasets: userDatasets,
+            datasets: [
+                {
+                    label: "Poin Setting Harian",
+                    data: values,
+                    backgroundColor: "#c5162e",
+                    borderRadius: 6,
+                },
+            ],
         },
         options: {
             responsive: true,
             plugins: {
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
+                        title: (items) => {
+                            const item = items[0] || {};
+                            const tooltip = tooltips[item.dataIndex] || {};
+                            return tooltip.date ? `Tanggal: ${tooltip.date}` : "";
+                        },
                         label: (context) => {
-                            return `${context.dataset.label}: ${context.raw} total point setting`;
+                            const tooltip = tooltips[context.dataIndex] || {};
+                            return [
+                                `Hari: ${tooltip.day_name || "-"}`,
+                                `Total poin: ${tooltip.total_point || 0}`,
+                                `Jumlah SO yang dikerjakan: ${tooltip.so_count || 0}`,
+                            ];
                         },
                     },
                 },
             },
-            scales: { y: { beginAtZero: true } },
+            scales: {
+                x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 16 } },
+                y: { beginAtZero: true },
+            },
         },
     });
 }

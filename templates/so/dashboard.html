@@ -57,24 +57,69 @@
 </div>
 
 <div class="panel mt-4">
-    <div class="section-title">Poin Setting Bulanan</div>
-    <div class="dashboard-target-summary mb-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div class="section-title mb-0">Poin Setting Harian</div>
+        <form class="d-flex flex-wrap gap-2" method="get">
+            <select class="form-select form-select-sm w-auto" name="month" aria-label="Bulan">
+                {% for month_value, month_label in daily_setting.month_options %}
+                    <option value="{{ month_value }}" {% if month_value == daily_setting.month %}selected{% endif %}>{{ month_label }}</option>
+                {% endfor %}
+            </select>
+            <select class="form-select form-select-sm w-auto" name="year" aria-label="Tahun">
+                {% for year_value in daily_setting.year_options %}
+                    <option value="{{ year_value }}" {% if year_value == daily_setting.year %}selected{% endif %}>{{ year_value }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-sm btn-outline-dark" type="submit">Terapkan</button>
+        </form>
+    </div>
+    <div class="dashboard-target-summary dashboard-setting-summary mb-4">
         <div>
-            <span>Total Poin Setting Bulan Ini</span>
-            <strong>{{ setting_progress.total_point|number(1) }}</strong>
+            <span>Total Poin Bulan Ini</span>
+            <strong>{{ daily_setting.summary.total_point|number(1) }}</strong>
+        </div>
+        <div>
+            <span>Rata-rata Poin per Hari Aktif</span>
+            <strong>{{ daily_setting.summary.active_day_average|number(1) }}</strong>
+        </div>
+        <div>
+            <span>Hari Paling Ramai</span>
+            <strong class="dashboard-summary-text">{{ daily_setting.summary.busiest_day }}</strong>
+        </div>
+        <div>
+            <span>Total SO Disetting Bulan Ini</span>
+            <strong>{{ daily_setting.summary.total_so }}</strong>
         </div>
         <div>
             <span>User Poin Setting Tertinggi</span>
             <strong>{{ setting_progress.top_user.name if setting_progress.top_user else '-' }}</strong>
         </div>
     </div>
-    {% if setting_progress.rows %}
-        <canvas id="settingTargetChart"
-                data-labels='{{ setting_progress["labels"]|tojson }}'
-                data-values='{{ setting_progress["values"]|tojson }}'
-                data-colors='{{ setting_progress["colors"]|tojson }}'></canvas>
-    {% else %}
-        <div class="text-muted">Belum ada poin setting pada bulan berjalan.</div>
-    {% endif %}
+    <canvas id="dailySettingPointChart"
+            data-labels='{{ daily_setting["labels"]|tojson }}'
+            data-values='{{ daily_setting["values"]|tojson }}'
+            data-tooltips='{{ daily_setting["tooltips"]|tojson }}'></canvas>
+
+    <div class="mt-4">
+        <div class="section-title">Rata-rata Poin Berdasarkan Hari</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Hari</th>
+                        <th class="text-end">Rata-rata Poin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in daily_setting.weekday_averages %}
+                        <tr>
+                            <td>{{ row.day_name }}</td>
+                            <td class="text-end">{{ row.average_point|number(1) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

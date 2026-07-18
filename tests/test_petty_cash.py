@@ -6,7 +6,7 @@ from app import create_app
 from config import Config
 from database.db import db
 from models import Brand, Nota, NotaCustomer, NotaPayment, User
-from models.petty_cash import PettyCashTransaction
+from models.petty_cash import ExpenseCategoryGroup, PettyCashCategory, PettyCashTransaction
 from services.nota_service import add_payment, update_payment, void_payment
 from services.petty_cash_service import (
     SOURCE_CAPITAL_ADDITION,
@@ -14,6 +14,7 @@ from services.petty_cash_service import (
     SOURCE_EMPLOYEE_CASH_ADVANCE_RETURN,
     SOURCE_OFFLINE_SALE,
     SOURCE_OPENING_BALANCE,
+    SOURCE_OPERATING_EXPENSE,
     SOURCE_OWNER_WITHDRAWAL,
     SOURCE_TRANSFER_TO_MAIN_CASH,
     SOURCE_ALLOWANCE_RESERVE,
@@ -21,6 +22,7 @@ from services.petty_cash_service import (
     create_income,
     current_balance,
     petty_cash_detail_report,
+    upsert_category,
     void_transaction,
 )
 
@@ -183,6 +185,107 @@ class PettyCashTestCase(unittest.TestCase):
         self.assertIn("LAPORAN DETAIL KAS KECIL", detail_text)
         self.assertIn("REKAP PENGELUARAN BERDASARKAN KELOMPOK", detail_text)
         self.assertIn("DETAIL TRANSAKSI KAS KECIL", detail_text)
+
+    def test_category_form_uses_group_dropdown_and_hides_manual_code(self):
+        client = self.app.test_client()
+        client.post("/auth/login", data={"username": "admin", "password": "admin"})
+        html = client.get("/keuangan/kategori").data.decode()
+        self.assertIn('name="group_id"', html)
+        self.assertIn("+ Tambah Kelompok Baru", html)
+        self.assertIn("Kode Otomatis", html)
+        self.assertIn('id="automaticCode"', html)
+        self.assertNotIn('name="category_code"', html)
+
+    def test_create_category_with_existing_group_generates_code(self):
+        group = ExpenseCategoryGroup.query.filter_by(name="Produksi dan Packaging").first()
+        category = upsert_category(
+            _form(
+                group_id=str(group.id),
+                category_name="Label Hangtag",
+                category_type=SOURCE_OPERATING_EXPENSE,
+                is_operational_expense="on",
+                is_active="on",
+                sort_order="99",
+            )
+        )
+        self.assertEqual(category.group_name, "Produksi dan Packaging")
+        self.assertEqual(category.category_code, "PROD_LABEL_HANGTAG")
+        self.assertEqual(category.sort_order, 7)
+        shifted = PettyCashCategory.query.filter_by(category_code="LOG_PICKUP").first()
+        self.assertEqual(shifted.sort_order, 8)
+
+    def test_new_group_is_saved_and_duplicate_group_is_rejected(self):
+        next_order = (db.session.query(db.func.max(PettyCashCategory.sort_order)).scalar() or 0) + 1
+        category = upsert_category(
+            _form(
+                group_id="__new__",
+                new_group_name="Perawatan Mesin",
+                new_group_prefix="MAINTX",
+                category_name="Oli Mesin",
+                category_type=SOURCE_OPERATING_EXPENSE,
+                is_operational_expense="on",
+                is_active="on",
+            )
+        )
+        self.assertEqual(category.group.code_prefix, "MAINTX")
+        self.assertEqual(category.category_code, "MAINTX_OLI_MESIN")
+        self.assertEqual(category.sort_order, next_order)
+        self.assertIsNotNone(ExpenseCategoryGroup.query.filter_by(normalized_name="perawatan mesin").first())
+        with self.assertRaisesRegex(ValueError, "Kelompok tersebut sudah tersedia."):
+            upsert_category(
+                _form(
+                    group_id="__new__",
+                    new_group_name=" perawatan mesin ",
+                    new_group_prefix="MACHINE",
+                    category_name="Sparepart",
+                    category_type=SOURCE_OPERATING_EXPENSE,
+                    is_active="on",
+                )
+            )
+
+    def test_duplicate_subcategory_only_rejected_inside_same_group(self):
+        prod_group = ExpenseCategoryGroup.query.filter_by(name="Produksi dan Packaging").first()
+        admin_group = ExpenseCategoryGroup.query.filter_by(name="Administrasi dan Perkantoran").first()
+        with self.assertRaisesRegex(ValueError, "Subkategori tersebut sudah tersedia pada kelompok yang dipilih."):
+            upsert_category(
+                _form(
+                    group_id=str(prod_group.id),
+                    category_name=" packaging produk ",
+                    category_type=SOURCE_OPERATING_EXPENSE,
+                    is_active="on",
+                )
+            )
+        category = upsert_category(
+            _form(
+                group_id=str(admin_group.id),
+                category_name="Packaging Produk",
+                category_type=SOURCE_OPERATING_EXPENSE,
+                is_operational_expense="on",
+                is_active="on",
+            )
+        )
+        self.assertEqual(category.group_name, "Administrasi dan Perkantoran")
+        self.assertEqual(category.category_code, "ADM_PACKAGING_PRODUK")
+
+    def test_used_category_edit_keeps_historical_code(self):
+        create_income(_form(transaction_date="2026-07-01", source_type=SOURCE_OPENING_BALANCE, amount="1000000"), self.user)
+        category = _category_by_name("Packaging Produk")
+        create_expense(_form(transaction_date="2026-07-02", category_id=str(category.id), amount="100000", description="Packaging"), self.user)
+        original_code = category.category_code
+        admin_group = ExpenseCategoryGroup.query.filter_by(name="Administrasi dan Perkantoran").first()
+        updated = upsert_category(
+            _form(
+                category_id=str(category.id),
+                group_id=str(admin_group.id),
+                category_name="Packaging Admin",
+                category_type=SOURCE_OPERATING_EXPENSE,
+                is_operational_expense="on",
+                is_active="on",
+                sort_order=str(category.sort_order),
+            )
+        )
+        self.assertEqual(updated.category_code, original_code)
+        self.assertEqual(PettyCashTransaction.query.filter_by(category_id=category.id).first().category.category_code, original_code)
 
     def test_detail_pdf_report_calculation_matches_required_example(self):
         create_income(_form(transaction_date="2026-07-01", source_type=SOURCE_OPENING_BALANCE, amount="1000000"), self.user)

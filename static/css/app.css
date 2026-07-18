@@ -139,7 +139,7 @@ a {
 .module-grid {
     display: grid;
     gap: 16px;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
 .module-card {
@@ -187,6 +187,16 @@ a {
     color: #687182;
     font-size: 0.92rem;
     margin: 0;
+}
+
+.dashboard-summary-text {
+    font-size: clamp(1rem, 1.3vw, 1.25rem) !important;
+}
+
+@media (min-width: 1200px) {
+    .module-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 .crm-detail-header {
@@ -530,6 +540,16 @@ a {
     font-size: 1.15rem;
     line-height: 1.2;
     overflow-wrap: anywhere;
+}
+
+.dashboard-setting-summary {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+@media (min-width: 1200px) {
+    .dashboard-setting-summary {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
 }
 
 .so-media-preview,

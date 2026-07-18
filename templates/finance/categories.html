@@ -8,13 +8,30 @@
     <h2 class="section-title">Tambah atau Edit Kategori</h2>
     <form method="post" class="row g-3">
         <input type="hidden" name="category_id" id="categoryId">
-        <div class="col-md-3"><label class="form-label">Kelompok</label><input class="form-control" name="group_name" id="groupName" required></div>
-        <div class="col-md-3"><label class="form-label">Subkategori</label><input class="form-control" name="category_name" id="categoryName" required></div>
-        <div class="col-md-2"><label class="form-label">Kode</label><input class="form-control" name="category_code" id="categoryCode" required></div>
+        <div class="col-xl-3 col-md-6">
+            <label class="form-label">Kelompok</label>
+            <select class="form-select" name="group_id" id="groupSelect" required>
+                <option value="">Pilih Kelompok</option>
+                {% for group in expense_groups %}
+                    <option value="{{ group.id }}" data-prefix="{{ group.code_prefix }}">{{ group.name }}</option>
+                {% endfor %}
+                <option value="__new__">+ Tambah Kelompok Baru</option>
+            </select>
+        </div>
+        <div class="col-xl-3 col-md-6"><label class="form-label">Subkategori</label><input class="form-control" name="category_name" id="categoryName" required></div>
         <div class="col-md-2"><label class="form-label">Tipe</label><select class="form-select" name="category_type" id="categoryType">{% for code, label in type_labels.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></div>
-        <div class="col-md-1"><label class="form-label">Urut</label><input type="number" class="form-control" name="sort_order" id="sortOrder" value="0"></div>
+        <div class="col-md-1"><label class="form-label">Urut</label><input type="number" class="form-control" name="sort_order" id="sortOrder" value="{{ next_category_sort_order }}" readonly></div>
         <div class="col-md-1 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" id="isActive" checked><label class="form-check-label" for="isActive">Aktif</label></div></div>
-        <div class="col-md-3"><div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_operational_expense" id="isOperational" checked><label class="form-check-label" for="isOperational">Biaya operasional</label></div></div>
+        <div class="col-12 row g-3 d-none" id="newGroupFields">
+            <div class="col-md-6"><label class="form-label">Nama Kelompok Baru</label><input class="form-control" name="new_group_name" id="newGroupName"></div>
+            <div class="col-md-3"><label class="form-label">Prefix Kelompok</label><input class="form-control text-uppercase" name="new_group_prefix" id="newGroupPrefix" maxlength="30" pattern="[A-Z0-9]+"></div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Kode Otomatis</label>
+            <input class="form-control" id="automaticCode" readonly>
+            <div class="form-text">Urutan dibuat otomatis berdasarkan kelompok yang dipilih.</div>
+        </div>
+        <div class="col-md-3 d-flex align-items-end"><div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_operational_expense" id="isOperational" checked><label class="form-check-label" for="isOperational">Biaya operasional</label></div></div>
         <div class="col-12 d-flex justify-content-end"><button class="btn btn-rdr">Simpan Kategori</button></div>
     </form>
 </section>
@@ -33,7 +50,7 @@
                     <td>{{ 'Ya' if category.is_operational_expense else 'Tidak' }}</td>
                     <td><span class="badge {{ 'text-bg-success' if category.is_active else 'text-bg-secondary' }}">{{ 'Aktif' if category.is_active else 'Nonaktif' }}</span></td>
                     <td class="d-flex flex-wrap gap-1">
-                        <button class="btn btn-sm btn-outline-dark" type="button" data-edit='{"id":"{{ category.id }}","group":"{{ category.group_name }}","name":"{{ category.category_name }}","code":"{{ category.category_code }}","type":"{{ category.category_type }}","sort":"{{ category.sort_order }}","active":{{ 'true' if category.is_active else 'false' }},"operational":{{ 'true' if category.is_operational_expense else 'false' }}}'>Edit</button>
+                        <button class="btn btn-sm btn-outline-dark" type="button" data-edit='{{ {"id": category.id, "group_id": category.group_id, "group": category.group_name, "name": category.category_name, "code": category.category_code, "type": category.category_type, "sort": category.sort_order, "active": category.is_active, "operational": category.is_operational_expense, "used": (category.transactions|length > 0)}|tojson }}'>Edit</button>
                         {% if category.is_active %}
                             <form method="post" action="{{ url_for('finance.category_deactivate', category_id=category.id) }}"><button class="btn btn-sm btn-outline-danger">Nonaktifkan</button></form>
                         {% else %}
@@ -49,19 +66,116 @@
 {% endblock %}
 {% block scripts %}
 <script>
+const groupSelect = document.getElementById('groupSelect');
+const categoryName = document.getElementById('categoryName');
+const automaticCode = document.getElementById('automaticCode');
+const newGroupFields = document.getElementById('newGroupFields');
+const newGroupName = document.getElementById('newGroupName');
+const newGroupPrefix = document.getElementById('newGroupPrefix');
+const sortOrder = document.getElementById('sortOrder');
+const categoryOrderRows = {{ category_order_rows|tojson }};
+const fallbackNextSortOrder = Number({{ next_category_sort_order|tojson }});
+let lockedCode = '';
+let editingCategory = false;
+
+const normalizePrefix = (value) => (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const slugCode = (value) => (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 40);
+const suggestPrefix = (value) => {
+    const words = (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .split(/[^A-Z0-9]+/)
+        .filter((word) => word && !['DAN', 'YANG', 'KE'].includes(word));
+    if (!words.length) return '';
+    if (words.length === 1) return words[0].slice(0, 8);
+    return words.map((word) => word.slice(0, 2)).join('').slice(0, 8);
+};
+const selectedPrefix = () => {
+    if (groupSelect.value === '__new__') return normalizePrefix(newGroupPrefix.value);
+    const selected = groupSelect.options[groupSelect.selectedIndex];
+    return selected ? normalizePrefix(selected.dataset.prefix) : '';
+};
+const updateNewGroupFields = () => {
+    const isNew = groupSelect.value === '__new__';
+    newGroupFields.classList.toggle('d-none', !isNew);
+    newGroupName.required = isNew;
+    newGroupPrefix.required = isNew;
+};
+const updateAutomaticCode = () => {
+    if (lockedCode) {
+        automaticCode.value = lockedCode;
+        return;
+    }
+    const prefix = selectedPrefix();
+    const slug = slugCode(categoryName.value);
+    automaticCode.value = prefix && slug ? `${prefix}_${slug}` : '';
+};
+const nextSortOrderForGroup = () => {
+    if (groupSelect.value === '__new__') return fallbackNextSortOrder;
+    const selectedGroupId = Number(groupSelect.value || 0);
+    const groupRows = categoryOrderRows.filter((row) => Number(row.group_id || 0) === selectedGroupId);
+    if (!groupRows.length) return fallbackNextSortOrder;
+    return Math.max(...groupRows.map((row) => Number(row.sort_order || 0))) + 1;
+};
+const updateSortOrderPreview = () => {
+    if (!editingCategory) sortOrder.value = nextSortOrderForGroup();
+};
+
+groupSelect.addEventListener('change', () => {
+    lockedCode = '';
+    updateNewGroupFields();
+    updateAutomaticCode();
+    updateSortOrderPreview();
+});
+categoryName.addEventListener('input', () => {
+    lockedCode = '';
+    updateAutomaticCode();
+    updateSortOrderPreview();
+});
+newGroupName.addEventListener('input', () => {
+    if (!newGroupPrefix.dataset.touched) {
+        newGroupPrefix.value = suggestPrefix(newGroupName.value);
+    }
+    updateAutomaticCode();
+});
+newGroupPrefix.addEventListener('input', () => {
+    newGroupPrefix.dataset.touched = '1';
+    newGroupPrefix.value = normalizePrefix(newGroupPrefix.value);
+    updateAutomaticCode();
+});
+
 document.querySelectorAll('[data-edit]').forEach((button) => {
     button.addEventListener('click', () => {
         const row = JSON.parse(button.dataset.edit);
+        editingCategory = true;
         categoryId.value = row.id;
-        groupName.value = row.group;
+        const groupOption = Array.from(groupSelect.options).find((option) => option.value === String(row.group_id));
+        groupSelect.value = groupOption ? String(row.group_id) : '';
         categoryName.value = row.name;
-        categoryCode.value = row.code;
+        lockedCode = row.used ? row.code : '';
+        automaticCode.value = row.code;
         categoryType.value = row.type;
         sortOrder.value = row.sort;
         isActive.checked = row.active;
         isOperational.checked = row.operational;
+        newGroupName.value = '';
+        newGroupPrefix.value = '';
+        delete newGroupPrefix.dataset.touched;
+        updateNewGroupFields();
+        if (!lockedCode) updateAutomaticCode();
         window.scrollTo({top: 0, behavior: 'smooth'});
     });
 });
+updateNewGroupFields();
+updateAutomaticCode();
+updateSortOrderPreview();
 </script>
 {% endblock %}

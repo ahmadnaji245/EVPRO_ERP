@@ -36,5 +36,14 @@
             </div>
         </a>
     {% endif %}
+    {% if has_permission('can_access_finance') %}
+        <a class="module-card" href="{{ url_for('finance.dashboard') }}">
+            <div class="module-card-icon"><i class="bi bi-wallet2"></i></div>
+            <div>
+                <h2>Keuangan</h2>
+                <p>Kas kecil, transaksi tunai, pengeluaran, dan laporan keuangan.</p>
+            </div>
+        </a>
+    {% endif %}
 </div>
 {% endblock %}

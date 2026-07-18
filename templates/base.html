@@ -40,7 +40,7 @@
                     {% if has_permission('crm.view') %}
                         <a class="nav-link {{ 'active' if is_crm_module else '' }}" href="{{ url_for('crm.dashboard') }}">CRM</a>
                     {% endif %}
-                    {% if has_permission('finance.view') %}
+                    {% if has_permission('can_access_finance') %}
                         <a class="nav-link {{ 'active' if is_finance_module else '' }}" href="{{ url_for('finance.dashboard') }}">Keuangan</a>
                     {% endif %}
                     <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
@@ -118,7 +118,7 @@
 {% endif %}
 
 {% set show_finance_shell = current_user.is_authenticated and request.endpoint and request.endpoint.startswith('finance.') %}
-{% if show_finance_shell and has_permission('finance.view') %}
+{% if show_finance_shell and has_permission('can_access_finance') %}
     <nav class="nota-subnav" aria-label="Keuangan navigation">
         <div class="container-fluid">
             <div class="nota-subnav-inner">

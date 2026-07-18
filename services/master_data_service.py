@@ -1,4 +1,5 @@
 from database.db import db
+from sqlalchemy import func
 
 
 def list_rows(model):
@@ -7,6 +8,11 @@ def list_rows(model):
 
 def list_active_rows(model):
     return model.query.filter_by(status="active").order_by(model.sort_order, model.name).all()
+
+
+def get_next_sort_order(model):
+    max_order = db.session.query(func.coalesce(func.max(model.sort_order), 0)).scalar() or 0
+    return int(max_order) + 1
 
 
 def get_row(model, row_id):
@@ -31,7 +37,7 @@ def create_row(model, form):
     row = model(
         name=form.get("name", "").strip(),
         status=form.get("status") or "active",
-        sort_order=int(form.get("sort_order") or 0),
+        sort_order=get_next_sort_order(model),
     )
     _apply_item_options(row, form)
     db.session.add(row)

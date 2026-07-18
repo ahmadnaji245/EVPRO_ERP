@@ -1,3 +1,4 @@
+import calendar
 from datetime import date
 
 from models import ProductionChecklist, SalesOrderDesign, SalesOrderPlayer, Setting
@@ -16,6 +17,23 @@ SETTING_POINT_CHART_COLORS = [
     "#E83E8C",
     "#6610F2",
 ]
+
+MONTH_OPTIONS = [
+    (1, "Januari"),
+    (2, "Februari"),
+    (3, "Maret"),
+    (4, "April"),
+    (5, "Mei"),
+    (6, "Juni"),
+    (7, "Juli"),
+    (8, "Agustus"),
+    (9, "September"),
+    (10, "Oktober"),
+    (11, "November"),
+    (12, "Desember"),
+]
+
+DAY_NAMES = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 
 
 def dashboard_stats():
@@ -87,24 +105,15 @@ def _player_setting_point(player):
     return order.brand.point_per_size if order and order.brand else 1
 
 
-def monthly_setting_point_progress():
+def monthly_setting_point_progress(month=None, year=None):
     today = date.today()
+    month = _valid_month(month, today.month)
+    year = _valid_year(year, today.year)
     users = {}
 
-    checklists = (
-        ProductionChecklist.query.join(SalesOrderPlayer)
-        .join(SalesOrderDesign)
-        .join(SalesOrder)
-        .filter(
-            ProductionChecklist.setting_done.is_(True),
-            SalesOrder.is_deleted.is_(False),
-            SalesOrder.deleted_at.is_(None),
-        )
-        .all()
-    )
-    for checklist in checklists:
+    for checklist in _setting_checklists():
         setting_at = _checklist_setting_at(checklist)
-        if not setting_at or setting_at.year != today.year or setting_at.month != today.month:
+        if not setting_at or setting_at.year != year or setting_at.month != month:
             continue
         user_id = _checklist_setting_user_id(checklist) or f"name:{_checklist_setting_user_name(checklist)}"
         row = users.setdefault(
@@ -132,3 +141,130 @@ def monthly_setting_point_progress():
         "values": [row["total_point"] for row in rows],
         "colors": [row["color"] for row in rows],
     }
+
+
+def daily_setting_point_chart(month=None, year=None):
+    today = date.today()
+    month = _valid_month(month, today.month)
+    year = _valid_year(year, today.year)
+    days_in_month = calendar.monthrange(year, month)[1]
+    daily_rows = {}
+    month_so_ids = set()
+
+    for day in range(1, days_in_month + 1):
+        current = date(year, month, day)
+        daily_rows[day] = {
+            "date": current,
+            "label": f"{day:02d} {MONTH_OPTIONS[month - 1][1][:3]}",
+            "day_name": DAY_NAMES[current.weekday()],
+            "total_point": 0,
+            "so_ids": set(),
+        }
+
+    for checklist in _setting_checklists():
+        setting_at = _checklist_setting_at(checklist)
+        if not setting_at or setting_at.year != year or setting_at.month != month:
+            continue
+        order = checklist.player.design.sales_order if checklist.player and checklist.player.design else None
+        day_row = daily_rows[setting_at.day]
+        day_row["total_point"] += _player_setting_point(checklist.player)
+        if order:
+            day_row["so_ids"].add(order.id)
+            month_so_ids.add(order.id)
+
+    rows = []
+    for day in range(1, days_in_month + 1):
+        row = daily_rows[day]
+        rows.append(
+            {
+                "date": row["date"],
+                "label": row["label"],
+                "day_name": row["day_name"],
+                "total_point": row["total_point"],
+                "so_count": len(row["so_ids"]),
+            }
+        )
+
+    total_point = sum(row["total_point"] for row in rows)
+    active_rows = [row for row in rows if row["total_point"] > 0]
+    busiest_day = max(rows, key=lambda row: (row["total_point"], -row["date"].day)) if rows else None
+    weekday_rows = []
+    for weekday_index, day_name in enumerate(DAY_NAMES):
+        weekday_days = [row for row in rows if row["date"].weekday() == weekday_index]
+        total_weekday_point = sum(row["total_point"] for row in weekday_days)
+        weekday_rows.append(
+            {
+                "day_name": day_name,
+                "average_point": (total_weekday_point / len(weekday_days)) if weekday_days else 0,
+            }
+        )
+
+    return {
+        "month": month,
+        "year": year,
+        "month_options": MONTH_OPTIONS,
+        "year_options": _year_options(year),
+        "labels": [row["label"] for row in rows],
+        "values": [row["total_point"] for row in rows],
+        "tooltips": [
+            {
+                "date": _format_indonesian_date(row["date"]),
+                "day_name": row["day_name"],
+                "total_point": row["total_point"],
+                "so_count": row["so_count"],
+            }
+            for row in rows
+        ],
+        "summary": {
+            "total_point": total_point,
+            "active_day_average": (total_point / len(active_rows)) if active_rows else 0,
+            "busiest_day": _format_busiest_day(busiest_day) if busiest_day and busiest_day["total_point"] > 0 else "-",
+            "total_so": len(month_so_ids),
+        },
+        "weekday_averages": weekday_rows,
+    }
+
+
+def _setting_checklists():
+    return (
+        ProductionChecklist.query.join(SalesOrderPlayer)
+        .join(SalesOrderDesign)
+        .join(SalesOrder)
+        .filter(
+            ProductionChecklist.setting_done.is_(True),
+            SalesOrder.is_deleted.is_(False),
+            SalesOrder.deleted_at.is_(None),
+        )
+        .all()
+    )
+
+
+def _valid_month(value, default):
+    try:
+        month = int(value)
+    except (TypeError, ValueError):
+        return default
+    return month if 1 <= month <= 12 else default
+
+
+def _valid_year(value, default):
+    try:
+        year = int(value)
+    except (TypeError, ValueError):
+        return default
+    return year if 2000 <= year <= 2100 else default
+
+
+def _year_options(selected_year):
+    today = date.today()
+    start_year = min(2020, selected_year, today.year)
+    end_year = max(today.year + 1, selected_year)
+    return list(range(end_year, start_year - 1, -1))
+
+
+def _format_indonesian_date(value):
+    return f"{value.day} {MONTH_OPTIONS[value.month - 1][1]} {value.year}"
+
+
+def _format_busiest_day(row):
+    return f"{row['day_name']}, {_format_indonesian_date(row['date'])}"

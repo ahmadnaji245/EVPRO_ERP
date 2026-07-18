@@ -851,17 +851,15 @@ def ensure_v09_finance_schema():
         _create_index_if_missing("ix_nota_payments_payment_method", "nota_payments", "payment_method")
         _create_index_if_missing("ix_nota_payments_is_void", "nota_payments", "is_void")
 
-    if not _table_exists("petty_cash_categories"):
+    if not _table_exists("expense_category_groups"):
         db.session.execute(
             text(
                 """
-                CREATE TABLE petty_cash_categories (
+                CREATE TABLE expense_category_groups (
                     id INTEGER NOT NULL PRIMARY KEY,
-                    group_name VARCHAR(120) NOT NULL,
-                    category_name VARCHAR(150) NOT NULL,
-                    category_code VARCHAR(80) NOT NULL UNIQUE,
-                    category_type VARCHAR(40) NOT NULL DEFAULT 'OPERATING_EXPENSE',
-                    is_operational_expense BOOLEAN NOT NULL DEFAULT 1,
+                    name VARCHAR(120) NOT NULL UNIQUE,
+                    normalized_name VARCHAR(120) NOT NULL UNIQUE,
+                    code_prefix VARCHAR(30) NOT NULL UNIQUE,
                     is_active BOOLEAN NOT NULL DEFAULT 1,
                     sort_order INTEGER NOT NULL DEFAULT 0,
                     created_at DATETIME NOT NULL,
@@ -871,6 +869,35 @@ def ensure_v09_finance_schema():
             )
         )
         db.session.commit()
+    _create_index_if_missing("ix_expense_category_groups_name", "expense_category_groups", "name", unique=True)
+    _create_index_if_missing("ix_expense_category_groups_normalized_name", "expense_category_groups", "normalized_name", unique=True)
+    _create_index_if_missing("ix_expense_category_groups_code_prefix", "expense_category_groups", "code_prefix", unique=True)
+    _create_index_if_missing("ix_expense_category_groups_is_active", "expense_category_groups", "is_active")
+
+    if not _table_exists("petty_cash_categories"):
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE petty_cash_categories (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    group_id INTEGER,
+                    group_name VARCHAR(120) NOT NULL,
+                    category_name VARCHAR(150) NOT NULL,
+                    category_code VARCHAR(80) NOT NULL UNIQUE,
+                    category_type VARCHAR(40) NOT NULL DEFAULT 'OPERATING_EXPENSE',
+                    is_operational_expense BOOLEAN NOT NULL DEFAULT 1,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(group_id) REFERENCES expense_category_groups (id)
+                )
+                """
+            )
+        )
+        db.session.commit()
+    _add_column_if_missing("petty_cash_categories", "group_id", "INTEGER")
+    _create_index_if_missing("ix_petty_cash_categories_group_id", "petty_cash_categories", "group_id")
     _create_index_if_missing("ix_petty_cash_categories_group_name", "petty_cash_categories", "group_name")
     _create_index_if_missing("ix_petty_cash_categories_category_code", "petty_cash_categories", "category_code", unique=True)
     _create_index_if_missing("ix_petty_cash_categories_category_type", "petty_cash_categories", "category_type")

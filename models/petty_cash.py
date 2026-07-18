@@ -7,6 +7,7 @@ class PettyCashCategory(db.Model):
     __tablename__ = "petty_cash_categories"
 
     id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey("expense_category_groups.id"), index=True)
     group_name = db.Column(db.String(120), nullable=False, index=True)
     category_name = db.Column(db.String(150), nullable=False)
     category_code = db.Column(db.String(80), nullable=False, unique=True, index=True)
@@ -18,6 +19,22 @@ class PettyCashCategory(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     transactions = db.relationship("PettyCashTransaction", back_populates="category")
+    group = db.relationship("ExpenseCategoryGroup", back_populates="categories")
+
+
+class ExpenseCategoryGroup(db.Model):
+    __tablename__ = "expense_category_groups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    normalized_name = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    code_prefix = db.Column(db.String(30), nullable=False, unique=True, index=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    categories = db.relationship("PettyCashCategory", back_populates="group")
 
 
 class PettyCashTransaction(db.Model):

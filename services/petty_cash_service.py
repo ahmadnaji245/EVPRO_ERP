@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from io import BytesIO
 from types import SimpleNamespace
@@ -11,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 from database.db import db
 from models import NotaPayment, User
-from models.petty_cash import AllowanceReserve, EmployeeCashAdvance, FinancialAuditLog, PettyCashCategory, PettyCashTransaction
+from models.petty_cash import AllowanceReserve, EmployeeCashAdvance, ExpenseCategoryGroup, FinancialAuditLog, PettyCashCategory, PettyCashTransaction
 from services.nota_service import display_nota_number
 from utils.formatters import pretty_date, rupiah
 
@@ -125,20 +126,45 @@ DEFAULT_CATEGORIES = [
     ("Pengeluaran Lainnya", "Pengeluaran Lainnya", "OTHER_EXPENSE", SOURCE_OPERATING_EXPENSE, True),
 ]
 
+DEFAULT_GROUP_PREFIXES = {
+    "Produksi dan Packaging": "PROD",
+    "Transportasi dan Logistik": "LOG",
+    "Gaji, Upah, dan Insentif": "PAY",
+    "Konsumsi dan Kegiatan Karyawan": "MEAL",
+    "Administrasi dan Perkantoran": "ADM",
+    "Sewa dan Utilitas": "UTIL",
+    "Pemeliharaan dan Perbaikan": "MAINT",
+    "Kasbon Karyawan": "ADVANCE",
+    "Penyisihan Tunjangan": "ALLOW",
+    "Transfer ke Kas Besar": "TRANSFER",
+    "Prive/Pengambilan Pemilik": "OWNER",
+    "Pengeluaran Lainnya": "OTHER",
+    "Operasional Kantor": "OPS",
+    "Transportasi": "TRANS",
+    "Karyawan": "EMP",
+    "Marketing": "MKT",
+    "Tunjangan": "ALLOWANCE",
+    "Lainnya": "OTHER",
+}
+
 
 def seed_default_petty_cash_categories():
+    _sync_expense_category_groups()
     existing = {row.category_code: row for row in PettyCashCategory.query.all()}
     for index, (group, name, code, category_type, operational) in enumerate(DEFAULT_CATEGORIES, start=1):
+        group_row = _ensure_expense_category_group(group, sort_order=index)
         category = existing.get(code)
         if not category:
             category = PettyCashCategory(category_code=code)
             db.session.add(category)
-        category.group_name = group
+        category.group = group_row
+        category.group_name = group_row.name
         category.category_name = name
         category.category_type = category_type
         category.is_operational_expense = operational
         category.sort_order = index
     db.session.commit()
+    _sync_category_group_ids()
 
 
 def categories(active_only=False):
@@ -154,6 +180,225 @@ def category_groups(active_only=False):
     for category in rows:
         grouped.setdefault(category.group_name, []).append(category)
     return grouped
+
+
+def expense_category_groups(active_only=False):
+    _sync_expense_category_groups()
+    query = ExpenseCategoryGroup.query
+    if active_only:
+        query = query.filter(ExpenseCategoryGroup.is_active.is_(True))
+    return query.order_by(ExpenseCategoryGroup.sort_order.asc(), ExpenseCategoryGroup.name.asc()).all()
+
+
+def suggested_category_code(form):
+    group, _, _ = _resolve_category_group(form, persist=False)
+    category_name = _clean_label(form.get("category_name"))
+    if not group or not category_name:
+        return ""
+    return _unique_category_code(group.code_prefix, category_name, None)
+
+
+def suggested_category_sort_order(form):
+    group, _, _ = _resolve_category_group(form, persist=False)
+    if not group:
+        return _next_category_sort_order_for_new_group()
+    return _next_category_sort_order_for_group(group)
+
+
+def _sync_expense_category_groups():
+    sort_lookup = {}
+    for index, (group_name, _, _, _, _) in enumerate(DEFAULT_CATEGORIES, start=1):
+        sort_lookup.setdefault(_normalize_label(group_name), index)
+        _ensure_expense_category_group(group_name, sort_order=index)
+    existing_names = [
+        row[0]
+        for row in db.session.query(PettyCashCategory.group_name)
+        .filter(PettyCashCategory.group_name.isnot(None), PettyCashCategory.group_name != "")
+        .distinct()
+        .all()
+    ]
+    for group_name in existing_names:
+        _ensure_expense_category_group(group_name, sort_order=sort_lookup.get(_normalize_label(group_name), 999))
+    db.session.flush()
+    _sync_category_group_ids()
+    db.session.commit()
+
+
+def _sync_category_group_ids():
+    groups = {group.normalized_name: group for group in ExpenseCategoryGroup.query.all()}
+    for category in PettyCashCategory.query.filter(PettyCashCategory.group_name.isnot(None)).all():
+        group = groups.get(_normalize_label(category.group_name))
+        if group:
+            category.group = group
+            category.group_name = group.name
+
+
+def _ensure_expense_category_group(group_name, code_prefix=None, sort_order=0):
+    name = _clean_label(group_name)
+    normalized = _normalize_label(name)
+    if not normalized:
+        return None
+    existing = ExpenseCategoryGroup.query.filter(ExpenseCategoryGroup.normalized_name == normalized).first()
+    if existing:
+        if code_prefix:
+            prefix = _normalize_prefix(code_prefix)
+            if prefix and prefix != existing.code_prefix:
+                duplicate = ExpenseCategoryGroup.query.filter(ExpenseCategoryGroup.code_prefix == prefix, ExpenseCategoryGroup.id != existing.id).first()
+                if duplicate:
+                    raise ValueError("Prefix kelompok sudah digunakan.")
+                existing.code_prefix = prefix
+        existing.name = name
+        existing.sort_order = existing.sort_order or sort_order
+        return existing
+
+    prefix = _normalize_prefix(code_prefix) or DEFAULT_GROUP_PREFIXES.get(name) or _suggest_group_prefix(name)
+    prefix = _unique_group_prefix(prefix)
+    group = ExpenseCategoryGroup(
+        name=name,
+        normalized_name=normalized,
+        code_prefix=prefix,
+        sort_order=sort_order,
+        is_active=True,
+    )
+    db.session.add(group)
+    return group
+
+
+def _resolve_category_group(form, persist=False):
+    group_raw = str(form.get("group_id") or "").strip()
+    group_id = _parse_int(group_raw)
+    selection = str(form.get("group_select") or "").strip()
+    wants_new = group_raw == "__new__" or selection == "__new__" or str(form.get("new_group_name") or "").strip()
+    if wants_new:
+        name = _clean_label(form.get("new_group_name"))
+        prefix = _normalize_prefix(form.get("new_group_prefix"))
+        if not name:
+            return None, True, "Nama Kelompok Baru wajib diisi."
+        if not prefix:
+            return None, True, "Prefix kelompok wajib diisi."
+        existing_name = ExpenseCategoryGroup.query.filter(ExpenseCategoryGroup.normalized_name == _normalize_label(name)).first()
+        if existing_name:
+            return None, True, "Kelompok tersebut sudah tersedia."
+        existing_prefix = ExpenseCategoryGroup.query.filter(ExpenseCategoryGroup.code_prefix == prefix).first()
+        if existing_prefix:
+            return None, True, "Prefix kelompok sudah digunakan."
+        if not persist:
+            return _row(id=None, name=name, code_prefix=prefix), True, None
+        group = _ensure_expense_category_group(name, code_prefix=prefix, sort_order=_next_expense_group_sort_order())
+        return group, True, None
+
+    if group_id:
+        group = ExpenseCategoryGroup.query.get(group_id)
+        if group:
+            return group, False, None
+    legacy_name = _clean_label(form.get("group_name"))
+    if legacy_name:
+        group = ExpenseCategoryGroup.query.filter(ExpenseCategoryGroup.normalized_name == _normalize_label(legacy_name)).first()
+        if group:
+            return group, False, None
+    return None, False, "Kelompok wajib dipilih."
+
+
+def _validate_duplicate_subcategory(group, category_name, category_id=None):
+    normalized_name = _normalize_label(category_name)
+    for row in PettyCashCategory.query.filter(PettyCashCategory.id != (category_id or 0)).all():
+        same_group_id = row.group_id and group.id and row.group_id == group.id
+        same_group_name = _normalize_label(row.group_name) == group.normalized_name
+        if (same_group_id or same_group_name) and _normalize_label(row.category_name) == normalized_name:
+            raise ValueError("Subkategori tersebut sudah tersedia pada kelompok yang dipilih.")
+
+
+def _unique_category_code(group_prefix, category_name, category_id=None):
+    base = f"{_normalize_prefix(group_prefix)}_{_slug_code(category_name)}".strip("_")
+    if not base:
+        base = "CATEGORY"
+    code = base
+    sequence = 2
+    while PettyCashCategory.query.filter(PettyCashCategory.category_code == code, PettyCashCategory.id != (category_id or 0)).first():
+        code = f"{base}_{sequence}"
+        sequence += 1
+    return code
+
+
+def _next_category_sort_order_for_group(group):
+    if not group or not getattr(group, "id", None):
+        return _next_category_sort_order_for_new_group()
+    same_group_orders = [
+        row.sort_order or 0
+        for row in PettyCashCategory.query.filter(
+            (PettyCashCategory.group_id == group.id) | (PettyCashCategory.group_name == group.name)
+        ).all()
+    ]
+    if same_group_orders:
+        return max(same_group_orders) + 1
+    previous_group_max = (
+        db.session.query(func.coalesce(func.max(PettyCashCategory.sort_order), 0))
+        .join(ExpenseCategoryGroup, PettyCashCategory.group_id == ExpenseCategoryGroup.id)
+        .filter(ExpenseCategoryGroup.sort_order < (group.sort_order or 0))
+        .scalar()
+        or 0
+    )
+    return int(previous_group_max) + 1
+
+
+def _next_category_sort_order_for_new_group():
+    max_order = db.session.query(func.coalesce(func.max(PettyCashCategory.sort_order), 0)).scalar() or 0
+    return int(max_order) + 1
+
+
+def _shift_category_sort_orders_from(start_order):
+    if not start_order:
+        return
+    rows = PettyCashCategory.query.filter(PettyCashCategory.sort_order >= start_order).order_by(PettyCashCategory.sort_order.desc(), PettyCashCategory.id.desc()).all()
+    for row in rows:
+        row.sort_order = (row.sort_order or 0) + 1
+
+
+def _unique_group_prefix(prefix):
+    base = _normalize_prefix(prefix) or "GROUP"
+    value = base
+    sequence = 2
+    while ExpenseCategoryGroup.query.filter_by(code_prefix=value).first():
+        value = f"{base}{sequence}"
+        sequence += 1
+    return value
+
+
+def _next_expense_group_sort_order():
+    max_order = db.session.query(func.coalesce(func.max(ExpenseCategoryGroup.sort_order), 0)).scalar() or 0
+    return int(max_order) + 1
+
+
+def _suggest_group_prefix(group_name):
+    words = [word for word in re.split(r"[^A-Za-z0-9]+", _strip_accents(group_name).upper()) if word and word not in {"DAN", "YANG", "KE"}]
+    if not words:
+        return "GROUP"
+    if len(words) == 1:
+        return words[0][:8]
+    return "".join(word[:2] for word in words)[:8]
+
+
+def _slug_code(value):
+    text_value = _strip_accents(value).upper()
+    text_value = re.sub(r"[^A-Z0-9]+", "_", text_value)
+    text_value = re.sub(r"_+", "_", text_value).strip("_")
+    return text_value[:40] or "CATEGORY"
+
+
+def _normalize_prefix(value):
+    return re.sub(r"[^A-Z0-9]", "", _strip_accents(value).upper())
+
+
+def _normalize_label(value):
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def _clean_label(value):
+    return " ".join(str(value or "").strip().split())
+
+
+def _strip_accents(value):
+    return str(value or "").encode("ascii", "ignore").decode("ascii")
 
 
 def transaction_year_options(today=None):
@@ -297,24 +542,40 @@ def create_expense(form, user, file_storage=None):
 def upsert_category(form):
     category_id = _parse_int(form.get("category_id"))
     category = PettyCashCategory.query.get(category_id) if category_id else None
-    code = str(form.get("category_code") or "").strip().upper().replace(" ", "_")
-    if not category:
-        category = PettyCashCategory()
-        db.session.add(category)
-    if not str(form.get("group_name") or "").strip() or not str(form.get("category_name") or "").strip():
+    existing_category = bool(category)
+    group, is_new_group, group_error = _resolve_category_group(form, persist=True)
+    category_name = _clean_label(form.get("category_name"))
+    if group_error:
+        raise ValueError(group_error)
+    if not group or not category_name:
         raise ValueError("Kelompok dan subkategori wajib diisi.")
-    if not code:
-        raise ValueError("Kode kategori wajib diisi.")
-    duplicate = PettyCashCategory.query.filter(PettyCashCategory.category_code == code, PettyCashCategory.id != (category.id or 0)).first()
-    if duplicate:
-        raise ValueError("Kode kategori sudah digunakan.")
-    category.group_name = str(form.get("group_name") or "").strip()
-    category.category_name = str(form.get("category_name") or "").strip()
-    category.category_code = code
+    _validate_duplicate_subcategory(group, category_name, category.id if category else None)
+
+    category_is_used = existing_category and PettyCashTransaction.query.filter_by(category_id=category.id).first() is not None
+    group_changed = existing_category and category.group_id and category.group_id != group.id
+    name_changed = existing_category and _normalize_label(category.category_name) != _normalize_label(category_name)
+    generated_code = None
+    if not existing_category or (not category_is_used and (group_changed or name_changed)):
+        generated_code = _unique_category_code(group.code_prefix, category_name, category.id if category else None)
+
+    generated_sort_order = None
+    if not existing_category:
+        generated_sort_order = _next_category_sort_order_for_group(group)
+        _shift_category_sort_orders_from(generated_sort_order)
+
+    if not category:
+        category = PettyCashCategory(category_code=generated_code)
+        db.session.add(category)
+    elif generated_code:
+        category.category_code = generated_code
+
+    category.group = group
+    category.group_name = group.name
+    category.category_name = category_name
     category.category_type = str(form.get("category_type") or SOURCE_OPERATING_EXPENSE).strip()
     category.is_operational_expense = bool(form.get("is_operational_expense"))
     category.is_active = bool(form.get("is_active"))
-    category.sort_order = _parse_int(form.get("sort_order"))
+    category.sort_order = generated_sort_order if generated_sort_order is not None else _parse_int(form.get("sort_order"))
     db.session.commit()
     return category
 

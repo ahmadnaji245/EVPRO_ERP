@@ -10,6 +10,7 @@ ROLE_ADMIN = "admin"
 ROLE_DESAIN = "desain"
 ROLE_PRODUKSI = "produksi"
 ROLE_FINANCE = "finance"
+ROLE_OWNER = "owner"
 
 
 PERMISSIONS = {
@@ -34,12 +35,13 @@ PERMISSIONS = {
     "nota.manage": {ROLE_ADMIN},
     "crm.view": {ROLE_ADMIN},
     "crm.manage": {ROLE_ADMIN},
+    "can_access_finance": {ROLE_ADMIN, ROLE_FINANCE, ROLE_OWNER},
     "master.view": {ROLE_ADMIN},
     "reports.view": {ROLE_ADMIN},
     "settings.view": {ROLE_ADMIN},
     "users.manage": {ROLE_ADMIN},
-    "finance.view": {ROLE_ADMIN, ROLE_FINANCE},
-    "finance.manage": {ROLE_ADMIN, ROLE_FINANCE},
+    "finance.view": {ROLE_ADMIN, ROLE_FINANCE, ROLE_OWNER},
+    "finance.manage": {ROLE_ADMIN, ROLE_FINANCE, ROLE_OWNER},
 }
 
 
