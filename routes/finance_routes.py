@@ -20,7 +20,6 @@ from services.petty_cash_service import (
     month_expenses,
     set_category_active,
     transaction_year_options,
-    suggested_category_sort_order,
     upsert_category,
     void_transaction,
 )
@@ -120,13 +119,10 @@ def category_index():
         else:
             flash("Kategori berhasil disimpan.", "success")
         return redirect(url_for("finance.category_index"))
-    category_rows = categories()
     return render_template(
         "finance/categories.html",
-        categories=category_rows,
-        category_order_rows=[{"group_id": row.group_id, "sort_order": row.sort_order} for row in category_rows],
+        categories=categories(),
         expense_groups=expense_category_groups(),
-        next_category_sort_order=suggested_category_sort_order(request.form),
         type_labels=CATEGORY_TYPE_LABELS,
     )
 

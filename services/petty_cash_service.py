@@ -14,6 +14,7 @@ from database.db import db
 from models import NotaPayment, User
 from models.petty_cash import AllowanceReserve, EmployeeCashAdvance, ExpenseCategoryGroup, FinancialAuditLog, PettyCashCategory, PettyCashTransaction
 from services.nota_service import display_nota_number
+from services.sort_order_service import get_next_sort_order
 from utils.formatters import pretty_date, rupiah
 
 
@@ -155,23 +156,36 @@ def seed_default_petty_cash_categories():
         group_row = _ensure_expense_category_group(group, sort_order=index)
         category = existing.get(code)
         if not category:
-            category = PettyCashCategory(category_code=code)
+            category = PettyCashCategory(
+                category_code=code,
+                group=group_row,
+                group_name=group_row.name,
+                category_name=name,
+                category_type=category_type,
+                is_operational_expense=operational,
+                sort_order=_next_category_sort_order_for_group(group_row),
+            )
             db.session.add(category)
-        category.group = group_row
-        category.group_name = group_row.name
-        category.category_name = name
-        category.category_type = category_type
-        category.is_operational_expense = operational
-        category.sort_order = index
+        else:
+            category.group = category.group or group_row
+            category.group_name = category.group_name or group_row.name
+            category.category_name = category.category_name or name
+            category.category_type = category.category_type or category_type
+    _backfill_expense_category_metadata()
     db.session.commit()
     _sync_category_group_ids()
 
 
 def categories(active_only=False):
-    query = PettyCashCategory.query
+    query = PettyCashCategory.query.outerjoin(ExpenseCategoryGroup)
     if active_only:
         query = query.filter(PettyCashCategory.is_active.is_(True))
-    return query.order_by(PettyCashCategory.sort_order.asc(), PettyCashCategory.group_name.asc(), PettyCashCategory.category_name.asc()).all()
+    return query.order_by(
+        func.coalesce(ExpenseCategoryGroup.sort_order, 2147483647).asc(),
+        PettyCashCategory.group_name.asc(),
+        func.coalesce(PettyCashCategory.sort_order, 0).asc(),
+        PettyCashCategory.category_name.asc(),
+    ).all()
 
 
 def category_groups(active_only=False):
@@ -231,6 +245,24 @@ def _sync_category_group_ids():
         if group:
             category.group = group
             category.group_name = group.name
+
+
+def _backfill_expense_category_metadata():
+    next_orders = {}
+    rows = PettyCashCategory.query.order_by(PettyCashCategory.id.asc()).all()
+    for category in rows:
+        group_key = category.group_id or _normalize_label(category.group_name)
+        if category.sort_order and category.sort_order > 0:
+            next_orders[group_key] = max(next_orders.get(group_key, 0), category.sort_order)
+
+    for category in rows:
+        group = category.group
+        if not category.category_code and group:
+            category.category_code = _unique_category_code(group.code_prefix, category.category_name, category.id)
+        if not category.sort_order or category.sort_order < 1:
+            group_key = category.group_id or _normalize_label(category.group_name)
+            next_orders[group_key] = next_orders.get(group_key, 0) + 1
+            category.sort_order = next_orders[group_key]
 
 
 def _ensure_expense_category_group(group_name, code_prefix=None, sort_order=0):
@@ -323,35 +355,11 @@ def _unique_category_code(group_prefix, category_name, category_id=None):
 def _next_category_sort_order_for_group(group):
     if not group or not getattr(group, "id", None):
         return _next_category_sort_order_for_new_group()
-    same_group_orders = [
-        row.sort_order or 0
-        for row in PettyCashCategory.query.filter(
-            (PettyCashCategory.group_id == group.id) | (PettyCashCategory.group_name == group.name)
-        ).all()
-    ]
-    if same_group_orders:
-        return max(same_group_orders) + 1
-    previous_group_max = (
-        db.session.query(func.coalesce(func.max(PettyCashCategory.sort_order), 0))
-        .join(ExpenseCategoryGroup, PettyCashCategory.group_id == ExpenseCategoryGroup.id)
-        .filter(ExpenseCategoryGroup.sort_order < (group.sort_order or 0))
-        .scalar()
-        or 0
-    )
-    return int(previous_group_max) + 1
+    return get_next_sort_order(PettyCashCategory, {"group_id": group.id})
 
 
 def _next_category_sort_order_for_new_group():
-    max_order = db.session.query(func.coalesce(func.max(PettyCashCategory.sort_order), 0)).scalar() or 0
-    return int(max_order) + 1
-
-
-def _shift_category_sort_orders_from(start_order):
-    if not start_order:
-        return
-    rows = PettyCashCategory.query.filter(PettyCashCategory.sort_order >= start_order).order_by(PettyCashCategory.sort_order.desc(), PettyCashCategory.id.desc()).all()
-    for row in rows:
-        row.sort_order = (row.sort_order or 0) + 1
+    return 1
 
 
 def _unique_group_prefix(prefix):
@@ -365,8 +373,7 @@ def _unique_group_prefix(prefix):
 
 
 def _next_expense_group_sort_order():
-    max_order = db.session.query(func.coalesce(func.max(ExpenseCategoryGroup.sort_order), 0)).scalar() or 0
-    return int(max_order) + 1
+    return get_next_sort_order(ExpenseCategoryGroup)
 
 
 def _suggest_group_prefix(group_name):
@@ -558,10 +565,9 @@ def upsert_category(form):
     if not existing_category or (not category_is_used and (group_changed or name_changed)):
         generated_code = _unique_category_code(group.code_prefix, category_name, category.id if category else None)
 
-    generated_sort_order = None
-    if not existing_category:
+    generated_sort_order = category.sort_order if existing_category else None
+    if not existing_category or not generated_sort_order or generated_sort_order < 1:
         generated_sort_order = _next_category_sort_order_for_group(group)
-        _shift_category_sort_orders_from(generated_sort_order)
 
     if not category:
         category = PettyCashCategory(category_code=generated_code)
@@ -575,7 +581,7 @@ def upsert_category(form):
     category.category_type = str(form.get("category_type") or SOURCE_OPERATING_EXPENSE).strip()
     category.is_operational_expense = bool(form.get("is_operational_expense"))
     category.is_active = bool(form.get("is_active"))
-    category.sort_order = generated_sort_order if generated_sort_order is not None else _parse_int(form.get("sort_order"))
+    category.sort_order = generated_sort_order
     db.session.commit()
     return category
 

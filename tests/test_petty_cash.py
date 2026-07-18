@@ -195,9 +195,12 @@ class PettyCashTestCase(unittest.TestCase):
         self.assertIn("Kode Otomatis", html)
         self.assertIn('id="automaticCode"', html)
         self.assertNotIn('name="category_code"', html)
+        self.assertNotIn('name="sort_order"', html)
 
     def test_create_category_with_existing_group_generates_code(self):
         group = ExpenseCategoryGroup.query.filter_by(name="Produksi dan Packaging").first()
+        other_group_category = PettyCashCategory.query.filter_by(category_code="LOG_PICKUP").first()
+        other_group_sort_order = other_group_category.sort_order
         category = upsert_category(
             _form(
                 group_id=str(group.id),
@@ -211,11 +214,9 @@ class PettyCashTestCase(unittest.TestCase):
         self.assertEqual(category.group_name, "Produksi dan Packaging")
         self.assertEqual(category.category_code, "PROD_LABEL_HANGTAG")
         self.assertEqual(category.sort_order, 7)
-        shifted = PettyCashCategory.query.filter_by(category_code="LOG_PICKUP").first()
-        self.assertEqual(shifted.sort_order, 8)
+        self.assertEqual(other_group_category.sort_order, other_group_sort_order)
 
     def test_new_group_is_saved_and_duplicate_group_is_rejected(self):
-        next_order = (db.session.query(db.func.max(PettyCashCategory.sort_order)).scalar() or 0) + 1
         category = upsert_category(
             _form(
                 group_id="__new__",
@@ -229,7 +230,7 @@ class PettyCashTestCase(unittest.TestCase):
         )
         self.assertEqual(category.group.code_prefix, "MAINTX")
         self.assertEqual(category.category_code, "MAINTX_OLI_MESIN")
-        self.assertEqual(category.sort_order, next_order)
+        self.assertEqual(category.sort_order, 1)
         self.assertIsNotNone(ExpenseCategoryGroup.query.filter_by(normalized_name="perawatan mesin").first())
         with self.assertRaisesRegex(ValueError, "Kelompok tersebut sudah tersedia."):
             upsert_category(
@@ -272,6 +273,7 @@ class PettyCashTestCase(unittest.TestCase):
         category = _category_by_name("Packaging Produk")
         create_expense(_form(transaction_date="2026-07-02", category_id=str(category.id), amount="100000", description="Packaging"), self.user)
         original_code = category.category_code
+        original_sort_order = category.sort_order
         admin_group = ExpenseCategoryGroup.query.filter_by(name="Administrasi dan Perkantoran").first()
         updated = upsert_category(
             _form(
@@ -285,6 +287,7 @@ class PettyCashTestCase(unittest.TestCase):
             )
         )
         self.assertEqual(updated.category_code, original_code)
+        self.assertEqual(updated.sort_order, original_sort_order)
         self.assertEqual(PettyCashTransaction.query.filter_by(category_id=category.id).first().category.category_code, original_code)
 
     def test_detail_pdf_report_calculation_matches_required_example(self):

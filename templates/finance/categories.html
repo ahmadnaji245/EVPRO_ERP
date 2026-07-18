@@ -20,7 +20,6 @@
         </div>
         <div class="col-xl-3 col-md-6"><label class="form-label">Subkategori</label><input class="form-control" name="category_name" id="categoryName" required></div>
         <div class="col-md-2"><label class="form-label">Tipe</label><select class="form-select" name="category_type" id="categoryType">{% for code, label in type_labels.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></div>
-        <div class="col-md-1"><label class="form-label">Urut</label><input type="number" class="form-control" name="sort_order" id="sortOrder" value="{{ next_category_sort_order }}" readonly></div>
         <div class="col-md-1 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" id="isActive" checked><label class="form-check-label" for="isActive">Aktif</label></div></div>
         <div class="col-12 row g-3 d-none" id="newGroupFields">
             <div class="col-md-6"><label class="form-label">Nama Kelompok Baru</label><input class="form-control" name="new_group_name" id="newGroupName"></div>
@@ -72,11 +71,7 @@ const automaticCode = document.getElementById('automaticCode');
 const newGroupFields = document.getElementById('newGroupFields');
 const newGroupName = document.getElementById('newGroupName');
 const newGroupPrefix = document.getElementById('newGroupPrefix');
-const sortOrder = document.getElementById('sortOrder');
-const categoryOrderRows = {{ category_order_rows|tojson }};
-const fallbackNextSortOrder = Number({{ next_category_sort_order|tojson }});
 let lockedCode = '';
-let editingCategory = false;
 
 const normalizePrefix = (value) => (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const slugCode = (value) => (value || '')
@@ -118,27 +113,14 @@ const updateAutomaticCode = () => {
     const slug = slugCode(categoryName.value);
     automaticCode.value = prefix && slug ? `${prefix}_${slug}` : '';
 };
-const nextSortOrderForGroup = () => {
-    if (groupSelect.value === '__new__') return fallbackNextSortOrder;
-    const selectedGroupId = Number(groupSelect.value || 0);
-    const groupRows = categoryOrderRows.filter((row) => Number(row.group_id || 0) === selectedGroupId);
-    if (!groupRows.length) return fallbackNextSortOrder;
-    return Math.max(...groupRows.map((row) => Number(row.sort_order || 0))) + 1;
-};
-const updateSortOrderPreview = () => {
-    if (!editingCategory) sortOrder.value = nextSortOrderForGroup();
-};
-
 groupSelect.addEventListener('change', () => {
     lockedCode = '';
     updateNewGroupFields();
     updateAutomaticCode();
-    updateSortOrderPreview();
 });
 categoryName.addEventListener('input', () => {
     lockedCode = '';
     updateAutomaticCode();
-    updateSortOrderPreview();
 });
 newGroupName.addEventListener('input', () => {
     if (!newGroupPrefix.dataset.touched) {
@@ -155,7 +137,6 @@ newGroupPrefix.addEventListener('input', () => {
 document.querySelectorAll('[data-edit]').forEach((button) => {
     button.addEventListener('click', () => {
         const row = JSON.parse(button.dataset.edit);
-        editingCategory = true;
         categoryId.value = row.id;
         const groupOption = Array.from(groupSelect.options).find((option) => option.value === String(row.group_id));
         groupSelect.value = groupOption ? String(row.group_id) : '';
@@ -163,7 +144,6 @@ document.querySelectorAll('[data-edit]').forEach((button) => {
         lockedCode = row.used ? row.code : '';
         automaticCode.value = row.code;
         categoryType.value = row.type;
-        sortOrder.value = row.sort;
         isActive.checked = row.active;
         isOperational.checked = row.operational;
         newGroupName.value = '';
@@ -176,6 +156,5 @@ document.querySelectorAll('[data-edit]').forEach((button) => {
 });
 updateNewGroupFields();
 updateAutomaticCode();
-updateSortOrderPreview();
 </script>
 {% endblock %}

@@ -66,14 +66,7 @@
                     <label class="form-label">Nama</label>
                     <input class="form-control" name="name" value="{{ editing_row.name if editing_row else '' }}" required>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Urutan</label>
-                    <input class="form-control" name="sort_order" type="number" value="{{ editing_row.sort_order if editing_row else next_sort_order }}" {% if not editing_row %}readonly{% endif %}>
-                    {% if not editing_row %}
-                        <div class="form-text">Urutan dibuat otomatis berdasarkan data terakhir.</div>
-                    {% endif %}
-                </div>
-                <div class="col-md-6">
+                <div class="col-12">
                     <label class="form-label">Status</label>
                     {% set selected_status = editing_row.status if editing_row else 'active' %}
                     <select class="form-select" name="status">
