@@ -1,6 +1,12 @@
 __pycache__/
 .venv/
+venv/
 *.py[cod]
+.env
 instance/
+instance/*.lock
+instance/database-startup.lock
+backups/
+static/uploads/
 static/uploads/temp/
 static/uploads/petty_cash/

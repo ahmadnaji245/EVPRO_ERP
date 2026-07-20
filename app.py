@@ -1,6 +1,8 @@
+import logging
+import threading
+from datetime import datetime
 from pathlib import Path
 
-from datetime import datetime
 from flask import Blueprint, Flask, abort, current_app, flash, redirect, render_template, request, send_file, session, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from sqlalchemy import inspect, text
@@ -33,10 +35,16 @@ from utils.helpers import active_class, ensure_upload_folders, nota_pdf_download
 from utils.permissions import has_permission, permission_required
 from utils.constants import long_sleeve_size_label, long_sleeve_type_label, normalize_size_key, sort_long_sleeve_rows, sort_size_rows
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows development fallback
+    fcntl = None
+
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.login_message_category = "warning"
+startup_thread_lock = threading.Lock()
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -581,15 +589,56 @@ def create_app(config_class=Config):
 
     with app.app_context():
         ensure_upload_folders()
-        db.create_all()
-        ensure_database_schema_migrations()
-        ensure_tracking_codes()
-        seed_initial_data()
-        seed_default_whatsapp_templates()
-        backfill_crm_data()
-        db.session.commit()
+        run_startup_database_tasks(app)
 
     return app
+
+
+def run_startup_database_tasks(app):
+    lock_path = Path(app.instance_path) / "database-startup.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    app.logger.setLevel(logging.INFO)
+
+    if fcntl is None:
+        app.logger.info("Waiting for database startup lock")
+        startup_thread_lock.acquire()
+        app.logger.info("Database startup lock acquired")
+        try:
+            _execute_startup_database_tasks()
+            app.logger.info("Database startup tasks completed")
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Database startup tasks failed")
+            raise
+        finally:
+            startup_thread_lock.release()
+            app.logger.info("Database startup lock released")
+        return
+
+    with lock_path.open("w") as lock_file:
+        app.logger.info("Waiting for database startup lock")
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        app.logger.info("Database startup lock acquired")
+        try:
+            _execute_startup_database_tasks()
+            app.logger.info("Database startup tasks completed")
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Database startup tasks failed")
+            raise
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            app.logger.info("Database startup lock released")
+
+
+def _execute_startup_database_tasks():
+    db.create_all()
+    ensure_database_schema_migrations()
+    ensure_tracking_codes()
+    seed_initial_data()
+    seed_default_whatsapp_templates()
+    backfill_crm_data()
+    db.session.commit()
 
 
 def ensure_database_schema_migrations():
