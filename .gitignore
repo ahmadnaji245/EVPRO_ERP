@@ -4,6 +4,9 @@ venv/
 *.py[cod]
 .env
 instance/
+instance/*.db
+instance/*.sqlite
+instance/*.sqlite3
 instance/*.lock
 instance/database-startup.lock
 backups/

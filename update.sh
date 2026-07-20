@@ -1,50 +1,79 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME="${SERVICE_NAME:-evpro-erp}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:5003}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:5003/}"
 
-cd "$PROJECT_DIR"
-
-echo "Project directory: ${PROJECT_DIR}"
-echo "Checking Git status..."
-git status --short
-
-echo "Pulling latest changes from origin/main..."
-if ! git pull origin main; then
-    echo "ERROR: git pull failed."
-    echo "If this failed because of local changes, review them manually on the VPS."
-    echo "This script will not stash, reset, discard changes, or restart ${SERVICE_NAME}."
+fail() {
+    echo "ERROR: $*" >&2
     exit 1
+}
+
+cd "$SCRIPT_DIR"
+echo "Project directory: $SCRIPT_DIR"
+echo "Current commit: $(git rev-parse --short HEAD)"
+
+[[ "$(git branch --show-current)" == "main" ]] || fail "deployment hanya boleh dijalankan dari branch main."
+[[ ! -d .git/rebase-merge && ! -d .git/rebase-apply ]] || fail "rebase sedang berjalan; selesaikan secara manual terlebih dahulu."
+[[ ! -f .git/MERGE_HEAD ]] || fail "merge sedang berjalan; selesaikan secara manual terlebih dahulu."
+
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    git status --short
+    fail "terdapat perubahan tracked lokal. Script tidak akan stash, reset, atau membuang perubahan tersebut."
 fi
 
-if [ -d "venv" ]; then
-    # shellcheck disable=SC1091
-    source "venv/bin/activate"
-elif [ -d ".venv" ]; then
-    # shellcheck disable=SC1091
-    source ".venv/bin/activate"
+echo "Fetching origin/main..."
+git fetch origin main
+
+if ! git merge-base --is-ancestor HEAD origin/main; then
+    echo "Local HEAD:  $(git rev-parse --short HEAD)" >&2
+    echo "Origin main: $(git rev-parse --short origin/main)" >&2
+    fail "branch VPS memiliki commit lokal atau divergent. Push/review commit secara manual; merge dan rebase otomatis tidak dilakukan."
+fi
+
+echo "Updating source with fast-forward only..."
+git pull --ff-only origin main || fail "fast-forward gagal; aplikasi tidak akan di-restart."
+
+if [[ -x "venv/bin/python" ]]; then
+    VENV_DIR="venv"
+elif [[ -x ".venv/bin/python" ]]; then
+    VENV_DIR=".venv"
 else
-    echo "No virtualenv found. Creating venv/..."
-    python3 -m venv venv
-    # shellcheck disable=SC1091
-    source "venv/bin/activate"
+    fail "virtualenv production tidak ditemukan di venv/ atau .venv/."
 fi
 
+# shellcheck disable=SC1091
+source "$VENV_DIR/bin/activate"
 python -m pip install -r requirements.txt
-if [ -f "requirements-prod.txt" ]; then
+if [[ -f requirements-prod.txt ]]; then
     python -m pip install -r requirements-prod.txt
 fi
+python -m compileall -q -x '(^|/)(venv|\.venv|\.git|backups|static/uploads)(/|$)' .
 
-echo "Restarting ${SERVICE_NAME}..."
-sudo systemctl restart evpro-erp
-sudo systemctl --no-pager status evpro-erp
-
-echo "Running health check: ${HEALTH_URL}"
-if ! curl -f "$HEALTH_URL"; then
-    echo "ERROR: health check failed."
-    echo "Last ${SERVICE_NAME} logs:"
-    sudo journalctl -u evpro-erp -n 50 --no-pager
-    exit 1
+echo "Restarting $SERVICE_NAME..."
+sudo systemctl restart "$SERVICE_NAME"
+if ! sudo systemctl is-active --quiet "$SERVICE_NAME"; then
+    sudo systemctl --no-pager --full status "$SERVICE_NAME" || true
+    sudo journalctl -u "$SERVICE_NAME" -n 100 --no-pager || true
+    fail "$SERVICE_NAME gagal aktif setelah restart."
 fi
+
+echo "Waiting for health check: $HEALTH_URL"
+healthy=false
+for attempt in {1..10}; do
+    if curl --max-time 5 -fsSL "$HEALTH_URL" >/dev/null; then
+        healthy=true
+        break
+    fi
+    echo "Health check attempt $attempt/10 belum berhasil; menunggu 2 detik..."
+    sleep 2
+done
+
+if [[ "$healthy" != true ]]; then
+    sudo systemctl --no-pager --full status "$SERVICE_NAME" || true
+    sudo journalctl -u "$SERVICE_NAME" -n 100 --no-pager || true
+    fail "health check gagal setelah 10 percobaan."
+fi
+
+echo "Deployment successful. Active commit: $(git rev-parse --short HEAD)"
