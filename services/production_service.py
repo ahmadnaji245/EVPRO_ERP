@@ -5,11 +5,13 @@ from database.db import db
 from models import Brand, CustomerAccess, QcChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
 from services.item_service import component_key, design_components, qc_enabled_components_for_order
 from services.number_generator import generate_tracking_code
+from services.history_service import record_history
 from utils.constants import PRODUCTION_STATUSES, PRODUCTION_VENDORS, normalize_production_status, sort_players_by_size
 
 
 ACTIVE_PRODUCTION_STATUSES = [status for status in PRODUCTION_STATUSES if status != "Finish"]
 FINISHED_PRODUCTION_STATUSES = {"Finish", "Selesai"}
+PRINTING_CONFIRMATION_STATUSES = {"Setting", "Printing"}
 VENDOR_PRINT_EXCLUDED_STATUSES = {
     "Terkirim dari Vendor",
     "Packing",
@@ -33,6 +35,28 @@ def list_production_orders(search=None):
     if not search_value:
         return orders
     return [order for order in orders if _matches_search(order, search_value)]
+
+
+def split_production_tables(orders):
+    printing_orders = sorted(
+        [order for order in orders if should_show_in_printing_table(order)],
+        key=_printing_order_sort_key,
+    )
+    unassigned_orders = sorted(
+        [order for order in orders if should_show_in_unassigned_vendor_table(order)],
+        key=_printing_order_sort_key,
+    )
+    active_orders = sorted(
+        [order for order in orders if production_vendor_selected(order)],
+        key=lambda order: (
+            order.production_vendor_deadline or date.max,
+            order.deadline or date.max,
+            order.created_at or datetime.min,
+            order.so_number or "",
+            order.id or 0,
+        ),
+    )
+    return printing_orders, unassigned_orders, active_orders
 
 
 def production_summary(orders):
@@ -357,6 +381,27 @@ def is_active_production_order(order):
     return not is_finished_production_order(order)
 
 
+def production_vendor_selected(order):
+    return bool(str(order.production_vendor or "").strip())
+
+
+def printing_confirmed(order):
+    return bool(getattr(order, "printing_confirmed", False))
+
+
+def should_show_in_printing_table(order):
+    return (
+        is_active_production_order(order)
+        and not production_vendor_selected(order)
+        and not printing_confirmed(order)
+        and production_status(order) in PRINTING_CONFIRMATION_STATUSES
+    )
+
+
+def should_show_in_unassigned_vendor_table(order):
+    return is_active_production_order(order) and not production_vendor_selected(order) and printing_confirmed(order)
+
+
 def finished_production_count():
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved")
@@ -394,6 +439,7 @@ def assign_vendor(order, vendor):
     vendor = validate_vendor(vendor)
     try:
         order.production_vendor = vendor
+        order.printing_confirmed = True
         order.production_assigned_at = datetime.utcnow()
         status_changed = _sync_vendor_assignment_stage(order)
         db.session.commit()
@@ -426,6 +472,7 @@ def save_vendor_assignment(order, vendor, deadline):
     try:
         order.production_vendor = vendor
         order.production_vendor_deadline = deadline_date
+        order.printing_confirmed = True
         order.production_assigned_at = datetime.utcnow()
         status_changed = _sync_vendor_assignment_stage(order)
         db.session.commit()
@@ -444,6 +491,75 @@ def set_vendor_deadline(order, deadline):
         db.session.rollback()
         raise
     return order, status_changed
+
+
+def confirm_printing_started(order, user=None):
+    if production_vendor_selected(order):
+        raise ValueError("Pesanan sudah memiliki vendor produksi.")
+    if not is_active_production_order(order):
+        raise ValueError("Pesanan selesai tidak dapat ditandai masuk printing.")
+    if production_status(order) not in PRINTING_CONFIRMATION_STATUSES:
+        raise ValueError("Pesanan hanya bisa ditandai dari tahap Setting atau Printing.")
+
+    now = datetime.utcnow()
+    old_status = production_status(order)
+    actor_name = _actor_name(user)
+    try:
+        order.printing_confirmed = True
+        order.printing_started_at = now
+        order.printing_started_by = getattr(user, "id", None) if user else None
+        if old_status == "Setting":
+            _set_stage(order, "Printing")
+        record_history(
+            order,
+            actor_name,
+            "printing_confirmed",
+            field_name="printing_confirmed",
+            old_value=False,
+            new_value=True,
+            user=user if getattr(user, "is_authenticated", False) else None,
+            notes="Pesanan ditandai sudah masuk proses printing.",
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return order
+
+
+def can_cancel_printing_confirmation(order):
+    return (
+        printing_confirmed(order)
+        and not production_vendor_selected(order)
+        and is_active_production_order(order)
+        and production_status(order) in PRINTING_CONFIRMATION_STATUSES
+    )
+
+
+def cancel_printing_confirmation(order, user=None):
+    if not can_cancel_printing_confirmation(order):
+        raise ValueError("Konfirmasi printing tidak dapat dibatalkan karena vendor sudah dipilih atau produksi sudah berjalan.")
+
+    actor_name = _actor_name(user)
+    try:
+        order.printing_confirmed = False
+        order.printing_started_at = None
+        order.printing_started_by = None
+        record_history(
+            order,
+            actor_name,
+            "printing_confirmation_cancelled",
+            field_name="printing_confirmed",
+            old_value=True,
+            new_value=False,
+            user=user if getattr(user, "is_authenticated", False) else None,
+            notes="Konfirmasi masuk printing dibatalkan.",
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return order
 
 
 def can_finish_order(order):
@@ -496,6 +612,20 @@ def _production_order_sort_key(order):
         order.so_number or "",
         order.id or 0,
     )
+
+
+def _printing_order_sort_key(order):
+    return (
+        order.deadline or date.max,
+        order.approved_at or order.created_at or datetime.min,
+        order.id or 0,
+    )
+
+
+def _actor_name(user):
+    if user and getattr(user, "is_authenticated", False):
+        return getattr(user, "name", None) or getattr(user, "username", None) or "System"
+    return "System"
 
 
 def list_vendor_production_rows(active_only=True):

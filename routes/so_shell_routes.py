@@ -17,6 +17,9 @@ from services.production_service import (
     PRODUCTION_STATUSES,
     PRODUCTION_VENDORS,
     can_finish_order,
+    cancel_printing_confirmation,
+    can_cancel_printing_confirmation,
+    confirm_printing_started,
     finish_production,
     list_production_orders,
     list_vendor_production_rows,
@@ -29,6 +32,7 @@ from services.production_service import (
     save_qc_checklist,
     save_vendor_assignment,
     set_vendor_deadline,
+    split_production_tables,
     validate_vendor,
     vendor_assignment_complete,
     vendor_print_rows,
@@ -110,20 +114,11 @@ def _get_production_order(sales_order_id):
 def production_index():
     search = request.args.get("q", "").strip()
     sales_orders = list_production_orders(search)
-    unassigned_orders = [order for order in sales_orders if not vendor_assignment_complete(order)]
-    active_orders = sorted(
-        [order for order in sales_orders if vendor_assignment_complete(order)],
-        key=lambda order: (
-            order.production_vendor_deadline or date.max,
-            order.deadline or date.max,
-            order.created_at or datetime.min,
-            order.so_number or "",
-            order.id or 0,
-        ),
-    )
+    printing_orders, unassigned_orders, active_orders = split_production_tables(sales_orders)
     return render_template(
         "production/index.html",
         sales_orders=sales_orders,
+        printing_orders=printing_orders,
         unassigned_orders=unassigned_orders,
         active_orders=active_orders,
         search=search,
@@ -133,6 +128,7 @@ def production_index():
         production_priority=production_priority,
         status_badge_class=_status_badge_class,
         can_finish_order=can_finish_order,
+        can_cancel_printing_confirmation=can_cancel_printing_confirmation,
     )
 
 
@@ -207,6 +203,32 @@ def production_set_deadline(sales_order_id):
         flash(str(exc), "danger")
     else:
         flash("Vendor berhasil diperbarui.", "success")
+    return redirect(url_for("production.index", q=request.form.get("q", "")))
+
+
+@production_bp.route("/<int:sales_order_id>/confirm-printing", methods=["POST"], endpoint="confirm_printing")
+@permission_required("production.update_status")
+def production_confirm_printing(sales_order_id):
+    order = _get_production_order(sales_order_id)
+    try:
+        confirm_printing_started(order, current_user)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Pesanan berhasil ditandai sudah masuk printing dan siap di-assign ke vendor.", "success")
+    return redirect(url_for("production.index", q=request.form.get("q", "")))
+
+
+@production_bp.route("/<int:sales_order_id>/cancel-printing", methods=["POST"], endpoint="cancel_printing")
+@permission_required("production.update_status")
+def production_cancel_printing(sales_order_id):
+    order = _get_production_order(sales_order_id)
+    try:
+        cancel_printing_confirmation(order, current_user)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Konfirmasi printing berhasil dibatalkan.", "success")
     return redirect(url_for("production.index", q=request.form.get("q", "")))
 
 

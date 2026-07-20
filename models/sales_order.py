@@ -38,6 +38,9 @@ class SalesOrder(db.Model):
     production_vendor = db.Column(db.String(80), index=True)
     production_vendor_deadline = db.Column(db.Date)
     production_assigned_at = db.Column(db.DateTime)
+    printing_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    printing_started_at = db.Column(db.DateTime)
+    printing_started_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     warehouse_received_at = db.Column(db.DateTime)
     shortage_note = db.Column(db.Text)
     qc_note = db.Column(db.Text)
@@ -55,6 +58,7 @@ class SalesOrder(db.Model):
 
     brand = db.relationship("Brand", back_populates="sales_orders")
     created_by = db.relationship("User", back_populates="sales_orders", foreign_keys=[created_by_id])
+    printing_started_user = db.relationship("User", foreign_keys=[printing_started_by])
     crm_customer = db.relationship("Customer", back_populates="sales_orders")
     serah_terima_admin = db.relationship("User", foreign_keys=[serah_terima_admin_id])
     designs = db.relationship("SalesOrderDesign", back_populates="sales_order", cascade="all, delete-orphan")

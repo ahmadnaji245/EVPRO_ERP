@@ -7,7 +7,7 @@ from app import create_app
 from config import Config
 from database.db import db
 from models import Brand, SalesOrder, User
-from services.production_service import assign_vendor, list_vendor_production_rows, save_vendor_assignment, set_vendor_deadline
+from services.production_service import assign_vendor, can_cancel_printing_confirmation, list_vendor_production_rows, save_vendor_assignment, set_vendor_deadline
 
 
 class TestConfig(Config):
@@ -53,6 +53,66 @@ class ProductionVendorAssignmentTestCase(unittest.TestCase):
         self.assertIn("Vendor berhasil diperbarui.", html)
         self.assertIn("Produksi Aktif", html)
         self.assertIn(">Jahit<", html)
+
+    def test_setting_order_waits_in_printing_table_until_confirmed(self):
+        order = self._create_order("SETTINGWAIT", production_status="Setting")
+        self.client.post("/auth/login", data={"username": "admin", "password": "admin"})
+
+        response = self.client.get("/production/")
+        html = response.data.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Printing", html)
+        self.assertIn(order.so_number, html)
+        self.assertIn("Sudah Masuk Printing", html)
+        self.assertLess(html.index("Printing"), html.index("Belum Assign Vendor"))
+
+    def test_confirm_printing_moves_order_to_unassigned_vendor(self):
+        order = self._create_order("CONFIRMPRINT", production_status="Setting")
+        self.client.post("/auth/login", data={"username": "admin", "password": "admin"})
+
+        response = self.client.post(
+            f"/production/{order.id}/confirm-printing",
+            follow_redirects=True,
+        )
+        db.session.refresh(order)
+        html = response.data.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(order.printing_confirmed)
+        self.assertIsNotNone(order.printing_started_at)
+        self.assertEqual(order.printing_started_by, self.admin.id)
+        self.assertEqual(order.production_status, "Printing")
+        self.assertIn("Pesanan berhasil ditandai sudah masuk printing dan siap di-assign ke vendor.", html)
+        self.assertIn("Batalkan Printing", html)
+
+    def test_cancel_printing_before_vendor_returns_to_printing_table(self):
+        order = self._create_order("CANCELPRINT", production_status="Printing", printing_confirmed=True)
+        self.client.post("/auth/login", data={"username": "admin", "password": "admin"})
+
+        response = self.client.post(
+            f"/production/{order.id}/cancel-printing",
+            follow_redirects=True,
+        )
+        db.session.refresh(order)
+        html = response.data.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(order.printing_confirmed)
+        self.assertIsNone(order.printing_started_at)
+        self.assertIsNone(order.printing_started_by)
+        self.assertIn("Sudah Masuk Printing", html)
+
+    def test_order_with_vendor_cannot_cancel_printing(self):
+        order = self._create_order(
+            "CANCELBLOCK",
+            production_status="Jahit",
+            production_vendor="Mas Amar",
+            production_vendor_deadline=date(2026, 7, 20),
+            printing_confirmed=True,
+        )
+
+        self.assertFalse(can_cancel_printing_confirmation(order))
 
     def test_updating_assigned_printing_order_sets_status_to_jahit(self):
         order = self._create_order(
@@ -163,7 +223,7 @@ class ProductionVendorAssignmentTestCase(unittest.TestCase):
         self.assertEqual(row["deadline_vendor"], date(2026, 7, 26))
         self.assertEqual(row["status"], "Jahit")
 
-    def _create_order(self, suffix, production_status, production_vendor=None, production_vendor_deadline=None):
+    def _create_order(self, suffix, production_status, production_vendor=None, production_vendor_deadline=None, printing_confirmed=False):
         order = SalesOrder(
             so_number=f"TEST/{suffix}",
             tracking_code=f"TRK{suffix}",
@@ -181,6 +241,7 @@ class ProductionVendorAssignmentTestCase(unittest.TestCase):
             customer_portal_status=production_status,
             production_vendor=production_vendor,
             production_vendor_deadline=production_vendor_deadline,
+            printing_confirmed=printing_confirmed,
             production_assigned_at=datetime.utcnow() if production_vendor or production_vendor_deadline else None,
             created_by_id=self.admin.id,
         )

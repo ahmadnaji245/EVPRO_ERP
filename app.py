@@ -602,6 +602,7 @@ def ensure_database_schema_migrations():
     ensure_design_material_schema()
     ensure_qc_schema()
     ensure_handover_schema()
+    ensure_printing_confirmation_schema()
     ensure_v09_finance_schema()
 
 
@@ -830,6 +831,39 @@ def ensure_handover_schema():
     for column_name, statement in schema_changes.items():
         if column_name not in columns:
             db.session.execute(text(statement))
+    db.session.commit()
+
+
+def ensure_printing_confirmation_schema():
+    if not _table_exists("sales_orders"):
+        return
+
+    _add_column_if_missing("sales_orders", "printing_confirmed", "BOOLEAN NOT NULL DEFAULT 0")
+    _add_column_if_missing("sales_orders", "printing_started_at", "DATETIME")
+    _add_column_if_missing("sales_orders", "printing_started_by", "INTEGER")
+    db.session.execute(
+        text(
+            """
+            UPDATE sales_orders
+            SET printing_confirmed = 1
+            WHERE COALESCE(printing_confirmed, 0) = 0
+              AND (
+                    TRIM(COALESCE(production_vendor, '')) != ''
+                    OR production_status IN (
+                        'Jahit',
+                        'QC',
+                        'Packing',
+                        'Dikirim ke Vendor',
+                        'Terkirim dari Vendor',
+                        'Barang Masuk',
+                        'Finish',
+                        'Selesai'
+                    )
+                    OR tanggal_finish_produksi IS NOT NULL
+              )
+            """
+        )
+    )
     db.session.commit()
 
 
