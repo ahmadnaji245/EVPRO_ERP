@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from app import create_app
@@ -21,6 +22,7 @@ from services.petty_cash_service import (
     create_expense,
     create_income,
     current_balance,
+    ledger,
     petty_cash_detail_report,
     upsert_category,
     void_transaction,
@@ -166,6 +168,60 @@ class PettyCashTestCase(unittest.TestCase):
         pdf = client.get(f"/keuangan/kas-kecil/detail/pdf?{query}")
         self.assertEqual(pdf.status_code, 200)
         self.assertEqual(pdf.data[:4], b"%PDF")
+
+    def test_detail_ledger_orders_latest_first_and_keeps_chronological_running_balance(self):
+        first_income = create_income(
+            _form(transaction_date="2026-07-13", source_type=SOURCE_OPENING_BALANCE, amount="1000000", description="Saldo awal"),
+            self.user,
+        )
+        expense = create_expense(
+            _form(transaction_date="2026-07-14", category_id=str(_category("Produksi dan Packaging").id), amount="100000", description="Beli bahan"),
+            self.user,
+        )
+        older_same_day_income = create_income(
+            _form(transaction_date="2026-07-14", source_type=SOURCE_CAPITAL_ADDITION, amount="50000", description="Modal pagi"),
+            self.user,
+        )
+        newer_same_day_income = create_income(
+            _form(transaction_date="2026-07-14", source_type=SOURCE_OFFLINE_SALE, amount="200000", description="Penjualan sore"),
+            self.user,
+        )
+        latest_income = create_income(
+            _form(transaction_date="2026-07-15", source_type=SOURCE_CAPITAL_ADDITION, amount="300000", description="Modal terbaru"),
+            self.user,
+        )
+        first_income.created_at = datetime(2026, 7, 13, 9, 0, 0)
+        expense.created_at = datetime(2026, 7, 14, 8, 0, 0)
+        older_same_day_income.created_at = datetime(2026, 7, 14, 9, 0, 0)
+        newer_same_day_income.created_at = datetime(2026, 7, 14, 10, 0, 0)
+        latest_income.created_at = datetime(2026, 7, 15, 9, 0, 0)
+        db.session.commit()
+
+        filters = {"month": "7", "year": "2026"}
+        pagination, running_rows, totals = ledger(filters, page=1, per_page=3)
+        self.assertEqual([trx.id for trx in pagination.items], [latest_income.id, newer_same_day_income.id, older_same_day_income.id])
+        self.assertEqual([trx.transaction_date.isoformat() for trx in pagination.items], ["2026-07-15", "2026-07-14", "2026-07-14"])
+        self.assertEqual(running_rows[latest_income.id].running_balance, 1_450_000)
+        self.assertEqual(running_rows[newer_same_day_income.id].running_balance, 1_150_000)
+        self.assertEqual(running_rows[older_same_day_income.id].running_balance, 950_000)
+        self.assertEqual(totals["income"], 1_550_000)
+        self.assertEqual(totals["expense"], 100_000)
+        self.assertEqual(totals["net"], 1_450_000)
+        self.assertEqual(totals["count"], 5)
+
+        next_page, next_running_rows, _ = ledger(filters, page=2, per_page=3)
+        self.assertEqual([trx.id for trx in next_page.items], [expense.id, first_income.id])
+        self.assertEqual(next_running_rows[expense.id].running_balance, 900_000)
+        self.assertEqual(next_running_rows[first_income.id].running_balance, 1_000_000)
+
+        filtered_page, filtered_running_rows, filtered_totals = ledger({**filters, "transaction_type": "IN", "q": "Modal"}, page=1, per_page=10)
+        self.assertEqual([trx.id for trx in filtered_page.items], [latest_income.id, older_same_day_income.id])
+        self.assertEqual(filtered_running_rows[latest_income.id].running_balance, 350_000)
+        self.assertEqual(filtered_running_rows[older_same_day_income.id].running_balance, 50_000)
+        self.assertEqual(filtered_totals["income"], 350_000)
+        self.assertEqual(filtered_totals["expense"], 0)
+        self.assertEqual(filtered_totals["net"], 350_000)
+        self.assertEqual(filtered_totals["count"], 2)
 
     def test_summary_and_detail_pdf_are_separate_outputs(self):
         client = self.app.test_client()

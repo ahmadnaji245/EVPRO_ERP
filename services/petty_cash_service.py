@@ -7,7 +7,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import joinedload
 
 from database.db import db
@@ -653,10 +653,9 @@ def sync_nota_payment_cash_transaction(payment, user=None):
 def ledger(filters=None, page=1, per_page=25):
     filters = filters or {}
     query = _filtered_query(filters)
-    pagination = _ordered_query(query).paginate(page=max(int(page or 1), 1), per_page=per_page, error_out=False)
-    rows = running_balance_rows(_ordered_query(_filtered_query(filters)).all())
-    visible = {row.transaction.id: row for row in rows}
-    totals = _filter_totals(query.all())
+    pagination = _latest_first_query(query).paginate(page=max(int(page or 1), 1), per_page=per_page, error_out=False)
+    visible = _running_balance_map_for_page(filters, [trx.id for trx in pagination.items])
+    totals = _filter_totals_from_query(query)
     return pagination, visible, totals
 
 
@@ -1292,6 +1291,47 @@ def _ordered_query(query):
     return query.order_by(PettyCashTransaction.transaction_date.asc(), PettyCashTransaction.created_at.asc(), PettyCashTransaction.id.asc())
 
 
+def _latest_first_query(query):
+    return query.order_by(PettyCashTransaction.transaction_date.desc(), PettyCashTransaction.created_at.desc(), PettyCashTransaction.id.desc())
+
+
+def _running_balance_map_for_page(filters, transaction_ids):
+    if not transaction_ids:
+        return {}
+    signed_amount = case(
+        (
+            PettyCashTransaction.is_void.is_(False),
+            case(
+                (PettyCashTransaction.transaction_type == TRANSACTION_IN, PettyCashTransaction.amount),
+                else_=-PettyCashTransaction.amount,
+            ),
+        ),
+        else_=0,
+    )
+    running_subquery = (
+        _filtered_query(filters)
+        .with_entities(
+            PettyCashTransaction.id.label("transaction_id"),
+            func.sum(signed_amount)
+            .over(
+                order_by=(
+                    PettyCashTransaction.transaction_date.asc(),
+                    PettyCashTransaction.created_at.asc(),
+                    PettyCashTransaction.id.asc(),
+                )
+            )
+            .label("running_balance"),
+        )
+        .subquery()
+    )
+    rows = (
+        db.session.query(running_subquery.c.transaction_id, running_subquery.c.running_balance)
+        .filter(running_subquery.c.transaction_id.in_(transaction_ids))
+        .all()
+    )
+    return {row.transaction_id: _row(running_balance=row.running_balance or 0) for row in rows}
+
+
 def _active_query():
     return PettyCashTransaction.query.filter(PettyCashTransaction.is_void.is_(False))
 
@@ -1310,6 +1350,35 @@ def _filter_totals(transactions):
         "expense": sum(row.amount for row in active if row.transaction_type == TRANSACTION_OUT),
         "net": sum(row.amount if row.transaction_type == TRANSACTION_IN else -row.amount for row in active),
         "count": len(active),
+    }
+
+
+def _filter_totals_from_query(query):
+    income_amount = case(
+        (
+            PettyCashTransaction.is_void.is_(False) & (PettyCashTransaction.transaction_type == TRANSACTION_IN),
+            PettyCashTransaction.amount,
+        ),
+        else_=0,
+    )
+    expense_amount = case(
+        (
+            PettyCashTransaction.is_void.is_(False) & (PettyCashTransaction.transaction_type == TRANSACTION_OUT),
+            PettyCashTransaction.amount,
+        ),
+        else_=0,
+    )
+    active_count = case((PettyCashTransaction.is_void.is_(False), 1), else_=0)
+    income, expense, count = query.with_entities(
+        func.coalesce(func.sum(income_amount), 0),
+        func.coalesce(func.sum(expense_amount), 0),
+        func.coalesce(func.sum(active_count), 0),
+    ).one()
+    return {
+        "income": income,
+        "expense": expense,
+        "net": income - expense,
+        "count": count,
     }
 
 
