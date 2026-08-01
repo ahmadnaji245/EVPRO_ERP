@@ -1,6 +1,6 @@
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from app import create_app
@@ -22,6 +22,8 @@ from services.petty_cash_service import (
     create_expense,
     create_income,
     current_balance,
+    build_petty_cash_pdf,
+    dashboard_data,
     ledger,
     petty_cash_detail_report,
     upsert_category,
@@ -143,9 +145,9 @@ class PettyCashTestCase(unittest.TestCase):
         html = response.data.decode()
         self.assertEqual(response.status_code, 200)
         self.assertIn('name="month"', html)
-        self.assertIn('value="7" selected', html)
+        self.assertIn(f'value="{date.today().month}" selected', html)
         self.assertIn('name="year"', html)
-        self.assertIn('value="2026" selected', html)
+        self.assertIn(f'value="{date.today().year}" selected', html)
         for removed in ("start_date", "end_date", "date_from", "date_to", "tanggal_dari", "tanggal_sampai"):
             self.assertNotIn(removed, html)
 
@@ -345,6 +347,49 @@ class PettyCashTestCase(unittest.TestCase):
         self.assertEqual(updated.category_code, original_code)
         self.assertEqual(updated.sort_order, original_sort_order)
         self.assertEqual(PettyCashTransaction.query.filter_by(category_id=category.id).first().category.category_code, original_code)
+
+    def test_new_month_uses_previous_month_ending_balance_everywhere(self):
+        july_income = create_income(
+            _form(transaction_date="2026-07-31", source_type=SOURCE_OPENING_BALANCE, amount="3019500"),
+            self.user,
+        )
+        expense = create_expense(
+            _form(
+                transaction_date="2026-08-01",
+                category_id=str(_category("Produksi dan Packaging").id),
+                amount="50000",
+                description="Pengeluaran Agustus",
+            ),
+            self.user,
+        )
+        filters = {"month": "8", "year": "2026"}
+
+        pagination, running_rows, totals = ledger(filters)
+        self.assertEqual([trx.id for trx in pagination.items], [expense.id])
+        self.assertEqual(running_rows[expense.id].running_balance, 2_969_500)
+        self.assertEqual(totals["income"], 0)
+        self.assertEqual(totals["expense"], 50_000)
+        self.assertEqual(totals["net"], running_rows[expense.id].running_balance)
+
+        report = petty_cash_detail_report(filters, self.user)
+        self.assertEqual(report["summary"]["opening_balance"], 3_019_500)
+        self.assertEqual(report["summary"]["total_income"], 0)
+        self.assertEqual(report["summary"]["total_expense"], 50_000)
+        self.assertEqual(report["summary"]["ending_balance"], 2_969_500)
+        self.assertEqual(report["transactions"][0].running_balance, 2_969_500)
+
+        summary_pdf_text = _pdf_text(build_petty_cash_pdf(filters, self.user).read())
+        self.assertIn("Rp50.000", summary_pdf_text)
+        self.assertIn("Rp2.969.500", summary_pdf_text)
+        self.assertNotIn("Rp-50.000", summary_pdf_text)
+        self.assertEqual(dashboard_data(today=_date("2026-08-01"))["balance"], 2_969_500)
+        self.assertEqual(july_income.amount, 3_019_500)
+
+        client = self.app.test_client()
+        client.post("/auth/login", data={"username": "admin", "password": "admin"})
+        detail_html = client.get("/keuangan/kas-kecil/detail?month=8&year=2026").data.decode()
+        self.assertIn("Saldo Bersih</span><strong>Rp2.969.500</strong>", detail_html)
+        self.assertIn("Pengeluaran Agustus", detail_html)
 
     def test_detail_pdf_report_calculation_matches_required_example(self):
         create_income(_form(transaction_date="2026-07-01", source_type=SOURCE_OPENING_BALANCE, amount="1000000"), self.user)

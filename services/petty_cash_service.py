@@ -654,20 +654,28 @@ def ledger(filters=None, page=1, per_page=25):
     filters = filters or {}
     query = _filtered_query(filters)
     pagination = _latest_first_query(query).paginate(page=max(int(page or 1), 1), per_page=per_page, error_out=False)
-    visible = _running_balance_map_for_page(filters, [trx.id for trx in pagination.items])
-    totals = _filter_totals_from_query(query)
+    balance_report = period_cash_balance(filters)
+    page_transaction_ids = {trx.id for trx in pagination.items}
+    visible = {
+        row.transaction.id: _row(running_balance=row.running_balance)
+        for row in balance_report["transactions"]
+        if row.transaction.id in page_transaction_ids
+    }
+    # Keep the statistics cards aligned with the same period calculation used
+    # by the running-balance rows and both PDF reports. `net` is the ending
+    # balance, not only the period's income minus expense.
+    totals = {
+        "income": balance_report["total_income"],
+        "expense": balance_report["total_expense"],
+        "net": balance_report["ending_balance"],
+        "count": balance_report["active_count"],
+    }
     return pagination, visible, totals
 
 
 def running_balance_rows(transactions=None):
     transactions = transactions if transactions is not None else _ordered_query(PettyCashTransaction.query).all()
-    balance = 0
-    rows = []
-    for trx in transactions:
-        if not trx.is_void:
-            balance += trx.amount if trx.transaction_type == TRANSACTION_IN else -trx.amount
-        rows.append(_row(transaction=trx, running_balance=balance))
-    return rows
+    return _running_balance_rows(transactions)
 
 
 def month_expenses(today=None):
@@ -695,10 +703,10 @@ def month_expenses(today=None):
 
 
 def build_petty_cash_pdf(filters, user):
-    rows = running_balance_rows(_ordered_query(_filtered_query(filters)).all())
-    active = [row.transaction for row in rows if not row.transaction.is_void]
-    total_in = sum(row.amount for row in active if row.transaction_type == TRANSACTION_IN)
-    total_out = sum(row.amount for row in active if row.transaction_type == TRANSACTION_OUT)
+    report = period_cash_balance(filters)
+    rows = report["transactions"]
+    total_in = report["total_income"]
+    total_out = report["total_expense"]
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=22, bottomMargin=22)
     styles = _summary_pdf_styles()
@@ -707,7 +715,7 @@ def build_petty_cash_pdf(filters, user):
         Paragraph("Laporan Kas Kecil", styles["SummaryTitle"]),
         Paragraph(f"Tanggal cetak: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Dicetak oleh: {getattr(user, 'name', '-')}", styles["SummaryMeta"]),
         Spacer(1, 12),
-        _summary_metric_table(total_in, total_out, total_in - total_out, styles),
+        _summary_metric_table(total_in, total_out, report["ending_balance"], styles),
         Spacer(1, 8),
         Paragraph("Keterangan: transaksi yang dibatalkan tetap tampil dalam riwayat, tetapi tidak memengaruhi saldo berjalan.", styles["SummaryNote"]),
         Spacer(1, 12),
@@ -780,27 +788,13 @@ def build_petty_cash_detail_pdf(filters, user):
 
 def petty_cash_detail_report(filters, user=None):
     filters = filters or {}
-    period_start, period_end = _period_bounds(filters)
-    opening_balance = _opening_balance_before(period_start)
     transactions = _ordered_query(
         _filtered_query(filters).options(joinedload(PettyCashTransaction.category), joinedload(PettyCashTransaction.creator))
     ).all()
-    running_rows = []
-    running_balance = opening_balance
-    active_count = 0
-    void_count = 0
-    for index, trx in enumerate(transactions, start=1):
-        if trx.is_void:
-            void_count += 1
-        else:
-            active_count += 1
-            running_balance += trx.amount if trx.transaction_type == TRANSACTION_IN else -trx.amount
-        running_rows.append(_row(no=index, transaction=trx, running_balance=running_balance))
-
-    active_transactions = [row.transaction for row in running_rows if not row.transaction.is_void]
-    total_income = sum(trx.amount for trx in active_transactions if trx.transaction_type == TRANSACTION_IN)
-    total_expense = sum(trx.amount for trx in active_transactions if trx.transaction_type == TRANSACTION_OUT)
-    net_change = total_income - total_expense
+    balance_report = period_cash_balance(filters, transactions=transactions)
+    running_rows = balance_report["transactions"]
+    total_income = balance_report["total_income"]
+    total_expense = balance_report["total_expense"]
     group_recap = _detail_group_recap(filters, total_expense)
     subcategory_recap = _detail_subcategory_recap(filters)
     classification = _detail_classification(filters)
@@ -809,21 +803,21 @@ def petty_cash_detail_report(filters, user=None):
         "filters": filters,
         "meta": _detail_filter_meta(filters, user),
         "summary": {
-            "opening_balance": opening_balance,
+            "opening_balance": balance_report["opening_balance"],
             "total_income": total_income,
             "total_expense": total_expense,
-            "net_change": net_change,
-            "ending_balance": opening_balance + net_change,
-            "active_count": active_count,
-            "void_count": void_count,
+            "net_change": balance_report["net_change"],
+            "ending_balance": balance_report["ending_balance"],
+            "active_count": balance_report["active_count"],
+            "void_count": balance_report["void_count"],
         },
         "group_recap": group_recap,
         "subcategory_recap": subcategory_recap,
         "classification": classification,
         "income_recap": income_recap,
         "transactions": running_rows,
-        "period_start": period_start,
-        "period_end": period_end,
+        "period_start": balance_report["period_start"],
+        "period_end": balance_report["period_end"],
     }
 
 
@@ -986,6 +980,41 @@ def _period_bounds(filters):
     else:
         end = date(year, month + 1, 1)
     return start, end
+
+
+def period_cash_balance(filters=None, transactions=None):
+    """Calculate a selected period from its opening balance and its transactions."""
+    filters = filters or {}
+    period_start, period_end = _period_bounds(filters)
+    opening_balance = _opening_balance_before(period_start)
+    if transactions is None:
+        transactions = _ordered_query(_filtered_query(filters)).all()
+    running_rows = _running_balance_rows(transactions, opening_balance=opening_balance)
+    active_transactions = [row.transaction for row in running_rows if not row.transaction.is_void]
+    total_income = sum(trx.amount for trx in active_transactions if trx.transaction_type == TRANSACTION_IN)
+    total_expense = sum(trx.amount for trx in active_transactions if trx.transaction_type == TRANSACTION_OUT)
+    return {
+        "period_start": period_start,
+        "period_end": period_end,
+        "opening_balance": opening_balance,
+        "transactions": running_rows,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net_change": total_income - total_expense,
+        "ending_balance": opening_balance + total_income - total_expense,
+        "active_count": len(active_transactions),
+        "void_count": len(running_rows) - len(active_transactions),
+    }
+
+
+def _running_balance_rows(transactions, opening_balance=0):
+    balance = opening_balance
+    rows = []
+    for index, trx in enumerate(transactions, start=1):
+        if not trx.is_void:
+            balance += trx.amount if trx.transaction_type == TRANSACTION_IN else -trx.amount
+        rows.append(_row(no=index, transaction=trx, running_balance=balance))
+    return rows
 
 
 def _opening_balance_before(period_start):
@@ -1288,48 +1317,11 @@ def _filtered_query(filters):
 
 
 def _ordered_query(query):
-    return query.order_by(PettyCashTransaction.transaction_date.asc(), PettyCashTransaction.created_at.asc(), PettyCashTransaction.id.asc())
+    return query.order_by(PettyCashTransaction.transaction_date.asc(), PettyCashTransaction.id.asc())
 
 
 def _latest_first_query(query):
-    return query.order_by(PettyCashTransaction.transaction_date.desc(), PettyCashTransaction.created_at.desc(), PettyCashTransaction.id.desc())
-
-
-def _running_balance_map_for_page(filters, transaction_ids):
-    if not transaction_ids:
-        return {}
-    signed_amount = case(
-        (
-            PettyCashTransaction.is_void.is_(False),
-            case(
-                (PettyCashTransaction.transaction_type == TRANSACTION_IN, PettyCashTransaction.amount),
-                else_=-PettyCashTransaction.amount,
-            ),
-        ),
-        else_=0,
-    )
-    running_subquery = (
-        _filtered_query(filters)
-        .with_entities(
-            PettyCashTransaction.id.label("transaction_id"),
-            func.sum(signed_amount)
-            .over(
-                order_by=(
-                    PettyCashTransaction.transaction_date.asc(),
-                    PettyCashTransaction.created_at.asc(),
-                    PettyCashTransaction.id.asc(),
-                )
-            )
-            .label("running_balance"),
-        )
-        .subquery()
-    )
-    rows = (
-        db.session.query(running_subquery.c.transaction_id, running_subquery.c.running_balance)
-        .filter(running_subquery.c.transaction_id.in_(transaction_ids))
-        .all()
-    )
-    return {row.transaction_id: _row(running_balance=row.running_balance or 0) for row in rows}
+    return query.order_by(PettyCashTransaction.transaction_date.desc(), PettyCashTransaction.id.desc())
 
 
 def _active_query():
