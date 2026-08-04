@@ -198,7 +198,7 @@ def approve_customer(access_code):
             notes=f"Customer portal token: {access_record.access_code}",
         )
         db.session.commit()
-        flash("Surat Order berhasil disetujui.", "success")
+        flash("Surat Order berhasil disetujui. Terima kasih. Selanjutnya, status produksi pesanan dapat dipantau secara real-time melalui halaman ini menggunakan link yang sama.", "success")
     return redirect(url_for("tracking.detail", access_code=access_code))
 
 
@@ -223,7 +223,7 @@ def approve_customer_order(order):
             notes=f"Tracking code: {order.tracking_code}",
         )
         db.session.commit()
-        flash("Surat Order berhasil disetujui.", "success")
+        flash("Surat Order berhasil disetujui. Terima kasih. Selanjutnya, status produksi pesanan dapat dipantau secara real-time melalui halaman ini menggunakan link yang sama.", "success")
 
 
 @tracking_bp.route("/<access_code>/production-photos/<int:photo_id>")
