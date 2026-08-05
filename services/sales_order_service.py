@@ -24,6 +24,8 @@ VALID_PLAYER_SIZES = [
     "XL Women",
     "XXL Women",
     "3XL Women",
+    "4XL Women",
+    "5XL Women",
     "S",
     "M",
     "L",

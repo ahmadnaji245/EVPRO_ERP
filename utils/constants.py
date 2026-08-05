@@ -70,6 +70,10 @@ SIZE_ORDER = {
     "WM": 11,
     "WL": 12,
     "WXL": 13,
+    "WXXL": 14,
+    "W3XL": 15,
+    "W4XL": 16,
+    "W5XL": 17,
     "XS": 20,
     "S": 21,
     "M": 22,
@@ -94,13 +98,15 @@ SIZE_ALIASES = {
     "L WOMEN": "WL",
     "XL WOMEN": "WXL",
     "XS WOMEN": "WS",
-    "XXL WOMEN": "WXL",
-    "3XL WOMEN": "WXL",
+    "XXL WOMEN": "WXXL",
+    "3XL WOMEN": "W3XL",
+    "4XL WOMEN": "W4XL",
+    "5XL WOMEN": "W5XL",
 }
 
 SIZE_GROUPS = {
     "Kids": {"KS", "KM", "KL", "KXL", "KXXL"},
-    "Women": {"WS", "WM", "WL", "WXL"},
+    "Women": {"WS", "WM", "WL", "WXL", "WXXL", "W3XL", "W4XL", "W5XL"},
 }
 LONG_SLEEVE_MARKERS = ("LENGAN PANJANG", "LONG SLEEVE", "LP")
 LONG_SLEEVE_THREE_QUARTER_MARKERS = ("3/4", "3 / 4", "¾")
