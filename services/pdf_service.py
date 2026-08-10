@@ -738,7 +738,7 @@ def build_vendor_production_table_pdf(vendor, rows, quantity_columns, printed_at
     title = f"DAFTAR PRODUKSI VENDOR - {str(vendor or '').upper()}"
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=A4,
+        pagesize=landscape(A4),
         rightMargin=8 * mm,
         leftMargin=8 * mm,
         topMargin=8 * mm,
@@ -868,10 +868,10 @@ def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
         )
         data.append(line)
 
-    qty_width = 13 * mm
-    col_widths = [8 * mm, 34 * mm, 22 * mm, 14 * mm]
+    qty_width = 20 * mm
+    col_widths = [9 * mm, 48 * mm, 28 * mm, 16 * mm]
     col_widths.extend([qty_width] * len(quantity_columns))
-    col_widths.extend([22 * mm, 22 * mm, 46 * mm])
+    col_widths.extend([24 * mm, 24 * mm, 52 * mm])
     table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
 
     table_style = [
