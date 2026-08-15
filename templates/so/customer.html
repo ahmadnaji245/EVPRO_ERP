@@ -196,12 +196,13 @@
             </div>
             <div class="table-responsive mt-3">
                 <table class="table table-sm align-middle mb-0">
-                    <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th></tr></thead>
+                    <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Harga Satuan</th><th class="text-end">Subtotal</th></tr></thead>
                     <tbody>
                         {% for item in linked_nota.items|sort(attribute='sort_order') %}
                             <tr>
                                 <td>{{ item.description }}</td>
                                 <td class="text-end">{{ item.quantity }}</td>
+                                <td class="text-end">{{ item.price|rupiah }}</td>
                                 <td class="text-end">{{ item.subtotal|rupiah }}</td>
                             </tr>
                         {% endfor %}
