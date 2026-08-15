@@ -61,11 +61,12 @@ USER_ROLE_ALIASES = {
 UPLOAD_SUBFOLDERS = ["brands", "designs", "customers", "pdf", "temp", "petty_cash"]
 
 SIZE_ORDER = {
-    "KS": 1,
-    "KM": 2,
-    "KL": 3,
-    "KXL": 4,
-    "KXXL": 5,
+    "KXS": 1,
+    "KS": 2,
+    "KM": 3,
+    "KL": 4,
+    "KXL": 5,
+    "KXXL": 6,
     "WS": 10,
     "WM": 11,
     "WL": 12,
@@ -87,11 +88,11 @@ SIZE_ORDER = {
 }
 
 SIZE_ALIASES = {
+    "XS KIDS": "KXS",
     "S KIDS": "KS",
     "M KIDS": "KM",
     "L KIDS": "KL",
     "XL KIDS": "KXL",
-    "XS KIDS": "KS",
     "XXL KIDS": "KXXL",
     "S WOMEN": "WS",
     "M WOMEN": "WM",
@@ -105,7 +106,7 @@ SIZE_ALIASES = {
 }
 
 SIZE_GROUPS = {
-    "Kids": {"KS", "KM", "KL", "KXL", "KXXL"},
+    "Kids": {"KXS", "KS", "KM", "KL", "KXL", "KXXL"},
     "Women": {"WS", "WM", "WL", "WXL", "WXXL", "W3XL", "W4XL", "W5XL"},
 }
 LONG_SLEEVE_MARKERS = ("LENGAN PANJANG", "LONG SLEEVE", "LP")

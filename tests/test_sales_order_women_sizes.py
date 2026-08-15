@@ -6,6 +6,32 @@ from utils.constants import normalize_size_key, size_group_name
 
 
 class SalesOrderWomenSizesTestCase(unittest.TestCase):
+    def test_kids_xs_and_s_have_distinct_keys_and_group(self):
+        cases = {
+            "XS Kids": "KXS",
+            "S Kids": "KS",
+        }
+
+        for size, expected_key in cases.items():
+            with self.subTest(size=size):
+                self.assertEqual(normalize_size_key(size), expected_key)
+                self.assertEqual(size_group_name(size), "Kids")
+
+    def test_size_recap_keeps_xs_and_s_kids_separate(self):
+        design = SalesOrderDesign(design_name="Home", item_name="Jersey")
+        design.players = [
+            SalesOrderPlayer(player_name="A", player_number="1", size="XS Kids", sort_order=1),
+            SalesOrderPlayer(player_name="B", player_number="2", size="S Kids", sort_order=2),
+        ]
+
+        self.assertEqual(
+            design.size_recap["groups"]["Kids"],
+            [
+                {"size": "XS Kids", "qty": 1},
+                {"size": "S Kids", "qty": 1},
+            ],
+        )
+
     def test_women_big_sizes_have_distinct_keys_and_group(self):
         cases = {
             "XL Women": "WXL",
