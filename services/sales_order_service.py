@@ -11,6 +11,7 @@ from utils.constants import PRODUCTION_STATUSES, normalize_production_status
 
 
 VALID_PLAYER_SIZES = [
+    "XXS Kids",
     "XS Kids",
     "S Kids",
     "M Kids",
@@ -26,6 +27,7 @@ VALID_PLAYER_SIZES = [
     "3XL Women",
     "4XL Women",
     "5XL Women",
+    "XS",
     "S",
     "M",
     "L",
@@ -43,6 +45,12 @@ VALID_PLAYER_SIZES = [
     "XL Lengan Panjang 3/4",
 ]
 PLAYER_SIZE_LOOKUP = {size.casefold(): size for size in VALID_PLAYER_SIZES}
+PLAYER_SIZE_LOOKUP.update(
+    {
+        "xs reguler": "XS",
+        "xs regular": "XS",
+    }
+)
 
 
 def _brand_is_evpro(brand):

@@ -6,8 +6,9 @@ from utils.constants import normalize_size_key, size_group_name
 
 
 class SalesOrderWomenSizesTestCase(unittest.TestCase):
-    def test_kids_xs_and_s_have_distinct_keys_and_group(self):
+    def test_kids_xxs_xs_and_s_have_distinct_keys_and_group(self):
         cases = {
+            "XXS Kids": "KXXS",
             "XS Kids": "KXS",
             "S Kids": "KS",
         }
@@ -17,16 +18,23 @@ class SalesOrderWomenSizesTestCase(unittest.TestCase):
                 self.assertEqual(normalize_size_key(size), expected_key)
                 self.assertEqual(size_group_name(size), "Kids")
 
-    def test_size_recap_keeps_xs_and_s_kids_separate(self):
+    def test_player_input_accepts_xxs_kids_xs_and_xs_reguler(self):
+        players = _parse_players("A, 1, XXS Kids\nB, 2, XS\nC, 3, XS Reguler")
+
+        self.assertEqual([player.size for player in players], ["XXS Kids", "XS", "XS"])
+
+    def test_size_recap_keeps_xxs_xs_and_s_kids_separate(self):
         design = SalesOrderDesign(design_name="Home", item_name="Jersey")
         design.players = [
-            SalesOrderPlayer(player_name="A", player_number="1", size="XS Kids", sort_order=1),
-            SalesOrderPlayer(player_name="B", player_number="2", size="S Kids", sort_order=2),
+            SalesOrderPlayer(player_name="A", player_number="1", size="XXS Kids", sort_order=1),
+            SalesOrderPlayer(player_name="B", player_number="2", size="XS Kids", sort_order=2),
+            SalesOrderPlayer(player_name="C", player_number="3", size="S Kids", sort_order=3),
         ]
 
         self.assertEqual(
             design.size_recap["groups"]["Kids"],
             [
+                {"size": "XXS Kids", "qty": 1},
                 {"size": "XS Kids", "qty": 1},
                 {"size": "S Kids", "qty": 1},
             ],
