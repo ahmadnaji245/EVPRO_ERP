@@ -19,6 +19,21 @@ NOTA_STATUSES = (
     "Lunas",
 )
 
+MONTH_OPTIONS = [
+    (1, "Januari"),
+    (2, "Februari"),
+    (3, "Maret"),
+    (4, "April"),
+    (5, "Mei"),
+    (6, "Juni"),
+    (7, "Juli"),
+    (8, "Agustus"),
+    (9, "September"),
+    (10, "Oktober"),
+    (11, "November"),
+    (12, "Desember"),
+]
+
 DEFAULT_NOTA_PRODUCTS = [
     ("FP", "Setelan full printing", 135000),
     ("LP1", "Tambahan lengan panjang", 15000),
@@ -197,8 +212,8 @@ def nota_rows(search=None):
     return [_nota_row(nota) for nota in list_notas(search)]
 
 
-def report_nota_rows(brand=None):
-    return [_nota_row(nota) for nota in _filtered_notas(brand)]
+def report_nota_rows(brand=None, year=None, month=None):
+    return [_nota_row(nota) for nota in _filtered_notas(brand, year, month)]
 
 
 def get_nota(nota_id):
@@ -243,44 +258,58 @@ def invoice_status_badge_class(status):
     }.get(status, "status-belum-dp")
 
 
-def dashboard_stats(brand=None):
-    notas = _filtered_notas(brand)
+def dashboard_stats(brand=None, year=None, month=None):
+    notas = _filtered_notas(brand, year, month)
     revenue = sum(nota.total for nota in notas)
     income = sum(nota.paid for nota in notas)
+    today = date.today()
+    month_notas = [nota for nota in notas if _same_month(nota.order_date, today)]
+    year_notas = [nota for nota in notas if nota.order_date and nota.order_date.year == today.year]
+    month_income = sum(
+        payment.amount
+        for nota in notas
+        for payment in nota.payments
+        if not payment.is_void
+        and _same_month(payment.payment_date, today)
+    )
     return _row(
         revenue=revenue,
         income=income,
         receivable=revenue - income,
+        monthly_revenue=sum(nota.total for nota in month_notas),
+        yearly_revenue=sum(nota.total for nota in year_notas),
+        monthly_income=month_income,
+        monthly_receivable=sum(nota.remaining for nota in month_notas),
         invoice_count=len(notas),
         belum_dp_count=sum(1 for nota in notas if calculate_invoice_status(nota) == "Belum DP"),
         dp_count=sum(1 for nota in notas if calculate_invoice_status(nota) == "DP"),
         lunas_count=sum(1 for nota in notas if calculate_invoice_status(nota) == "Lunas"),
-        desain_count=0,
-        produksi_count=0,
-        selesai_count=0,
-        diambil_count=0,
     )
 
 
-def monthly_revenue(brand=None):
+def _same_month(value, reference):
+    return value and value.year == reference.year and value.month == reference.month
+
+
+def monthly_revenue(brand=None, year=None, month=None):
     buckets = {}
-    for nota in _filtered_notas(brand):
+    for nota in _filtered_notas(brand, year, month):
         key = nota.order_date.strftime("%Y-%m") if nota.order_date else "-"
         buckets[key] = buckets.get(key, 0) + nota.total
     return [_row(month=month, total=total) for month, total in sorted(buckets.items())]
 
 
-def yearly_revenue(brand=None):
+def yearly_revenue(brand=None, year=None, month=None):
     buckets = {}
-    for nota in _filtered_notas(brand):
+    for nota in _filtered_notas(brand, year, month):
         key = nota.order_date.strftime("%Y") if nota.order_date else "-"
         buckets[key] = buckets.get(key, 0) + nota.total
     return [_row(year=year, total=total) for year, total in sorted(buckets.items(), reverse=True)]
 
 
-def top_customers(brand=None):
+def top_customers(brand=None, year=None, month=None):
     rows = {}
-    for nota in _filtered_notas(brand):
+    for nota in _filtered_notas(brand, year, month):
         customer = nota.customer
         key = customer.id
         row = rows.setdefault(
@@ -302,9 +331,9 @@ def top_customers(brand=None):
     return [_row(**row) for row in sorted_rows[:10]]
 
 
-def receivables(brand=None, status=None):
+def receivables(brand=None, status=None, year=None, month=None):
     rows = []
-    for nota in _filtered_notas(brand):
+    for nota in _filtered_notas(brand, year, month):
         if status and calculate_invoice_status(nota) != status:
             continue
         row = _nota_row(nota)
@@ -639,10 +668,25 @@ def seed_default_nota_products():
             db.session.add(NotaProduct(code=code, description=description, price=price))
 
 
-def _filtered_notas(brand=None):
+def report_year_options(selected_year=None):
+    years = {date.today().year}
+    rows = db.session.query(func.strftime("%Y", Nota.order_date)).filter(Nota.order_date.isnot(None)).distinct().all()
+    for year, in rows:
+        if str(year or "").isdigit():
+            years.add(int(year))
+    if selected_year:
+        years.add(int(selected_year))
+    return sorted(years, reverse=True)
+
+
+def _filtered_notas(brand=None, year=None, month=None):
     query = Nota.query.join(Brand)
     if brand:
         query = query.filter(Brand.name == brand)
+    if year:
+        query = query.filter(func.strftime("%Y", Nota.order_date) == str(int(year)))
+    if month:
+        query = query.filter(func.strftime("%m", Nota.order_date) == f"{int(month):02d}")
     return query.order_by(Nota.order_date.desc(), Nota.id.desc()).all()
 
 

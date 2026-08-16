@@ -6,13 +6,27 @@
         <h1 class="page-title">Customer Terbanyak Order</h1>
         <p class="text-muted mb-0">Daftar customer dengan jumlah order dan omset terbesar.</p>
     </div>
-    <form method="get">
+    <form method="get" class="d-flex flex-wrap gap-2">
         <select class="form-select" name="brand" onchange="this.form.submit()">
             <option value="">Semua Brand</option>
             {% for brand in brands %}
                 <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
             {% endfor %}
         </select>
+        <select class="form-select" name="month">
+            <option value="">Semua Bulan</option>
+            {% for value, label in month_options %}
+                <option value="{{ value }}" {% if active_month|string == value|string %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select class="form-select" name="year">
+            <option value="">Semua Tahun</option>
+            {% for year in year_options %}
+                <option value="{{ year }}" {% if active_year|string == year|string %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-rdr" type="submit">Terapkan</button>
+        <a class="btn btn-outline-dark" href="{{ url_for('nota.customer_report') }}">Reset</a>
     </form>
 </div>
 <section class="panel table-panel">

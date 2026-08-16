@@ -74,6 +74,21 @@ def monthly_point_chart():
     }
 
 
+def yearly_point_chart():
+    buckets = {}
+    for order in _active_sales_orders():
+        if not order.created_at:
+            continue
+        year = str(order.created_at.year)
+        buckets[year] = buckets.get(year, 0) + order.total_point
+    if not buckets:
+        buckets[str(date.today().year)] = 0
+    return {
+        "labels": list(sorted(buckets.keys())),
+        "values": [buckets[year] for year in sorted(buckets.keys())],
+    }
+
+
 def _monthly_target_value():
     target = Setting.query.filter_by(key="monthly_target").first()
     try:
@@ -149,7 +164,6 @@ def daily_setting_point_chart(month=None, year=None):
     year = _valid_year(year, today.year)
     days_in_month = calendar.monthrange(year, month)[1]
     daily_rows = {}
-    month_so_ids = set()
 
     for day in range(1, days_in_month + 1):
         current = date(year, month, day)
@@ -158,19 +172,16 @@ def daily_setting_point_chart(month=None, year=None):
             "label": f"{day:02d} {MONTH_OPTIONS[month - 1][1][:3]}",
             "day_name": DAY_NAMES[current.weekday()],
             "total_point": 0,
-            "so_ids": set(),
+            "so_count": 0,
         }
 
-    for checklist in _setting_checklists():
-        setting_at = _checklist_setting_at(checklist)
-        if not setting_at or setting_at.year != year or setting_at.month != month:
+    for order in _active_sales_orders():
+        order_date = order.created_at.date() if order.created_at else None
+        if not order_date or order_date.year != year or order_date.month != month:
             continue
-        order = checklist.player.design.sales_order if checklist.player and checklist.player.design else None
-        day_row = daily_rows[setting_at.day]
-        day_row["total_point"] += _player_setting_point(checklist.player)
-        if order:
-            day_row["so_ids"].add(order.id)
-            month_so_ids.add(order.id)
+        day_row = daily_rows[order_date.day]
+        day_row["total_point"] += order.total_point
+        day_row["so_count"] += 1
 
     rows = []
     for day in range(1, days_in_month + 1):
@@ -181,7 +192,7 @@ def daily_setting_point_chart(month=None, year=None):
                 "label": row["label"],
                 "day_name": row["day_name"],
                 "total_point": row["total_point"],
-                "so_count": len(row["so_ids"]),
+                "so_count": row["so_count"],
             }
         )
 
@@ -219,10 +230,14 @@ def daily_setting_point_chart(month=None, year=None):
             "total_point": total_point,
             "active_day_average": (total_point / len(active_rows)) if active_rows else 0,
             "busiest_day": _format_busiest_day(busiest_day) if busiest_day and busiest_day["total_point"] > 0 else "-",
-            "total_so": len(month_so_ids),
+            "total_so": sum(row["so_count"] for row in rows),
         },
         "weekday_averages": weekday_rows,
     }
+
+
+def _active_sales_orders():
+    return SalesOrder.query.filter(SalesOrder.is_deleted.is_(False), SalesOrder.deleted_at.is_(None)).all()
 
 
 def _setting_checklists():

@@ -6,22 +6,36 @@
         <h1 class="page-title">Laporan</h1>
         <p class="text-muted mb-0">Ringkasan performa keuangan dan customer.</p>
     </div>
-    <form method="get" class="d-flex gap-2">
+    <form method="get" class="d-flex flex-wrap gap-2">
         <select class="form-select" name="brand" onchange="this.form.submit()">
             <option value="">Semua Brand</option>
             {% for brand in brands %}
                 <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
             {% endfor %}
         </select>
+        <select class="form-select" name="month">
+            <option value="">Semua Bulan</option>
+            {% for value, label in month_options %}
+                <option value="{{ value }}" {% if active_month|string == value|string %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select class="form-select" name="year">
+            <option value="">Semua Tahun</option>
+            {% for year in year_options %}
+                <option value="{{ year }}" {% if active_year|string == year|string %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-rdr" type="submit">Terapkan</button>
+        <a class="btn btn-outline-dark" href="{{ url_for('nota.reports') }}">Reset</a>
     </form>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_invoices', brand=active_brand) }}">Export Semua Nota ke Excel</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_receivables', brand=active_brand) }}">Export Piutang ke Excel</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_monthly_revenue', brand=active_brand) }}">Export Omset Bulanan ke Excel</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_customers', brand=active_brand) }}">Export Customer ke Excel</a>
-    <a class="btn btn-rdr" href="{{ url_for('nota.customer_report', brand=active_brand) }}">Customer Terbanyak Nota</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_invoices', **report_query) }}">Export Semua Nota ke Excel</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_receivables', **report_query) }}">Export Piutang ke Excel</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_monthly_revenue', **report_query) }}">Export Omset Bulanan ke Excel</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_customers', **report_query) }}">Export Customer ke Excel</a>
+    <a class="btn btn-rdr" href="{{ url_for('nota.customer_report', **report_query) }}">Customer Terbanyak Nota</a>
 </div>
 
 <div class="row g-3 mb-4">

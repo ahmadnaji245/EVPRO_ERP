@@ -1,5 +1,6 @@
 const monthlyPointChart = document.getElementById("monthlyPointChart");
 const dailySettingPointChart = document.getElementById("dailySettingPointChart");
+const yearlyPointChart = document.getElementById("yearlyPointChart");
 const monthlyRevenueChart = document.getElementById("monthlyRevenueChart");
 const yearlyRevenueChart = document.getElementById("yearlyRevenueChart");
 
@@ -39,7 +40,7 @@ if (dailySettingPointChart && window.Chart) {
             labels,
             datasets: [
                 {
-                    label: "Poin Setting Harian",
+                    label: "Total Poin Harian",
                     data: values,
                     backgroundColor: "#c5162e",
                     borderRadius: 6,
@@ -62,7 +63,7 @@ if (dailySettingPointChart && window.Chart) {
                             return [
                                 `Hari: ${tooltip.day_name || "-"}`,
                                 `Total poin: ${tooltip.total_point || 0}`,
-                                `Jumlah SO yang dikerjakan: ${tooltip.so_count || 0}`,
+                                `Jumlah SO: ${tooltip.so_count || 0}`,
                             ];
                         },
                     },
@@ -72,6 +73,33 @@ if (dailySettingPointChart && window.Chart) {
                 x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 16 } },
                 y: { beginAtZero: true },
             },
+        },
+    });
+}
+
+if (yearlyPointChart && window.Chart) {
+    const labels = JSON.parse(yearlyPointChart.dataset.labels || "[]");
+    const values = JSON.parse(yearlyPointChart.dataset.values || "[]");
+
+    new Chart(yearlyPointChart, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Total Point Tahunan",
+                    data: values,
+                    borderColor: "#20242a",
+                    backgroundColor: "rgba(197, 22, 46, 0.12)",
+                    tension: 0.25,
+                    fill: true,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } },
         },
     });
 }

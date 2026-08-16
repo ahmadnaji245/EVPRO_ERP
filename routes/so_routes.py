@@ -9,7 +9,7 @@ from models.master_data import MasterInstruction, MasterItem, MasterMaterial, Ma
 from services.history_service import record_history
 from services.brand_service import list_active_brands
 from services.crm_service import get_lead, lead_form_data_for_sales_order
-from services.dashboard_service import daily_setting_point_chart, dashboard_stats, monthly_point_chart, monthly_setting_point_progress
+from services.dashboard_service import daily_setting_point_chart, dashboard_stats, monthly_point_chart, yearly_point_chart
 from services.master_data_service import list_active_rows
 from services.nota_service import billing_status_for_sales_order, get_nota_by_so_id
 from services.order_status_service import get_display_status
@@ -98,8 +98,8 @@ def dashboard():
         "so/dashboard.html",
         stats=dashboard_stats(),
         monthly=monthly_point_chart(),
-        setting_progress=monthly_setting_point_progress(selected_month, selected_year),
         daily_setting=daily_setting_point_chart(selected_month, selected_year),
+        yearly=yearly_point_chart(),
     )
 
 

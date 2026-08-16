@@ -58,7 +58,7 @@
 
 <div class="panel mt-4">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-        <div class="section-title mb-0">Poin Setting Harian</div>
+        <div class="section-title mb-0">Total Poin Harian</div>
         <form class="d-flex flex-wrap gap-2" method="get">
             <select class="form-select form-select-sm w-auto" name="month" aria-label="Bulan">
                 {% for month_value, month_label in daily_setting.month_options %}
@@ -85,14 +85,6 @@
         <div>
             <span>Hari Paling Ramai</span>
             <strong class="dashboard-summary-text">{{ daily_setting.summary.busiest_day }}</strong>
-        </div>
-        <div>
-            <span>Total SO Disetting Bulan Ini</span>
-            <strong>{{ daily_setting.summary.total_so }}</strong>
-        </div>
-        <div>
-            <span>User Poin Setting Tertinggi</span>
-            <strong>{{ setting_progress.top_user.name if setting_progress.top_user else '-' }}</strong>
         </div>
     </div>
     <canvas id="dailySettingPointChart"
@@ -121,5 +113,12 @@
             </table>
         </div>
     </div>
+</div>
+
+<div class="panel mt-4">
+    <div class="section-title">Grafik Poin per Tahun</div>
+    <canvas id="yearlyPointChart"
+            data-labels='{{ yearly["labels"]|tojson }}'
+            data-values='{{ yearly["values"]|tojson }}'></canvas>
 </div>
 {% endblock %}

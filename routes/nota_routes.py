@@ -6,6 +6,7 @@ from flask_login import current_user
 
 from utils.permissions import permission_required
 from services.nota_service import (
+    MONTH_OPTIONS,
     NOTA_STATUSES,
     add_payment,
     calculate_invoice_status,
@@ -37,6 +38,7 @@ from services.nota_service import (
     posted_item_rows,
     receivables,
     report_nota_rows,
+    report_year_options,
     top_customers,
     totals,
     update_payment,
@@ -75,6 +77,25 @@ def _form_context(**kwargs):
 
 def _brand_filter():
     return request.args.get("brand", "").strip()
+
+
+def _report_period_filter():
+    month = request.args.get("month", "").strip()
+    year = request.args.get("year", "").strip()
+    month = int(month) if month.isdigit() and 1 <= int(month) <= 12 else None
+    year = int(year) if year.isdigit() and 2000 <= int(year) <= 2100 else None
+    return year, month
+
+
+def _report_query(brand=None, year=None, month=None):
+    query = {}
+    if brand:
+        query["brand"] = brand
+    if year:
+        query["year"] = year
+    if month:
+        query["month"] = month
+    return query
 
 
 @nota_bp.route("/dashboard")
@@ -147,14 +168,20 @@ def delete(nota_id):
 @permission_required("nota.view")
 def reports():
     brand = _brand_filter()
+    year, month = _report_period_filter()
     return render_template(
         "nota/reports/index.html",
-        stats=dashboard_stats(brand or None),
-        monthly=monthly_revenue(brand or None),
-        yearly=yearly_revenue(brand or None),
-        customers=top_customers(brand or None),
+        stats=dashboard_stats(brand or None, year, month),
+        monthly=monthly_revenue(brand or None, year, month),
+        yearly=yearly_revenue(brand or None, year, month),
+        customers=top_customers(brand or None, year, month),
         brands=list_invoice_brand_options(),
         active_brand=brand,
+        active_year=year,
+        active_month=month,
+        month_options=MONTH_OPTIONS,
+        year_options=report_year_options(year),
+        report_query=_report_query(brand, year, month),
     )
 
 
@@ -162,11 +189,16 @@ def reports():
 @permission_required("nota.view")
 def customer_report():
     brand = _brand_filter()
+    year, month = _report_period_filter()
     return render_template(
         "nota/reports/customers.html",
-        customers=top_customers(brand or None),
+        customers=top_customers(brand or None, year, month),
         brands=list_invoice_brand_options(),
         active_brand=brand,
+        active_year=year,
+        active_month=month,
+        month_options=MONTH_OPTIONS,
+        year_options=report_year_options(year),
     )
 
 
@@ -201,7 +233,8 @@ def income_page():
 @nota_bp.route("/export/nota")
 @permission_required("nota.view")
 def export_invoices():
-    rows = invoice_export_rows(report_nota_rows(_brand_filter() or None))
+    year, month = _report_period_filter()
+    rows = invoice_export_rows(report_nota_rows(_brand_filter() or None, year, month))
     workbook = workbook_response(
         "Semua Nota",
         ["Nomor Nota", "Tanggal", "Brand", "Customer", "Tim", "Total Nota", "Sudah Dibayar", "Sisa Piutang", "Status"],
@@ -213,7 +246,8 @@ def export_invoices():
 @nota_bp.route("/export/piutang")
 @permission_required("nota.view")
 def export_receivables():
-    rows = invoice_export_rows(receivables(_brand_filter() or None))
+    year, month = _report_period_filter()
+    rows = invoice_export_rows(receivables(_brand_filter() or None, year=year, month=month))
     workbook = workbook_response(
         "Piutang",
         ["Nomor Nota", "Tanggal", "Brand", "Customer", "Tim", "Total Nota", "Sudah Dibayar", "Sisa Piutang", "Status"],
@@ -225,7 +259,8 @@ def export_receivables():
 @nota_bp.route("/export/omset-bulanan")
 @permission_required("nota.view")
 def export_monthly_revenue():
-    rows = [[row.month, row.total] for row in monthly_revenue(_brand_filter() or None)]
+    year, month = _report_period_filter()
+    rows = [[row.month, row.total] for row in monthly_revenue(_brand_filter() or None, year, month)]
     workbook = workbook_response("Omset Bulanan", ["Bulan", "Omset"], rows)
     return _excel_file(workbook, "omset-bulanan.xlsx")
 
@@ -233,7 +268,8 @@ def export_monthly_revenue():
 @nota_bp.route("/export/customer")
 @permission_required("nota.view")
 def export_customers():
-    rows = [[row.name, row.team_name, row.brand, row.invoice_count, row.total] for row in top_customers(_brand_filter() or None)]
+    year, month = _report_period_filter()
+    rows = [[row.name, row.team_name, row.brand, row.invoice_count, row.total] for row in top_customers(_brand_filter() or None, year, month)]
     workbook = workbook_response("Customer", ["Nama Customer", "Tim", "Brand", "Jumlah Nota", "Total Omset"], rows)
     return _excel_file(workbook, "customer.xlsx")
 

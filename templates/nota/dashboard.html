@@ -20,17 +20,14 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-6 col-xl-3"><div class="metric"><span>Total Omset</span><strong>{{ stats.revenue|rupiah }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric"><span>Total Piutang</span><strong>{{ stats.receivable|rupiah }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric"><span>Total Pemasukan</span><strong>{{ stats.income|rupiah }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric"><span>Jumlah Nota</span><strong>{{ stats.invoice_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Omset Bulan Ini</span><strong>{{ stats.monthly_revenue|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Omset Tahunan</span><strong>{{ stats.yearly_revenue|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Piutang Bulan Ini</span><strong>{{ stats.monthly_receivable|rupiah }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Total Pemasukan Bulan Ini</span><strong>{{ stats.monthly_income|rupiah }}</strong></div></div>
     <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Belum DP</span><strong>{{ stats.belum_dp_count or 0 }}</strong></div></div>
     <div class="col-6 col-xl-3"><div class="metric small-metric"><span>DP</span><strong>{{ stats.dp_count or 0 }}</strong></div></div>
     <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Lunas</span><strong>{{ stats.lunas_count or 0 }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Desain</span><strong>{{ stats.desain_count or 0 }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Produksi</span><strong>{{ stats.produksi_count or 0 }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Selesai</span><strong>{{ stats.selesai_count or 0 }}</strong></div></div>
-    <div class="col-6 col-xl-3"><div class="metric small-metric"><span>Diambil</span><strong>{{ stats.diambil_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3"><div class="metric"><span>Jumlah Nota</span><strong>{{ stats.invoice_count or 0 }}</strong></div></div>
 </div>
 
 <div class="row g-4">
