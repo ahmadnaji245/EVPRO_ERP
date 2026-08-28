@@ -2,6 +2,10 @@ from datetime import date, datetime, timedelta
 from io import BytesIO
 from types import SimpleNamespace
 
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func, or_
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -10,7 +14,7 @@ from database.db import db
 from models import Brand, Nota, NotaCustomer, NotaItem, NotaPayment, NotaProduct, SalesOrder
 from services.crm_service import sync_nota_customer
 from services.number_generator import generate_nota_number
-from utils.formatters import pretty_date
+from utils.formatters import pretty_date, rupiah
 
 
 NOTA_STATUSES = (
@@ -62,17 +66,20 @@ INVOICE_BRAND_FF = {
 
 
 def list_brands():
-    return Brand.query.filter_by(status="active").order_by(Brand.name).all()
+    return Brand.query.filter_by(status="active").order_by(Brand.code.asc(), Brand.id.asc()).all()
+
+
+def list_brands_for_form(selected_brand_id=None):
+    brands = list_brands()
+    if str(selected_brand_id or "").isdigit():
+        selected_brand = Brand.query.get(int(selected_brand_id))
+        if selected_brand and selected_brand.id not in {brand.id for brand in brands}:
+            brands.append(selected_brand)
+    return brands
 
 
 def list_invoice_brand_options():
-    defaults = ["Evpro", "RDR Apparel", "FF Apparel"]
-    names = [brand.name for brand in Brand.query.order_by(Brand.name.asc()).all()]
-    options = []
-    for name in defaults + names:
-        if name and name not in options:
-            options.append(name)
-    return options
+    return list_brands()
 
 
 def get_invoice_brand(brand_name):
@@ -94,7 +101,7 @@ def get_invoice_brand_group(brand_name):
 
 
 def invoice_brand_filter_options():
-    return ["FF Apparel", "RDR Apparel", "EVPRO"]
+    return list_brands()
 
 
 def format_so_number_for_invoice(sales_order):
@@ -182,7 +189,6 @@ def list_notas(search=None):
     q = str(search.get("q") or "").strip()
     status = str(search.get("status") or "").strip()
     brand_id = str(search.get("brand_id") or "").strip()
-    brand_group = str(search.get("brand_group") or "").strip()
 
     if q:
         normalized_q = q.removeprefix("Nota-")
@@ -201,8 +207,6 @@ def list_notas(search=None):
     if brand_id.isdigit():
         query = query.filter(Nota.brand_id == int(brand_id))
     notas = query.order_by(Nota.order_date.desc(), Nota.id.desc()).all()
-    if brand_group in invoice_brand_filter_options():
-        notas = [nota for nota in notas if get_invoice_brand_group(nota.brand.name if nota.brand else "") == brand_group]
     if status:
         notas = [nota for nota in notas if calculate_invoice_status(nota) == status]
     return notas
@@ -212,8 +216,72 @@ def nota_rows(search=None):
     return [_nota_row(nota) for nota in list_notas(search)]
 
 
-def report_nota_rows(brand=None, year=None, month=None):
-    return [_nota_row(nota) for nota in _filtered_notas(brand, year, month)]
+def report_nota_rows(brand_id=None, year=None, month=None):
+    return [_nota_row(nota) for nota in _filtered_notas(brand_id, year, month)]
+
+
+def brand_report_rows(brand_id=None, year=None, month=None):
+    groups = {}
+    for nota in _filtered_notas(brand_id, year, month):
+        brand = nota.brand
+        key = nota.brand_id or 0
+        row = groups.setdefault(
+            key,
+            {
+                "brand": brand.name if brand else "-",
+                "invoice_count": 0,
+                "total_size": 0,
+                "revenue": 0,
+                "paid": 0,
+                "remaining": 0,
+            },
+        )
+        row["invoice_count"] += 1
+        row["total_size"] += _nota_total_size(nota)
+        row["revenue"] += nota.total
+        row["paid"] += nota.paid
+        row["remaining"] += nota.remaining
+    return [
+        _row(**row)
+        for row in sorted(
+            groups.values(),
+            key=lambda item: (item["total_size"], item["invoice_count"], item["revenue"], item["brand"]),
+            reverse=True,
+        )
+    ]
+
+
+def evpro_seller_report_rows(brand_id=None, year=None, month=None):
+    groups = {}
+    for nota in _filtered_notas(brand_id, year, month):
+        if not _brand_is_evpro(nota.brand):
+            continue
+        seller = str(nota.sales_order.seller_name or "").strip() if nota.sales_order else ""
+        seller = seller or "Tanpa Seller"
+        row = groups.setdefault(
+            seller,
+            {
+                "seller": seller,
+                "invoice_count": 0,
+                "total_size": 0,
+                "revenue": 0,
+                "paid": 0,
+                "remaining": 0,
+            },
+        )
+        row["invoice_count"] += 1
+        row["total_size"] += _nota_total_size(nota)
+        row["revenue"] += nota.total
+        row["paid"] += nota.paid
+        row["remaining"] += nota.remaining
+    return [
+        _row(**row)
+        for row in sorted(
+            groups.values(),
+            key=lambda item: (item["total_size"], item["invoice_count"], item["revenue"], item["seller"]),
+            reverse=True,
+        )
+    ]
 
 
 def get_nota(nota_id):
@@ -258,8 +326,8 @@ def invoice_status_badge_class(status):
     }.get(status, "status-belum-dp")
 
 
-def dashboard_stats(brand=None, year=None, month=None):
-    notas = _filtered_notas(brand, year, month)
+def dashboard_stats(brand_id=None, year=None, month=None):
+    notas = _filtered_notas(brand_id, year, month)
     revenue = sum(nota.total for nota in notas)
     income = sum(nota.paid for nota in notas)
     today = date.today()
@@ -291,25 +359,25 @@ def _same_month(value, reference):
     return value and value.year == reference.year and value.month == reference.month
 
 
-def monthly_revenue(brand=None, year=None, month=None):
+def monthly_revenue(brand_id=None, year=None, month=None):
     buckets = {}
-    for nota in _filtered_notas(brand, year, month):
+    for nota in _filtered_notas(brand_id, year, month):
         key = nota.order_date.strftime("%Y-%m") if nota.order_date else "-"
         buckets[key] = buckets.get(key, 0) + nota.total
     return [_row(month=month, total=total) for month, total in sorted(buckets.items())]
 
 
-def yearly_revenue(brand=None, year=None, month=None):
+def yearly_revenue(brand_id=None, year=None, month=None):
     buckets = {}
-    for nota in _filtered_notas(brand, year, month):
+    for nota in _filtered_notas(brand_id, year, month):
         key = nota.order_date.strftime("%Y") if nota.order_date else "-"
         buckets[key] = buckets.get(key, 0) + nota.total
     return [_row(year=year, total=total) for year, total in sorted(buckets.items(), reverse=True)]
 
 
-def top_customers(brand=None, year=None, month=None):
+def top_customers(brand_id=None, year=None, month=None):
     rows = {}
-    for nota in _filtered_notas(brand, year, month):
+    for nota in _filtered_notas(brand_id, year, month):
         customer = nota.customer
         key = customer.id
         row = rows.setdefault(
@@ -331,9 +399,9 @@ def top_customers(brand=None, year=None, month=None):
     return [_row(**row) for row in sorted_rows[:10]]
 
 
-def receivables(brand=None, status=None, year=None, month=None):
+def receivables(brand_id=None, status=None, year=None, month=None):
     rows = []
-    for nota in _filtered_notas(brand, year, month):
+    for nota in _filtered_notas(brand_id, year, month):
         if status and calculate_invoice_status(nota) != status:
             continue
         row = _nota_row(nota)
@@ -342,10 +410,10 @@ def receivables(brand=None, status=None, year=None, month=None):
     return rows
 
 
-def income_payments(brand=None):
+def income_payments(brand_id=None):
     query = NotaPayment.query.join(Nota).join(NotaCustomer)
-    if brand:
-        query = query.join(Brand, Nota.brand_id == Brand.id).filter(Brand.name == brand)
+    if str(brand_id or "").isdigit():
+        query = query.filter(Nota.brand_id == int(brand_id))
     payments = query.filter(NotaPayment.is_void.is_(False)).order_by(NotaPayment.payment_date.desc(), NotaPayment.id.desc()).all()
     return [
         _row(
@@ -361,12 +429,12 @@ def income_payments(brand=None):
     ]
 
 
-def income_summary(brand=None):
+def income_summary(brand_id=None):
     today = date.today()
     week_start = today - timedelta(days=6)
     month_key = today.strftime("%Y-%m")
     year_key = today.strftime("%Y")
-    payments = income_payments(brand)
+    payments = income_payments(brand_id)
     return _row(
         today=sum(payment.amount for payment in payments if payment.payment_date == today),
         weekly=sum(payment.amount for payment in payments if payment.payment_date and payment.payment_date >= week_start),
@@ -410,6 +478,117 @@ def invoice_export_rows(rows):
         ]
         for row in rows
     ]
+
+
+def build_nota_report_pdf(brand_rows, seller_rows, stats, filters=None):
+    filters = filters or {}
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("NotaReportTitle", parent=styles["Title"], fontSize=20, leading=24, textColor=colors.HexColor("#20242a"))
+    meta_style = ParagraphStyle("NotaReportMeta", parent=styles["Normal"], fontSize=10, leading=13, textColor=colors.HexColor("#555555"))
+    text_style = ParagraphStyle("NotaReportText", parent=styles["Normal"], fontSize=10, leading=13)
+    head_style = ParagraphStyle("NotaReportHead", parent=text_style, fontName="Helvetica-Bold", textColor=colors.white)
+    section_style = ParagraphStyle("NotaReportSection", parent=text_style, fontName="Helvetica-Bold", fontSize=13, leading=16)
+
+    filter_parts = [
+        f"Brand: {filters.get('brand') or 'Semua Brand'}",
+        f"Bulan: {filters.get('month') or 'Semua Bulan'}",
+        f"Tahun: {filters.get('year') or 'Semua Tahun'}",
+        f"Dicetak: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+    ]
+    story = [
+        Paragraph("Laporan Nota", title_style),
+        Paragraph(" | ".join(filter_parts), meta_style),
+        Spacer(1, 8),
+        _nota_report_summary_table(stats, text_style),
+        Spacer(1, 14),
+    ]
+
+    story.append(Paragraph("Rekap Brand", section_style))
+    story.append(Spacer(1, 6))
+    story.append(_nota_report_rows_table(_brand_report_pdf_rows(brand_rows), head_style, text_style))
+    if filters.get("show_evpro_sellers", True):
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Reseller Brand Evpro", section_style))
+        story.append(Spacer(1, 6))
+        story.append(_nota_report_rows_table(_seller_report_pdf_rows(seller_rows), head_style, text_style))
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Rekap Seller Evpro", section_style))
+        story.append(Spacer(1, 6))
+        story.append(_nota_report_rows_table(_seller_size_report_pdf_rows(seller_rows), head_style, text_style, col_widths=[520, 150]))
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+def _nota_report_summary_table(stats, text_style):
+    rows = [
+        ["Omset Total", rupiah(stats.revenue), "Total Pemasukan", rupiah(stats.income)],
+        ["Total Piutang", rupiah(stats.receivable), "Jumlah Nota", str(stats.invoice_count or 0)],
+    ]
+    return Table(
+        [[Paragraph(str(cell), text_style) for cell in row] for row in rows],
+        colWidths=[150, 200, 150, 200],
+        style=TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d9dce2")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7f8fa")),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        ),
+    )
+
+
+def _brand_report_pdf_rows(rows):
+    table_rows = [["Brand", "Jumlah Nota", "Total Size", "Omset", "Dibayar", "Sisa Piutang"]]
+    for row in rows:
+        table_rows.append([row.brand, row.invoice_count, row.total_size, rupiah(row.revenue), rupiah(row.paid), rupiah(row.remaining)])
+    if len(table_rows) == 1:
+        table_rows.append(["Belum ada data", "-", "-", "-", "-", "-"])
+    return table_rows
+
+
+def _seller_report_pdf_rows(rows):
+    table_rows = [["Seller", "Jumlah Nota", "Total Size", "Omset", "Dibayar", "Sisa Piutang"]]
+    for row in rows:
+        table_rows.append([row.seller, row.invoice_count, row.total_size, rupiah(row.revenue), rupiah(row.paid), rupiah(row.remaining)])
+    if len(table_rows) == 1:
+        table_rows.append(["Belum ada data reseller Evpro", "-", "-", "-", "-", "-"])
+    return table_rows
+
+
+def _seller_size_report_pdf_rows(rows):
+    table_rows = [["Seller", "Total Size"]]
+    for row in rows:
+        table_rows.append([row.seller, row.total_size])
+    if len(table_rows) == 1:
+        table_rows.append(["Belum ada data seller Evpro", "-"])
+    return table_rows
+
+
+def _nota_report_rows_table(rows, head_style, text_style, col_widths=None):
+    return Table(
+        [[Paragraph(str(cell), head_style if index == 0 else text_style) for cell in row] for index, row in enumerate(rows)],
+        repeatRows=1,
+        colWidths=col_widths or [190, 100, 100, 130, 130, 130],
+        style=TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#c5162e")),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d9dce2")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f8fa")]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        ),
+    )
 
 
 def item_rows_for_form(nota=None):
@@ -679,10 +858,10 @@ def report_year_options(selected_year=None):
     return sorted(years, reverse=True)
 
 
-def _filtered_notas(brand=None, year=None, month=None):
+def _filtered_notas(brand_id=None, year=None, month=None):
     query = Nota.query.join(Brand)
-    if brand:
-        query = query.filter(Brand.name == brand)
+    if str(brand_id or "").isdigit():
+        query = query.filter(Nota.brand_id == int(brand_id))
     if year:
         query = query.filter(func.strftime("%Y", Nota.order_date) == str(int(year)))
     if month:
@@ -704,10 +883,22 @@ def _nota_row(nota):
         customer_name=nota.customer.name,
         team_name=nota.team_name,
         phone=nota.customer.phone,
+        total_order=len(nota.items),
+        total_size=_nota_total_size(nota),
         total=nota.total,
         paid=nota.paid,
         remaining=nota.remaining,
     )
+
+
+def _nota_total_size(nota):
+    return sum(item.quantity for item in nota.items)
+
+
+def _brand_is_evpro(brand):
+    if not brand:
+        return False
+    return str(brand.name or "").strip().casefold() == "evpro" or str(brand.code or "").strip().casefold() == "evpro"
 
 
 def _row(**kwargs):

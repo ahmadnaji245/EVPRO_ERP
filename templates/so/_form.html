@@ -35,12 +35,11 @@
                     <input class="form-control" name="seller_name" value="{{ form.get('seller_name', sales_order.seller_name if sales_order else '') }}" data-seller-input>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Sumber Customer</label>
-                    {% set selected_customer_source = form.get('customer_source', sales_order.crm_customer.source if sales_order and sales_order.crm_customer else '') %}
-                    <select class="form-select" name="customer_source">
-                        <option value="">Otomatis dari brand/seller</option>
-                        {% for source in ('Ahmad', 'Reseller EVPRO', 'Brand') %}
-                            <option value="{{ source }}" {% if selected_customer_source == source %}selected{% endif %}>{{ source }}</option>
+                    <label class="form-label">Poin</label>
+                    {% set selected_point = form.get('point_per_size', sales_order.point_per_size if sales_order else 1)|float %}
+                    <select class="form-select" name="point_per_size" required>
+                        {% for point in (0, 0.5, 1, 1.5) %}
+                            <option value="{{ point }}" {% if selected_point == point %}selected{% endif %}>{{ point }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -99,7 +98,6 @@
     <div class="col-12">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 so-toolbar">
             <div class="section-title mb-0">Desain</div>
-            <button class="btn btn-outline-dark" type="button" data-add-design>+ Tambah Desain</button>
         </div>
         <div class="d-grid gap-3" data-design-list>
             {% for design in form_designs %}
@@ -206,6 +204,9 @@
                     </div>
                 </div>
             {% endfor %}
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-outline-dark" type="button" data-add-design>+ Tambah Desain</button>
         </div>
         <template data-design-template>
             <div class="panel" data-design-section>

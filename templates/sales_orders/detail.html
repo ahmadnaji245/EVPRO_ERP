@@ -127,8 +127,17 @@ Terima kasih 🙏{% endset %}
                 <dt class="col-5">Customer</dt><dd class="col-7">{{ sales_order.customer_access.customer_name if sales_order.customer_access else '-' }}</dd>
                 <dt class="col-5">Tracking Code</dt><dd class="col-7">{{ sales_order.tracking_code }}</dd>
                 <dt class="col-5">Kode Akses Lama</dt><dd class="col-7">{{ sales_order.access_code }}</dd>
-                <dt class="col-5">Tanggal Masuk</dt><dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
+                <dt class="col-5">Tanggal Masuk</dt>
+                <dd class="col-7">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span>{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</span>
+                        {% if has_permission('sales_order.manage') %}
+                            <button class="btn btn-outline-secondary btn-sm py-0" type="button" data-bs-toggle="modal" data-bs-target="#quickEditDateModal">Ubah Tanggal</button>
+                        {% endif %}
+                    </div>
+                </dd>
                 <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
+                <dt class="col-5">Poin</dt><dd class="col-7">{{ sales_order.point_per_size|number(1) }}</dd>
                 <dt class="col-5">Total Size</dt><dd class="col-7">{{ sales_order.total_size }}</dd>
                 <dt class="col-5">Total Point</dt><dd class="col-7">{{ sales_order.total_point|number(1) }}</dd>
             </dl>
@@ -224,7 +233,12 @@ Terima kasih 🙏{% endset %}
                     <div class="section-title mb-1">{{ design.design_name }}</div>
                     <p class="text-muted mb-0">{{ design.item_name }} · {{ design.total_size }} size</p>
                 </div>
-                <span class="badge {{ 'text-bg-success' if display_status.is_taken else 'text-bg-light border' }}">{{ display_status.short_status }}</span>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    {% if has_permission('sales_order.manage') %}
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#quickEditImageModal{{ design.id }}">Ganti Gambar</button>
+                    {% endif %}
+                    <span class="badge {{ 'text-bg-success' if display_status.is_taken else 'text-bg-light border' }}">{{ display_status.short_status }}</span>
+                </div>
             </div>
             {% if design.has_design_image %}
                 <div class="row g-4">
@@ -399,6 +413,56 @@ Terima kasih 🙏{% endset %}
         <button class="btn btn-rdr" {% if not can_update_setting_checklist and not can_update_checking %}disabled{% endif %}>Simpan Checklist Produksi</button>
     </div>
 </form>
+
+{% if has_permission('sales_order.manage') %}
+<div class="modal fade" id="quickEditDateModal" tabindex="-1" aria-labelledby="quickEditDateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" method="post" action="{{ url_for('sales_orders.quick_edit_date', sales_order_id=sales_order.id) }}">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickEditDateModalLabel">Ubah Tanggal Masuk</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Tanggal Masuk</label>
+                <input class="form-control" name="order_date" type="date" value="{{ sales_order.created_at.date().isoformat() if sales_order.created_at else '' }}" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button class="btn btn-rdr" type="submit">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% for design in sales_order.designs %}
+    <div class="modal fade" id="quickEditImageModal{{ design.id }}" tabindex="-1" aria-labelledby="quickEditImageModalLabel{{ design.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" method="post" enctype="multipart/form-data" action="{{ url_for('sales_orders.quick_edit_design_image', sales_order_id=sales_order.id, design_id=design.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="quickEditImageModalLabel{{ design.id }}">Ganti Gambar {{ design.design_name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Gambar {{ design.primary_item_label }}</label>
+                        <input class="form-control" name="top_image" type="file" accept="image/*">
+                    </div>
+                    {% if design.has_secondary_item %}
+                        <div>
+                            <label class="form-label">Gambar {{ design.secondary_item_label }}</label>
+                            <input class="form-control" name="bottom_image" type="file" accept="image/*">
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-rdr" type="submit">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>

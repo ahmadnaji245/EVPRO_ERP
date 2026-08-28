@@ -6,16 +6,16 @@
         <h1 class="page-title">Piutang</h1>
         <p class="text-muted mb-0">Nota dengan sisa pembayaran aktif.</p>
     </div>
-    <a class="btn btn-rdr" href="{{ url_for('nota.export_receivables', brand=active_brand) }}">Export Excel</a>
+    <a class="btn btn-rdr" href="{{ url_for('nota.export_receivables', brand_id=active_brand_id) }}">Export Excel</a>
 </div>
 <form class="panel mb-4" method="get">
     <div class="row g-3 align-items-end">
         <div class="col-md-5">
             <label class="form-label">Brand</label>
-            <select class="form-select" name="brand">
+            <select class="form-select" name="brand_id">
                 <option value="">Semua Brand</option>
                 {% for brand in brands %}
-                    <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                    <option value="{{ brand.id }}" {% if active_brand_id|string == brand.id|string %}selected{% endif %}>{{ brand.name }}</option>
                 {% endfor %}
             </select>
         </div>

@@ -34,11 +34,11 @@ class DashboardSettingPointTestCase(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_daily_setting_chart_uses_order_input_date_and_total_order_points(self):
-        order = self._order("SO-1", "2026-07-12")
+        order = self._order("SO-1", "2026-07-12", point_per_size=0.5)
         self._player(order, "A")
         self._player(order, "B")
 
-        second_order = self._order("SO-2", "2026-07-12")
+        second_order = self._order("SO-2", "2026-07-12", point_per_size=1.5)
         self._player(second_order, "C")
 
         setting_only_order = self._order("SO-SETTING", "2026-07-13")
@@ -48,30 +48,30 @@ class DashboardSettingPointTestCase(unittest.TestCase):
         chart = daily_setting_point_chart(month=7, year=2026)
         self.assertEqual(len(chart["values"]), 31)
         self.assertEqual(chart["values"][0], 0)
-        self.assertEqual(chart["values"][11], 6)
-        self.assertEqual(chart["values"][12], 2)
+        self.assertEqual(chart["values"][11], 2.5)
+        self.assertEqual(chart["values"][12], 1)
         self.assertEqual(chart["tooltips"][11]["day_name"], "Minggu")
         self.assertEqual(chart["tooltips"][11]["so_count"], 2)
-        self.assertEqual(chart["summary"]["total_point"], 8)
+        self.assertEqual(chart["summary"]["total_point"], 3.5)
         self.assertEqual(chart["summary"]["total_so"], 3)
-        self.assertEqual(chart["summary"]["active_day_average"], 4)
+        self.assertEqual(chart["summary"]["active_day_average"], 1.75)
         self.assertEqual(chart["summary"]["busiest_day"], "Minggu, 12 Juli 2026")
 
     def test_monthly_user_progress_accepts_selected_month(self):
-        july_order = self._order("SO-JUL")
+        july_order = self._order("SO-JUL", point_per_size=0.5)
         self._player_checklist(july_order, "A", "2026-07-12", setting_done=True)
         august_order = self._order("SO-AUG")
         self._player_checklist(august_order, "B", "2026-08-01", setting_done=True)
         db.session.commit()
 
         progress = monthly_setting_point_progress(month=7, year=2026)
-        self.assertEqual(progress["total_point"], 2)
+        self.assertEqual(progress["total_point"], 0.5)
         self.assertEqual(progress["top_user"]["name"], "Administrator")
 
     def test_yearly_point_chart_groups_order_points_by_input_year(self):
-        order_2025 = self._order("SO-2025", "2025-12-31")
+        order_2025 = self._order("SO-2025", "2025-12-31", point_per_size=0.5)
         self._player(order_2025, "A")
-        order_2026 = self._order("SO-2026", "2026-07-12")
+        order_2026 = self._order("SO-2026", "2026-07-12", point_per_size=1.5)
         self._player(order_2026, "B")
         self._player(order_2026, "C")
         db.session.commit()
@@ -79,8 +79,8 @@ class DashboardSettingPointTestCase(unittest.TestCase):
         chart = yearly_point_chart()
         self.assertIn("2025", chart["labels"])
         self.assertIn("2026", chart["labels"])
-        self.assertEqual(chart["values"][chart["labels"].index("2025")], 2)
-        self.assertEqual(chart["values"][chart["labels"].index("2026")], 4)
+        self.assertEqual(chart["values"][chart["labels"].index("2025")], 0.5)
+        self.assertEqual(chart["values"][chart["labels"].index("2026")], 3)
 
     def test_finance_menu_and_route_permissions(self):
         client = self.app.test_client()
@@ -116,7 +116,7 @@ class DashboardSettingPointTestCase(unittest.TestCase):
         self.assertNotIn("User Poin Setting Tertinggi", html)
         self.assertNotIn("settingTargetChart", html)
 
-    def _order(self, so_number, order_date="2026-01-01"):
+    def _order(self, so_number, order_date="2026-01-01", point_per_size=1):
         order = SalesOrder(
             so_number=so_number,
             tracking_code=f"TRK-{so_number}",
@@ -125,6 +125,7 @@ class DashboardSettingPointTestCase(unittest.TestCase):
             customer_code=f"CUST-{so_number}",
             access_code=f"ACCESS-{so_number}",
             created_at=datetime.strptime(order_date, "%Y-%m-%d"),
+            point_per_size=point_per_size,
         )
         design = SalesOrderDesign(design_name="Design", item_name="Jersey", sales_order=order)
         db.session.add(design)

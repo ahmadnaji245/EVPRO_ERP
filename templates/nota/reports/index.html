@@ -6,92 +6,159 @@
         <h1 class="page-title">Laporan</h1>
         <p class="text-muted mb-0">Ringkasan performa keuangan dan customer.</p>
     </div>
-    <form method="get" class="d-flex flex-wrap gap-2">
-        <select class="form-select" name="brand" onchange="this.form.submit()">
-            <option value="">Semua Brand</option>
-            {% for brand in brands %}
-                <option value="{{ brand }}" {% if active_brand == brand %}selected{% endif %}>{{ brand }}</option>
-            {% endfor %}
-        </select>
-        <select class="form-select" name="month">
-            <option value="">Semua Bulan</option>
-            {% for value, label in month_options %}
-                <option value="{{ value }}" {% if active_month|string == value|string %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-        <select class="form-select" name="year">
-            <option value="">Semua Tahun</option>
-            {% for year in year_options %}
-                <option value="{{ year }}" {% if active_year|string == year|string %}selected{% endif %}>{{ year }}</option>
-            {% endfor %}
-        </select>
-        <button class="btn btn-rdr" type="submit">Terapkan</button>
-        <a class="btn btn-outline-dark" href="{{ url_for('nota.reports') }}">Reset</a>
-    </form>
+    <a class="btn btn-rdr" href="{{ url_for('nota.report_pdf', **report_query) }}" target="_blank" rel="noopener">Cetak Laporan</a>
 </div>
 
-<div class="d-flex flex-wrap gap-2 mb-4">
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_invoices', **report_query) }}">Export Semua Nota ke Excel</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_receivables', **report_query) }}">Export Piutang ke Excel</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_monthly_revenue', **report_query) }}">Export Omset Bulanan ke Excel</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('nota.export_customers', **report_query) }}">Export Customer ke Excel</a>
-    <a class="btn btn-rdr" href="{{ url_for('nota.customer_report', **report_query) }}">Customer Terbanyak Nota</a>
-</div>
+<form class="panel mb-4" method="get">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Brand</label>
+            <select class="form-select" name="brand_id">
+                <option value="">Semua Brand</option>
+                {% for brand in brands %}
+                    <option value="{{ brand.id }}" {% if active_brand_id|string == brand.id|string %}selected{% endif %}>{{ brand.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Bulan</label>
+            <select class="form-select" name="month">
+                <option value="">Semua Bulan</option>
+                {% for value, label in month_options %}
+                    <option value="{{ value }}" {% if active_month|string == value|string %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Tahun</label>
+            <select class="form-select" name="year">
+                <option value="">Semua Tahun</option>
+                {% for year in year_options %}
+                    <option value="{{ year }}" {% if active_year|string == year|string %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid"><button class="btn btn-dark">Filter</button></div>
+    </div>
+</form>
 
 <div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="metric"><span>Total Piutang</span><strong>{{ stats.receivable|rupiah }}</strong></div></div>
-    <div class="col-md-3"><div class="metric"><span>Total Pemasukan</span><strong>{{ stats.income|rupiah }}</strong></div></div>
-    <div class="col-md-3"><div class="metric"><span>Omset Total</span><strong>{{ stats.revenue|rupiah }}</strong></div></div>
-    <div class="col-md-3"><div class="metric"><span>Jumlah Nota</span><strong>{{ stats.invoice_count or 0 }}</strong></div></div>
+    <div class="col-6 col-xl-3">
+        <div class="metric small-metric"><span>Omset Total</span><strong>{{ stats.revenue|rupiah }}</strong></div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="metric small-metric"><span>Total Pemasukan</span><strong>{{ stats.income|rupiah }}</strong></div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="metric small-metric"><span>Total Piutang</span><strong>{{ stats.receivable|rupiah }}</strong></div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="metric small-metric"><span>Jumlah Nota</span><strong>{{ stats.invoice_count or 0 }}</strong></div>
+    </div>
 </div>
 
-<div class="row g-4">
-    <div class="col-lg-6">
-        <section class="panel table-panel">
-            <h2 class="section-title">Omset Per Bulan</h2>
-            <table class="table">
-                <thead><tr><th>Bulan</th><th class="text-end">Omset</th></tr></thead>
-                <tbody>
-                {% for row in monthly %}
-                    <tr><td>{{ row.month }}</td><td class="text-end">{{ row.total|rupiah }}</td></tr>
-                {% else %}
-                    <tr><td colspan="2" class="text-center text-muted py-4">Belum ada data.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </section>
+<section class="panel table-panel">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div>
+            <h2 class="section-title mb-1">Rekap Brand</h2>
+            <p class="text-muted mb-0">Urutan berdasarkan total size terbesar.</p>
+        </div>
     </div>
-    <div class="col-lg-6">
-        <section class="panel table-panel">
-            <h2 class="section-title">Omset Per Tahun</h2>
-            <table class="table">
-                <thead><tr><th>Tahun</th><th class="text-end">Omset</th></tr></thead>
-                <tbody>
-                {% for row in yearly %}
-                    <tr><td>{{ row.year }}</td><td class="text-end">{{ row.total|rupiah }}</td></tr>
-                {% else %}
-                    <tr><td colspan="2" class="text-center text-muted py-4">Belum ada data.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </section>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Brand</th>
+                    <th class="text-end">Jumlah Nota</th>
+                    <th class="text-end">Total Size</th>
+                    <th class="text-end">Omset</th>
+                    <th class="text-end">Sudah Dibayar</th>
+                    <th class="text-end">Sisa Piutang</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in brand_reports %}
+                <tr>
+                    <td>{{ row.brand }}</td>
+                    <td class="text-end">{{ row.invoice_count }}</td>
+                    <td class="text-end">{{ row.total_size }}</td>
+                    <td class="text-end">{{ row.revenue|rupiah }}</td>
+                    <td class="text-end">{{ row.paid|rupiah }}</td>
+                    <td class="text-end">{{ row.remaining|rupiah }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">Belum ada data rekap brand.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
-    <div class="col-12">
-        <section class="panel table-panel">
-            <h2 class="section-title">Customer Paling Sering Order</h2>
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead><tr><th>Customer</th><th class="text-end">Jumlah Nota</th><th class="text-end">Omset</th></tr></thead>
-                    <tbody>
-                    {% for customer in customers %}
-                        <tr><td>{{ customer.name }}</td><td class="text-end">{{ customer.invoice_count }}</td><td class="text-end">{{ customer.total|rupiah }}</td></tr>
-                    {% else %}
-                        <tr><td colspan="3" class="text-center text-muted py-4">Belum ada data customer.</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+</section>
+
+{% if show_evpro_seller_report %}
+<section class="panel table-panel mt-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div>
+            <h2 class="section-title mb-1">Reseller Brand Evpro</h2>
+            <p class="text-muted mb-0">Seller paling aktif berdasarkan total size Evpro.</p>
+        </div>
     </div>
-</div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Seller</th>
+                    <th class="text-end">Jumlah Nota</th>
+                    <th class="text-end">Total Size</th>
+                    <th class="text-end">Omset</th>
+                    <th class="text-end">Sudah Dibayar</th>
+                    <th class="text-end">Sisa Piutang</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in evpro_seller_reports %}
+                <tr>
+                    <td>{{ row.seller }}</td>
+                    <td class="text-end">{{ row.invoice_count }}</td>
+                    <td class="text-end">{{ row.total_size }}</td>
+                    <td class="text-end">{{ row.revenue|rupiah }}</td>
+                    <td class="text-end">{{ row.paid|rupiah }}</td>
+                    <td class="text-end">{{ row.remaining|rupiah }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">Belum ada data reseller Evpro pada filter ini.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel table-panel mt-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div>
+            <h2 class="section-title mb-1">Rekap Seller Evpro</h2>
+            <p class="text-muted mb-0">Total size masing-masing seller Evpro.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Seller</th>
+                    <th class="text-end">Total Size</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in evpro_seller_reports %}
+                <tr>
+                    <td>{{ row.seller }}</td>
+                    <td class="text-end">{{ row.total_size }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="2" class="text-center text-muted py-4">Belum ada data seller Evpro pada filter ini.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

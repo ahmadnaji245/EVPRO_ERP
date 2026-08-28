@@ -747,7 +747,7 @@ def build_petty_cash_pdf(filters, user):
 def build_petty_cash_detail_pdf(filters, user):
     report = petty_cash_detail_report(filters, user)
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=16, rightMargin=16, topMargin=18, bottomMargin=22)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
     styles = _pdf_styles()
     story = [
         Paragraph("EVPRO TEXTILE", styles["ReportBrand"]),
@@ -1052,15 +1052,15 @@ def _detail_filter_meta(filters, user):
 
 def _pdf_styles():
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="ReportBrand", parent=styles["Heading2"], fontSize=10, leading=12, textColor=colors.HexColor("#c5162e"), spaceAfter=2))
-    styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], fontSize=15, leading=18, textColor=colors.HexColor("#20242a"), spaceAfter=6))
-    styles.add(ParagraphStyle(name="SectionTitle", parent=styles["Heading3"], fontSize=9, leading=11, textColor=colors.HexColor("#20242a"), spaceBefore=2, spaceAfter=4))
-    styles.add(ParagraphStyle(name="GroupTitle", parent=styles["Heading4"], fontSize=8, leading=10, textColor=colors.HexColor("#20242a"), spaceBefore=2, spaceAfter=3))
-    styles.add(ParagraphStyle(name="TableText", parent=styles["BodyText"], fontSize=6.2, leading=7.4, textColor=colors.HexColor("#20242a")))
-    styles.add(ParagraphStyle(name="TableTextSmall", parent=styles["TableText"], fontSize=5.4, leading=6.5))
+    styles.add(ParagraphStyle(name="ReportBrand", parent=styles["Heading2"], fontSize=12, leading=14, textColor=colors.HexColor("#c5162e"), spaceAfter=2))
+    styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], fontSize=20, leading=24, textColor=colors.HexColor("#20242a"), spaceAfter=8))
+    styles.add(ParagraphStyle(name="SectionTitle", parent=styles["Heading3"], fontSize=13, leading=16, textColor=colors.HexColor("#20242a"), spaceBefore=4, spaceAfter=6))
+    styles.add(ParagraphStyle(name="GroupTitle", parent=styles["Heading4"], fontSize=11, leading=13, textColor=colors.HexColor("#20242a"), spaceBefore=4, spaceAfter=4))
+    styles.add(ParagraphStyle(name="TableText", parent=styles["BodyText"], fontSize=9.5, leading=12, textColor=colors.HexColor("#20242a")))
+    styles.add(ParagraphStyle(name="TableTextSmall", parent=styles["TableText"], fontSize=7.6, leading=9.2))
     styles.add(ParagraphStyle(name="TableHead", parent=styles["TableText"], fontName="Helvetica-Bold", textColor=colors.white))
-    styles.add(ParagraphStyle(name="MetaText", parent=styles["BodyText"], fontSize=7, leading=8.5, textColor=colors.HexColor("#20242a")))
-    styles.add(ParagraphStyle(name="EmptyText", parent=styles["BodyText"], fontSize=8, leading=10, textColor=colors.HexColor("#687182")))
+    styles.add(ParagraphStyle(name="MetaText", parent=styles["BodyText"], fontSize=10, leading=13, textColor=colors.HexColor("#20242a")))
+    styles.add(ParagraphStyle(name="EmptyText", parent=styles["BodyText"], fontSize=10, leading=13, textColor=colors.HexColor("#687182")))
     return styles
 
 
@@ -1073,7 +1073,7 @@ def _meta_table(report, styles):
     ]
     return Table(
         [[_p(cell, styles["MetaText"]) for cell in row] for row in rows],
-        colWidths=[48, 142, 58, 130, 58, 130],
+        colWidths=[70, 180, 70, 160, 70, 160],
         style=_detail_table_style(header=False, compact=True),
     )
 
@@ -1085,7 +1085,7 @@ def _summary_table(summary, styles):
     ]
     return Table(
         [[_p(cell, styles["MetaText"]) for cell in row] for row in rows],
-        colWidths=[98, 90, 98, 90, 98, 90],
+        colWidths=[125, 125, 125, 125, 125, 125],
         style=_detail_table_style(header=False),
     )
 
@@ -1102,7 +1102,7 @@ def _group_recap_table(rows, styles):
     return Table(
         [[_p(cell, styles["TableHead"] if index == 0 else styles["TableText"]) for cell in row] for index, row in enumerate(table_rows)],
         repeatRows=1,
-        colWidths=[26, 260, 82, 100, 72],
+        colWidths=[36, 350, 120, 140, 100],
         style=_detail_table_style(),
     )
 
@@ -1115,7 +1115,7 @@ def _subcategory_recap_table(group, styles):
     return Table(
         [[_p(cell, styles["TableHead"] if index == 0 else styles["TableText"]) for cell in row] for index, row in enumerate(rows)],
         repeatRows=1,
-        colWidths=[300, 100, 120],
+        colWidths=[420, 140, 170],
         style=_detail_table_style(),
     )
 
@@ -1126,7 +1126,7 @@ def _classification_table(rows, styles):
     return Table(
         [[_p(cell, styles["TableHead"] if index == 0 else styles["TableText"]) for cell in row] for index, row in enumerate(table_rows)],
         repeatRows=1,
-        colWidths=[300, 140],
+        colWidths=[450, 180],
         style=_detail_table_style(),
     )
 
@@ -1137,7 +1137,7 @@ def _income_recap_table(rows, styles):
     return Table(
         [[_p(cell, styles["TableHead"] if index == 0 else styles["TableText"]) for cell in row] for index, row in enumerate(table_rows)],
         repeatRows=1,
-        colWidths=[300, 100, 120],
+        colWidths=[420, 140, 170],
         style=_detail_table_style(),
     )
 
@@ -1176,10 +1176,10 @@ def _detail_table_style(header=True, compact=False):
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#c8ced6")),
         ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 3),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-        ("TOPPADDING", (0, 0), (-1, -1), 2 if compact else 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2 if compact else 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4 if compact else 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4 if compact else 7),
         ("ALIGN", (-1, 0), (-1, -1), "RIGHT"),
     ]
     if header:

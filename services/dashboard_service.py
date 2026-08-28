@@ -117,7 +117,7 @@ def _checklist_setting_user_name(checklist):
 
 def _player_setting_point(player):
     order = player.design.sales_order if player and player.design else None
-    return order.brand.point_per_size if order and order.brand else 1
+    return order.point_per_size if order and order.point_per_size is not None else 1
 
 
 def monthly_setting_point_progress(month=None, year=None):

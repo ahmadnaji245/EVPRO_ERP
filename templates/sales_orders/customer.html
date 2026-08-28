@@ -8,6 +8,7 @@
         <p class="text-muted mb-0">{{ sales_order.so_number }} · {{ sales_order.team_name }}</p>
     </div>
     {% for design in sales_order.designs %}
+        {% set recap = design.size_recap %}
         <div class="panel mb-4">
             <div class="section-title">{{ design.design_name }}</div>
             <div class="row g-4">
@@ -50,6 +51,54 @@
                         </table>
                     </div>
                 </div>
+            </div>
+            <div class="mt-4">
+                <div class="section-title mb-3">Rekap Size {{ design.design_name }}</div>
+                {% if recap.groups %}
+                    <div class="row g-4">
+                        {% for group_name in ['Kids', 'Women', 'Reguler'] %}
+                            {% set rows = recap.groups.get(group_name, []) %}
+                            {% if rows %}
+                                <div class="col-md-4">
+                                    <div class="card border h-100">
+                                        <div class="card-header bg-light fw-semibold text-center">{{ group_name }}</div>
+                                        <div class="card-body p-0">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
+                                                <tbody>
+                                                    {% for row in rows %}
+                                                        <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
+                                                    {% endfor %}
+                                                    <tr class="fw-bold">
+                                                        <td>Total {{ group_name }}</td>
+                                                        <td class="text-center">{{ rows | sum(attribute='qty') }}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">Belum ada rekap size untuk {{ design.design_name }}.</div>
+                {% endif %}
+                {% if design.long_sleeve_recap %}
+                    <div class="fw-semibold mt-4 mb-2">Rekap Lengan Panjang {{ design.design_name }}</div>
+                    <div class="card border">
+                        <div class="card-body p-0">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead><tr><th>Size</th><th class="text-center">Qty</th></tr></thead>
+                                <tbody>
+                                    {% for row in design.long_sleeve_recap %}
+                                        <tr><td>{{ row.size }}</td><td class="text-center fw-semibold">{{ row.qty }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     {% endfor %}

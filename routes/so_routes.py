@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, time, timedelta
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user
 
 from database.db import db
-from models import Brand, ProductionSizeChecklist, SalesOrderPlayer
+from models import Brand, ProductionSizeChecklist, SalesOrderDesign, SalesOrderPlayer
 from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
 from services.history_service import record_history
 from services.brand_service import list_active_brands
@@ -27,6 +27,7 @@ from services.sales_order_service import (
     update_sales_order,
     validate_sales_order_form,
 )
+from services.upload_service import save_upload
 from utils.constants import user_is_admin, user_is_desain, user_is_produksi
 from utils.helpers import sales_order_pdf_download_name
 from utils.permissions import has_permission, permission_required
@@ -260,6 +261,92 @@ def pdf(sales_order_id):
     return response
 
 
+@sales_orders_bp.route("/<int:sales_order_id>/quick-edit-date", methods=["POST"])
+@permission_required("sales_order.manage")
+def quick_edit_date(sales_order_id):
+    order = get_sales_order(sales_order_id)
+    raw_date = str(request.form.get("order_date") or "").strip()
+    try:
+        new_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Tanggal masuk tidak valid.", "danger")
+        return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+    old_date = order.created_at.date() if order.created_at else None
+    old_deadline = order.deadline
+    new_deadline = new_date + timedelta(days=order.production_days or 0)
+    order.created_at = datetime.combine(new_date, time.min)
+    order.deadline = new_deadline
+    for design in order.designs:
+        design.deadline = new_deadline
+
+    record_history(
+        order,
+        actor_name=current_user.name or current_user.username,
+        action="Quick edit tanggal masuk",
+        field_name="created_at",
+        old_value=old_date.isoformat() if old_date else None,
+        new_value=new_date.isoformat(),
+        user=current_user,
+        notes=f"Deadline: {old_deadline.isoformat() if old_deadline else '-'} -> {new_deadline.isoformat()}",
+    )
+    db.session.commit()
+    flash("Tanggal masuk berhasil diperbarui tanpa membatalkan approval.", "success")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+@sales_orders_bp.route("/<int:sales_order_id>/designs/<int:design_id>/quick-edit-image", methods=["POST"])
+@permission_required("sales_order.manage")
+def quick_edit_design_image(sales_order_id, design_id):
+    order = get_sales_order(sales_order_id)
+    design = SalesOrderDesign.query.filter_by(id=design_id, sales_order_id=order.id).first_or_404()
+    changed = False
+    actor_name = current_user.name or current_user.username
+
+    top_image = request.files.get("top_image")
+    if top_image and top_image.filename:
+        old_top = design.display_top_image_path
+        new_top = save_upload(top_image, "designs")
+        design.top_image_path = new_top
+        design.image_path = new_top
+        record_history(
+            order,
+            actor_name=actor_name,
+            action="Quick edit gambar desain",
+            field_name=f"design:{design.id}:top_image_path",
+            old_value=old_top,
+            new_value=new_top,
+            user=current_user,
+            notes=design.design_name,
+        )
+        changed = True
+
+    bottom_image = request.files.get("bottom_image")
+    if design.has_secondary_item and bottom_image and bottom_image.filename:
+        old_bottom = design.bottom_image_path
+        new_bottom = save_upload(bottom_image, "designs")
+        design.bottom_image_path = new_bottom
+        record_history(
+            order,
+            actor_name=actor_name,
+            action="Quick edit gambar desain",
+            field_name=f"design:{design.id}:bottom_image_path",
+            old_value=old_bottom,
+            new_value=new_bottom,
+            user=current_user,
+            notes=design.design_name,
+        )
+        changed = True
+
+    if not changed:
+        flash("Pilih minimal satu gambar untuk diganti.", "warning")
+        return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+    db.session.commit()
+    flash("Gambar desain berhasil diperbarui tanpa membatalkan approval.", "success")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
 @sales_orders_bp.route("/<int:sales_order_id>/production-checklist", methods=["POST"])
 @permission_required("sales_order.view")
 def update_production_checklist(sales_order_id):
@@ -275,6 +362,7 @@ def update_production_checklist(sales_order_id):
     requested_qc = set(request.form.getlist("qc_done")) if can_update_checking else set()
     now = datetime.utcnow()
     current_user_name = current_user.name or current_user.username
+    is_admin = user_is_admin(current_user)
 
     for player_id in player_ids:
         player = SalesOrderPlayer.query.get(player_id)
@@ -283,7 +371,7 @@ def update_production_checklist(sales_order_id):
             setting_done = str(player_id) in requested_setting
             setting_owner_id = checklist.setting_done_by_user_id or checklist.setting_user_id
             if checklist.setting_done:
-                if not setting_done and setting_owner_id == current_user.id:
+                if not setting_done and (setting_owner_id == current_user.id or is_admin):
                     checklist.setting_done = False
                     checklist.setting_user_id = None
                     checklist.setting_at = None
@@ -302,7 +390,7 @@ def update_production_checklist(sales_order_id):
             qc_done = str(player_id) in requested_qc
             qc_owner_id = checklist.qc_done_by_user_id or checklist.qc_user_id
             if checklist.qc_done:
-                if not qc_done and qc_owner_id == current_user.id:
+                if not qc_done and (qc_owner_id == current_user.id or is_admin):
                     checklist.qc_done = False
                     checklist.qc_user_id = None
                     checklist.qc_at = None
@@ -337,10 +425,15 @@ def update_production_checklist(sales_order_id):
                     checklist = ProductionSizeChecklist(design=design, size=size)
                     db.session.add(checklist)
                 setting_done = key in requested_size_setting
-                if checklist.setting_done != setting_done:
-                    checklist.setting_done = setting_done
-                    checklist.setting_user_id = current_user.id if setting_done else None
-                    checklist.setting_at = now if setting_done else None
+                if checklist.setting_done:
+                    if not setting_done and (checklist.setting_user_id == current_user.id or is_admin):
+                        checklist.setting_done = False
+                        checklist.setting_user_id = None
+                        checklist.setting_at = None
+                elif setting_done:
+                    checklist.setting_done = True
+                    checklist.setting_user_id = current_user.id
+                    checklist.setting_at = now
 
     if can_update_setting and order.approved and _setting_checklist_complete(order) and _production_stage_index(order.production_status_label) < _production_stage_index("Printing"):
         order.setting_by_name = current_user_name

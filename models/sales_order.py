@@ -21,6 +21,7 @@ class SalesOrder(db.Model):
     pattern = db.Column(db.String(80))
     grade = db.Column(db.String(20))
     production_days = db.Column(db.Integer, nullable=False, default=7)
+    point_per_size = db.Column(db.Float, nullable=False, default=1.0)
     deadline = db.Column(db.Date)
     instructions = db.Column(db.Text)
     notes = db.Column(db.Text)
@@ -87,7 +88,7 @@ class SalesOrder(db.Model):
 
     @property
     def total_point(self):
-        return self.total_size * (self.brand.point_per_size if self.brand else 1)
+        return self.total_size * (self.point_per_size if self.point_per_size is not None else 1)
 
     @property
     def production_status_label(self):

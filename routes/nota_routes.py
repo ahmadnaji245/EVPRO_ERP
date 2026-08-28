@@ -9,12 +9,15 @@ from services.nota_service import (
     MONTH_OPTIONS,
     NOTA_STATUSES,
     add_payment,
+    brand_report_rows,
+    build_nota_report_pdf,
     calculate_invoice_status,
     create_nota,
     dashboard_stats,
     delete_nota,
     delete_product,
     display_nota_number,
+    evpro_seller_report_rows,
     format_so_number_for_invoice,
     form_data_from_sales_order,
     get_nota,
@@ -26,9 +29,8 @@ from services.nota_service import (
     invoice_export_rows,
     item_rows_from_sales_order,
     item_rows_for_form,
-    invoice_brand_filter_options,
     list_invoice_brand_options,
-    list_brands,
+    list_brands_for_form,
     list_customers_as_dicts,
     list_notas,
     list_products,
@@ -64,9 +66,12 @@ def _admin_required():
 
 
 def _form_context(**kwargs):
+    nota = kwargs.get("nota")
+    form = kwargs.get("form") or {}
+    selected_brand_id = form.get("brand_id") or (nota.brand_id if nota else None)
     context = {
         "statuses": NOTA_STATUSES,
-        "brands": list_brands(),
+        "brands": list_brands_for_form(selected_brand_id),
         "products": list_products_as_dicts(),
         "customers": list_customers_as_dicts(),
         "today": date.today().isoformat(),
@@ -76,7 +81,7 @@ def _form_context(**kwargs):
 
 
 def _brand_filter():
-    return request.args.get("brand", "").strip()
+    return request.args.get("brand_id", "").strip()
 
 
 def _report_period_filter():
@@ -90,7 +95,7 @@ def _report_period_filter():
 def _report_query(brand=None, year=None, month=None):
     query = {}
     if brand:
-        query["brand"] = brand
+        query["brand_id"] = brand
     if year:
         query["year"] = year
     if month:
@@ -98,17 +103,33 @@ def _report_query(brand=None, year=None, month=None):
     return query
 
 
+def _brand_filter_label(brand_id):
+    if not str(brand_id or "").isdigit():
+        return "Semua Brand"
+    brand = next((item for item in list_invoice_brand_options() if item.id == int(brand_id)), None)
+    return brand.name if brand else "Brand Terpilih"
+
+
+def _show_evpro_seller_report(brand_id):
+    if not str(brand_id or "").isdigit():
+        return True
+    brand = next((item for item in list_invoice_brand_options() if item.id == int(brand_id)), None)
+    if not brand:
+        return False
+    return str(brand.name or "").strip().casefold() == "evpro" or str(brand.code or "").strip().casefold() == "evpro"
+
+
 @nota_bp.route("/dashboard")
 @permission_required("nota.view")
 def dashboard():
-    brand = _brand_filter()
+    brand_id = _brand_filter()
     return render_template(
         "nota/dashboard.html",
-        stats=dashboard_stats(brand or None),
-        monthly=monthly_revenue(brand or None),
-        yearly=yearly_revenue(brand or None),
+        stats=dashboard_stats(brand_id or None),
+        monthly=monthly_revenue(brand_id or None),
+        yearly=yearly_revenue(brand_id or None),
         brands=list_invoice_brand_options(),
-        active_brand=brand,
+        active_brand_id=brand_id,
     )
 
 
@@ -118,18 +139,18 @@ def index():
     search = {
         "q": request.args.get("q", "").strip(),
         "status": request.args.get("status", "").strip(),
-        "brand_group": request.args.get("brand_group", "").strip(),
+        "brand_id": _brand_filter(),
     }
     return render_template(
         "nota/index.html",
         notas=list_notas(search),
         statuses=NOTA_STATUSES,
-        brand_groups=invoice_brand_filter_options(),
+        brands=list_invoice_brand_options(),
         calculate_invoice_status=calculate_invoice_status,
         format_so_number_for_invoice=format_so_number_for_invoice,
         search=search["q"],
         active_status=search["status"],
-        active_brand_group=search["brand_group"],
+        active_brand_id=search["brand_id"],
     )
 
 
@@ -167,34 +188,61 @@ def delete(nota_id):
 @nota_bp.route("/laporan")
 @permission_required("nota.view")
 def reports():
-    brand = _brand_filter()
+    brand_id = _brand_filter()
     year, month = _report_period_filter()
     return render_template(
         "nota/reports/index.html",
-        stats=dashboard_stats(brand or None, year, month),
-        monthly=monthly_revenue(brand or None, year, month),
-        yearly=yearly_revenue(brand or None, year, month),
-        customers=top_customers(brand or None, year, month),
+        stats=dashboard_stats(brand_id or None, year, month),
+        brand_reports=brand_report_rows(brand_id or None, year, month),
+        evpro_seller_reports=evpro_seller_report_rows(brand_id or None, year, month),
         brands=list_invoice_brand_options(),
-        active_brand=brand,
+        active_brand_id=brand_id,
         active_year=year,
         active_month=month,
         month_options=MONTH_OPTIONS,
         year_options=report_year_options(year),
-        report_query=_report_query(brand, year, month),
+        report_query=_report_query(brand_id, year, month),
+        show_evpro_seller_report=_show_evpro_seller_report(brand_id),
+    )
+
+
+@nota_bp.route("/laporan/pdf")
+@permission_required("nota.view")
+def report_pdf():
+    brand_id = _brand_filter()
+    year, month = _report_period_filter()
+    brand_rows = brand_report_rows(brand_id or None, year, month)
+    seller_rows = evpro_seller_report_rows(brand_id or None, year, month)
+    stats = dashboard_stats(brand_id or None, year, month)
+    pdf = build_nota_report_pdf(
+        brand_rows,
+        seller_rows,
+        stats,
+        {
+            "brand": _brand_filter_label(brand_id),
+            "month": dict(MONTH_OPTIONS).get(month) if month else None,
+            "year": year,
+            "show_evpro_sellers": _show_evpro_seller_report(brand_id),
+        },
+    )
+    return send_file(
+        pdf,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name="laporan-nota.pdf",
     )
 
 
 @nota_bp.route("/laporan/customer")
 @permission_required("nota.view")
 def customer_report():
-    brand = _brand_filter()
+    brand_id = _brand_filter()
     year, month = _report_period_filter()
     return render_template(
         "nota/reports/customers.html",
-        customers=top_customers(brand or None, year, month),
+        customers=top_customers(brand_id or None, year, month),
         brands=list_invoice_brand_options(),
-        active_brand=brand,
+        active_brand_id=brand_id,
         active_year=year,
         active_month=month,
         month_options=MONTH_OPTIONS,
@@ -205,14 +253,14 @@ def customer_report():
 @nota_bp.route("/piutang")
 @permission_required("nota.view")
 def receivables_page():
-    brand = _brand_filter()
+    brand_id = _brand_filter()
     status = request.args.get("status", "").strip()
     return render_template(
         "nota/reports/receivables.html",
-        invoices=receivables(brand or None, status or None),
+        invoices=receivables(brand_id or None, status or None),
         statuses=NOTA_STATUSES,
         brands=list_invoice_brand_options(),
-        active_brand=brand,
+        active_brand_id=brand_id,
         active_status=status,
     )
 
@@ -220,13 +268,13 @@ def receivables_page():
 @nota_bp.route("/pemasukan")
 @permission_required("nota.view")
 def income_page():
-    brand = _brand_filter()
+    brand_id = _brand_filter()
     return render_template(
         "nota/reports/income.html",
-        payments=income_payments(brand or None),
-        summary=income_summary(brand or None),
+        payments=income_payments(brand_id or None),
+        summary=income_summary(brand_id or None),
         brands=list_invoice_brand_options(),
-        active_brand=brand,
+        active_brand_id=brand_id,
     )
 
 

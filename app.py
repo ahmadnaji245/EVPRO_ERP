@@ -653,6 +653,7 @@ def ensure_database_schema_migrations():
     ensure_qc_schema()
     ensure_handover_schema()
     ensure_printing_confirmation_schema()
+    ensure_sales_order_point_schema()
     ensure_v09_finance_schema()
 
 
@@ -914,6 +915,15 @@ def ensure_printing_confirmation_schema():
             """
         )
     )
+    db.session.commit()
+
+
+def ensure_sales_order_point_schema():
+    if not _table_exists("sales_orders"):
+        return
+
+    _add_column_if_missing("sales_orders", "point_per_size", "REAL NOT NULL DEFAULT 1")
+    db.session.execute(text("UPDATE sales_orders SET point_per_size = 1 WHERE point_per_size IS NULL"))
     db.session.commit()
 
 
