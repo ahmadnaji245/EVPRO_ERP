@@ -23,6 +23,7 @@ from services.sales_order_service import (
     ensure_player_checklist,
     get_sales_order,
     list_sales_orders,
+    parse_point_per_size,
     set_production_stage,
     update_sales_order,
     validate_sales_order_form,
@@ -45,6 +46,11 @@ def _admin_required():
 def _production_or_admin_required():
     if not (user_is_admin(current_user) or user_is_produksi(current_user)):
         abort(403)
+
+
+def _format_point_value(value):
+    numeric = float(value if value is not None else 1)
+    return str(int(numeric)) if numeric.is_integer() else str(numeric)
 
 
 def _sales_order_access_required():
@@ -292,6 +298,35 @@ def quick_edit_date(sales_order_id):
     )
     db.session.commit()
     flash("Tanggal masuk berhasil diperbarui tanpa membatalkan approval.", "success")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+@sales_orders_bp.route("/<int:sales_order_id>/quick-update-point", methods=["POST"])
+@permission_required("sales_order.manage")
+def quick_update_point(sales_order_id):
+    order = get_sales_order(sales_order_id)
+    new_point = parse_point_per_size(request.form.get("point_per_size"), default=None)
+    if new_point is None:
+        flash("Poin tidak valid. Pilih 0, 0.5, 1, atau 1.5.", "danger")
+        return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+    old_point = order.point_per_size if order.point_per_size is not None else 1
+    if old_point == new_point:
+        flash("Poin tidak berubah.", "info")
+        return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+    order.point_per_size = new_point
+    record_history(
+        order,
+        actor_name=current_user.name or current_user.username,
+        action="Quick edit poin",
+        field_name="point_per_size",
+        old_value=_format_point_value(old_point),
+        new_value=_format_point_value(new_point),
+        user=current_user,
+    )
+    db.session.commit()
+    flash("Poin berhasil diperbarui tanpa membatalkan approval.", "success")
     return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
 

@@ -4,12 +4,15 @@ from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 
+from werkzeug.datastructures import MultiDict
+
 from app import create_app
 from config import Config
 from database.db import db
 from models import (
     Brand,
     CustomerAccess,
+    ProductionChecklist,
     ProductionSizeChecklist,
     RevisionHistory,
     SalesOrder,
@@ -17,6 +20,9 @@ from models import (
     SalesOrderPlayer,
     User,
 )
+from models.master_data import MasterInstruction, MasterMaterial
+from services.dashboard_service import monthly_setting_point_progress
+from services.sales_order_service import create_sales_order
 
 
 class TestConfig(Config):
@@ -86,6 +92,105 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
         self.assertEqual(self._approval_and_status_state(order), original_state)
         self.assertTrue(RevisionHistory.query.filter_by(sales_order_id=order.id, action="Quick edit gambar desain").first())
 
+    def test_create_sales_order_defaults_point_to_one_when_not_sent(self):
+        form = self._sales_order_form()
+        form.pop("point_per_size", None)
+
+        order = create_sales_order(form, self.admin)
+
+        self.assertEqual(order.point_per_size, 1)
+
+    def test_detail_sales_order_shows_point_and_quick_edit_button(self):
+        order, _design, _players = self._create_approved_order("QPOINTDETAIL", point_per_size=0.5)
+        self._login("admin", "admin")
+
+        html = self.client.get(f"/sales-order/{order.id}").data.decode()
+
+        self.assertIn("Poin", html)
+        self.assertIn("0.5", html)
+        self.assertIn("Ubah Poin", html)
+        self.assertIn(f"/sales-order/{order.id}/quick-update-point", html)
+
+    def test_quick_edit_point_updates_total_point_and_preserves_approval_status(self):
+        order, _design, _players = self._create_approved_order("QPOINT", point_per_size=1, player_count=10)
+        original_state = self._approval_and_status_state(order)
+        self._login("admin", "admin")
+
+        response = self.client.post(
+            f"/sales-order/{order.id}/quick-update-point",
+            data={"point_per_size": "1.5"},
+            follow_redirects=True,
+        )
+        db.session.refresh(order)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(order.point_per_size, 1.5)
+        self.assertEqual(order.total_point, 15)
+        self.assertEqual(self._approval_and_status_state(order), original_state)
+        history = RevisionHistory.query.filter_by(sales_order_id=order.id, action="Quick edit poin").first()
+        self.assertIsNotNone(history)
+        self.assertEqual(history.old_value, "1")
+        self.assertEqual(history.new_value, "1.5")
+
+    def test_quick_edit_point_rejects_invalid_value(self):
+        order, _design, _players = self._create_approved_order("QPOINTBAD", point_per_size=1)
+        self._login("admin", "admin")
+
+        response = self.client.post(
+            f"/sales-order/{order.id}/quick-update-point",
+            data={"point_per_size": "0.7"},
+            follow_redirects=True,
+        )
+        db.session.refresh(order)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Poin tidak valid", response.data.decode())
+        self.assertEqual(order.point_per_size, 1)
+
+    def test_regular_edit_does_not_reset_existing_point_when_field_is_absent(self):
+        order, _design, _players = self._create_approved_order("QPOINTEDIT", point_per_size=1.5)
+        self._login("admin", "admin")
+        edit_html = self.client.get(f"/sales-order/{order.id}/edit?revision_reason_admin=Update administratif").data.decode()
+        self.assertNotIn('name="point_per_size"', edit_html)
+
+        form = self._sales_order_form(order, notes="Catatan setelah edit")
+        form.pop("point_per_size", None)
+        response = self.client.post(
+            f"/sales-order/{order.id}/edit?revision_reason_admin=Update administratif",
+            data=form,
+            follow_redirects=True,
+        )
+
+        db.session.refresh(order)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(order.point_per_size, 1.5)
+        self.assertEqual(order.notes, "Catatan setelah edit")
+
+    def test_setting_point_uses_latest_sales_order_point_without_changing_owner(self):
+        order, _design, players = self._create_approved_order("QPOINTSETTING", point_per_size=1, player_count=5)
+        for player in players:
+            checklist = ProductionChecklist(
+                player=player,
+                setting_done=True,
+                setting_done_at=datetime(2026, 7, 12),
+                setting_done_by_user_id=self.desain.id,
+                setting_done_by_name=self.desain.name,
+            )
+            db.session.add(checklist)
+        db.session.commit()
+
+        progress = monthly_setting_point_progress(month=7, year=2026)
+        self.assertEqual(progress["total_point"], 5)
+
+        self._login("admin", "admin")
+        self.client.post(f"/sales-order/{order.id}/quick-update-point", data={"point_per_size": "1.5"})
+        db.session.refresh(players[0].checklist)
+
+        progress = monthly_setting_point_progress(month=7, year=2026)
+        self.assertEqual(progress["total_point"], 7.5)
+        self.assertEqual(players[0].checklist.setting_done_by_user_id, self.desain.id)
+
     def test_checklist_owner_is_first_user_who_checks_and_submit_does_not_steal(self):
         order, design, players = self._create_approved_order("OWNER")
         player_a, player_b = players
@@ -141,7 +246,7 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
         self.client.get("/auth/logout")
         self.client.post("/auth/login", data={"username": username, "password": password})
 
-    def _create_approved_order(self, suffix):
+    def _create_approved_order(self, suffix, point_per_size=1, player_count=2):
         order = SalesOrder(
             so_number=f"TEST/{suffix}",
             tracking_code=f"TRK{suffix}",
@@ -150,6 +255,7 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
             customer_code=f"CUST-{suffix}",
             access_code=f"access-{suffix.lower()}",
             production_days=7,
+            point_per_size=point_per_size,
             deadline=date(2026, 7, 8),
             approval_status="approved",
             approved_by="Customer",
@@ -171,8 +277,8 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
             bottom_image_path="uploads/designs/old-bottom.png",
         )
         players = [
-            SalesOrderPlayer(design=design, player_name="A", player_number="1", size="L", sort_order=1),
-            SalesOrderPlayer(design=design, player_name="B", player_number="2", size="XL", sort_order=2),
+            SalesOrderPlayer(design=design, player_name=f"Player {index}", player_number=str(index), size="L", sort_order=index)
+            for index in range(1, player_count + 1)
         ]
         db.session.add(order)
         db.session.flush()
@@ -180,9 +286,42 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
         db.session.commit()
         return order, design, players
 
+    def _sales_order_form(self, order=None, instructions="Instruksi test", notes=""):
+        material = MasterMaterial.query.filter_by(status="active").first()
+        instruction = MasterInstruction.query.filter_by(status="active").first()
+        form = MultiDict(
+            [
+                ("team_name", order.team_name if order else "Team Default Point"),
+                ("customer_name", "Customer"),
+                ("customer_phone", "08123456789"),
+                ("customer_address", "Alamat"),
+                ("brand_id", str(self.brand.id)),
+                ("seller_name", order.seller_name if order and order.seller_name else "Seller Test"),
+                ("point_per_size", "1"),
+                ("order_date", "2026-07-12"),
+                ("production_days", "7"),
+                ("pattern", ""),
+                ("grade", ""),
+                ("instructions", instructions if instructions != "Instruksi test" else (instruction.name if instruction else instructions)),
+                ("notes", notes),
+                ("design_id[]", str(order.designs[0].id) if order and order.designs else ""),
+                ("design_name[]", "Home"),
+                ("item_name[]", "Jersey"),
+                ("top_material[]", material.name if material else ""),
+                ("bottom_material[]", ""),
+                ("top_notes[]", ""),
+                ("bottom_notes[]", ""),
+                ("existing_top_image[]", order.designs[0].display_top_image_path if order and order.designs else ""),
+                ("existing_bottom_image[]", order.designs[0].bottom_image_path if order and order.designs else ""),
+                ("players[]", "A,1,L\nB,2,L"),
+            ]
+        )
+        return form
+
     def _approval_and_status_state(self, order):
         return (
             order.approval_status,
+            order.approved,
             order.approved_by,
             order.approved_source,
             order.approved_at,

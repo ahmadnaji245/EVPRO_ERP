@@ -34,15 +34,17 @@
                     <label class="form-label">Nama Seller</label>
                     <input class="form-control" name="seller_name" value="{{ form.get('seller_name', sales_order.seller_name if sales_order else '') }}" data-seller-input>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Poin</label>
-                    {% set selected_point = form.get('point_per_size', sales_order.point_per_size if sales_order else 1)|float %}
-                    <select class="form-select" name="point_per_size" required>
-                        {% for point in (0, 0.5, 1, 1.5) %}
-                            <option value="{{ point }}" {% if selected_point == point %}selected{% endif %}>{{ point }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                {% if not sales_order %}
+                    <div class="col-md-4">
+                        <label class="form-label">Poin</label>
+                        {% set selected_point = form.get('point_per_size', 1)|float %}
+                        <select class="form-select" name="point_per_size" required>
+                            {% for point in (0, 0.5, 1, 1.5) %}
+                                <option value="{{ point }}" {% if selected_point == point %}selected{% endif %}>{{ point }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
                 <div class="col-md-8">
                     <label class="form-label">Alamat Customer</label>
                     <input class="form-control" name="customer_address" value="{{ form.get('customer_address', sales_order.crm_customer.address if sales_order and sales_order.crm_customer else '') }}">

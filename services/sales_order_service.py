@@ -80,6 +80,8 @@ def _parse_int(value, default=7):
 
 def _parse_point_per_size(value, default=1):
     if value in (None, ""):
+        if default is None:
+            return None
         return float(default)
     try:
         point = float(value)
@@ -88,6 +90,10 @@ def _parse_point_per_size(value, default=1):
     if point in VALID_POINT_PER_SIZE_VALUES:
         return point
     return None
+
+
+def parse_point_per_size(value, default=1):
+    return _parse_point_per_size(value, default=default)
 
 
 def _normalize_player_size(value):
@@ -273,8 +279,9 @@ def _fill_sales_order(order, form):
     order.pattern = form.get("pattern", "").strip() or None
     order.grade = form.get("grade", "").strip() or None
     order.production_days = _parse_int(form.get("production_days"))
-    parsed_point = _parse_point_per_size(form.get("point_per_size"), default=1)
-    order.point_per_size = parsed_point if parsed_point is not None else 1
+    if order.id is None:
+        parsed_point = _parse_point_per_size(form.get("point_per_size"), default=1)
+        order.point_per_size = parsed_point if parsed_point is not None else 1
     order.deadline = order_date + timedelta(days=order.production_days)
     order.created_at = datetime.combine(order_date, time.min)
     order.instructions = form.get("instructions", "").strip() or None
@@ -396,7 +403,7 @@ def validate_sales_order_form(form):
             brand = Brand.query.get(brand_id)
             if _brand_is_evpro(brand) and not form.get("seller_name", "").strip():
                 errors.append("Nama seller wajib diisi untuk brand Evpro.")
-    if _parse_point_per_size(form.get("point_per_size"), default=1) is None:
+    if "point_per_size" in form and _parse_point_per_size(form.get("point_per_size"), default=1) is None:
         errors.append("Poin tidak valid.")
     instruction = form.get("instructions", "").strip()
     if not instruction:

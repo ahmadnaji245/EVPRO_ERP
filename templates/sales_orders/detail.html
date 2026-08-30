@@ -137,7 +137,15 @@ Terima kasih 🙏{% endset %}
                     </div>
                 </dd>
                 <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
-                <dt class="col-5">Poin</dt><dd class="col-7">{{ sales_order.point_per_size|number(1) }}</dd>
+                <dt class="col-5">Poin</dt>
+                <dd class="col-7">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span>{{ sales_order.point_per_size|number(1) }}</span>
+                        {% if has_permission('sales_order.manage') %}
+                            <button class="btn btn-outline-secondary btn-sm py-0" type="button" data-bs-toggle="modal" data-bs-target="#quickEditPointModal">Ubah Poin</button>
+                        {% endif %}
+                    </div>
+                </dd>
                 <dt class="col-5">Total Size</dt><dd class="col-7">{{ sales_order.total_size }}</dd>
                 <dt class="col-5">Total Point</dt><dd class="col-7">{{ sales_order.total_point|number(1) }}</dd>
             </dl>
@@ -425,6 +433,30 @@ Terima kasih 🙏{% endset %}
             <div class="modal-body">
                 <label class="form-label">Tanggal Masuk</label>
                 <input class="form-control" name="order_date" type="date" value="{{ sales_order.created_at.date().isoformat() if sales_order.created_at else '' }}" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button class="btn btn-rdr" type="submit">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="quickEditPointModal" tabindex="-1" aria-labelledby="quickEditPointModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" method="post" action="{{ url_for('sales_orders.quick_update_point', sales_order_id=sales_order.id) }}">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickEditPointModalLabel">Ubah Poin</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Poin</label>
+                {% set selected_point = (sales_order.point_per_size if sales_order.point_per_size is not none else 1)|float %}
+                <select class="form-select" name="point_per_size" required>
+                    {% for point in (0, 0.5, 1, 1.5) %}
+                        <option value="{{ point }}" {% if selected_point == point %}selected{% endif %}>{{ point }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
