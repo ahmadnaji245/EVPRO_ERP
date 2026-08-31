@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user
@@ -268,20 +268,18 @@ def pdf(sales_order_id):
 
 
 @sales_orders_bp.route("/<int:sales_order_id>/quick-edit-date", methods=["POST"])
+@sales_orders_bp.route("/<int:sales_order_id>/quick-edit-deadline", methods=["POST"])
 @permission_required("sales_order.manage")
-def quick_edit_date(sales_order_id):
+def quick_edit_deadline(sales_order_id):
     order = get_sales_order(sales_order_id)
-    raw_date = str(request.form.get("order_date") or "").strip()
+    raw_date = str(request.form.get("deadline") or "").strip()
     try:
-        new_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+        new_deadline = datetime.strptime(raw_date, "%Y-%m-%d").date()
     except ValueError:
-        flash("Tanggal masuk tidak valid.", "danger")
+        flash("Deadline tidak valid.", "danger")
         return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
-    old_date = order.created_at.date() if order.created_at else None
     old_deadline = order.deadline
-    new_deadline = new_date + timedelta(days=order.production_days or 0)
-    order.created_at = datetime.combine(new_date, time.min)
     order.deadline = new_deadline
     for design in order.designs:
         design.deadline = new_deadline
@@ -289,15 +287,14 @@ def quick_edit_date(sales_order_id):
     record_history(
         order,
         actor_name=current_user.name or current_user.username,
-        action="Quick edit tanggal masuk",
-        field_name="created_at",
-        old_value=old_date.isoformat() if old_date else None,
-        new_value=new_date.isoformat(),
+        action="Quick edit deadline",
+        field_name="deadline",
+        old_value=old_deadline.isoformat() if old_deadline else None,
+        new_value=new_deadline.isoformat(),
         user=current_user,
-        notes=f"Deadline: {old_deadline.isoformat() if old_deadline else '-'} -> {new_deadline.isoformat()}",
     )
     db.session.commit()
-    flash("Tanggal masuk berhasil diperbarui tanpa membatalkan approval.", "success")
+    flash("Deadline berhasil diperbarui tanpa membatalkan approval.", "success")
     return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
 

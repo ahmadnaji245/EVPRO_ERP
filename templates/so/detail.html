@@ -133,15 +133,16 @@ Terima kasih 🙏{% endset %}
                 <dt class="col-5">Tracking Code</dt><dd class="col-7">{{ sales_order.tracking_code }}</dd>
                 <dt class="col-5">Kode Akses Lama</dt><dd class="col-7">{{ sales_order.access_code }}</dd>
                 <dt class="col-5">Tanggal Masuk</dt>
+                <dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
+                <dt class="col-5">Deadline</dt>
                 <dd class="col-7">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span>{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</span>
+                        <span>{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</span>
                         {% if has_permission('sales_order.manage') %}
-                            <button class="btn btn-outline-secondary btn-sm py-0" type="button" data-bs-toggle="modal" data-bs-target="#quickEditDateModal">Ubah Tanggal</button>
+                            <button class="btn btn-outline-secondary btn-sm py-0" type="button" data-bs-toggle="modal" data-bs-target="#quickEditDeadlineModal">Ubah Deadline</button>
                         {% endif %}
                     </div>
                 </dd>
-                <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
                 <dt class="col-5">Penagihan</dt><dd class="col-7">{{ billing_status }}</dd>
                 <dt class="col-5">Poin</dt>
                 <dd class="col-7">
@@ -480,16 +481,16 @@ Terima kasih 🙏{% endset %}
 </form>
 
 {% if has_permission('sales_order.manage') %}
-<div class="modal fade" id="quickEditDateModal" tabindex="-1" aria-labelledby="quickEditDateModalLabel" aria-hidden="true">
+<div class="modal fade" id="quickEditDeadlineModal" tabindex="-1" aria-labelledby="quickEditDeadlineModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <form class="modal-content" method="post" action="{{ url_for('sales_orders.quick_edit_date', sales_order_id=sales_order.id) }}">
+        <form class="modal-content" method="post" action="{{ url_for('sales_orders.quick_edit_deadline', sales_order_id=sales_order.id) }}">
             <div class="modal-header">
-                <h5 class="modal-title" id="quickEditDateModalLabel">Ubah Tanggal Masuk</h5>
+                <h5 class="modal-title" id="quickEditDeadlineModalLabel">Ubah Deadline</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
             </div>
             <div class="modal-body">
-                <label class="form-label">Tanggal Masuk</label>
-                <input class="form-control" name="order_date" type="date" value="{{ sales_order.created_at.date().isoformat() if sales_order.created_at else '' }}" required>
+                <label class="form-label">Deadline</label>
+                <input class="form-control" name="deadline" type="date" value="{{ sales_order.deadline.isoformat() if sales_order.deadline else '' }}" required>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>

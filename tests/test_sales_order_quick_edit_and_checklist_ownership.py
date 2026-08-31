@@ -49,27 +49,28 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
         self.ctx.pop()
         self.tmp.cleanup()
 
-    def test_quick_edit_date_preserves_approval_and_status_fields(self):
+    def test_quick_edit_deadline_preserves_input_date_approval_and_status_fields(self):
         order, design, _players = self._create_approved_order("QDATE")
         original_state = self._approval_and_status_state(order)
+        original_created_at = order.created_at
         self._login("admin", "admin")
 
         response = self.client.post(
-            f"/sales-order/{order.id}/quick-edit-date",
-            data={"order_date": "2026-07-10"},
+            f"/sales-order/{order.id}/quick-edit-deadline",
+            data={"deadline": "2026-07-10"},
             follow_redirects=True,
         )
         db.session.refresh(order)
         db.session.refresh(design)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(order.created_at.date(), date(2026, 7, 10))
-        self.assertEqual(order.deadline, date(2026, 7, 17))
-        self.assertEqual(design.deadline, date(2026, 7, 17))
+        self.assertEqual(order.created_at, original_created_at)
+        self.assertEqual(order.deadline, date(2026, 7, 10))
+        self.assertEqual(design.deadline, date(2026, 7, 10))
         self.assertEqual(order.so_number, "TEST/QDATE")
         self.assertEqual(order.tracking_code, "TRKQDATE")
         self.assertEqual(self._approval_and_status_state(order), original_state)
-        self.assertTrue(RevisionHistory.query.filter_by(sales_order_id=order.id, action="Quick edit tanggal masuk").first())
+        self.assertTrue(RevisionHistory.query.filter_by(sales_order_id=order.id, action="Quick edit deadline").first())
 
     def test_quick_edit_design_image_preserves_approval_and_status_fields(self):
         order, design, _players = self._create_approved_order("QIMAGE")
@@ -109,6 +110,8 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
         self.assertIn("Poin", html)
         self.assertIn("0.5", html)
         self.assertIn("Ubah Poin", html)
+        self.assertIn("Ubah Deadline", html)
+        self.assertNotIn("Ubah Tanggal", html)
         self.assertIn(f"/sales-order/{order.id}/quick-update-point", html)
 
     def test_quick_edit_point_updates_total_point_and_preserves_approval_status(self):
