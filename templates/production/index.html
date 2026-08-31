@@ -136,6 +136,9 @@
                                     {% for vendor in vendors %}
                                         <option value="{{ vendor }}" {% if so.production_vendor == vendor %}selected{% endif %}>{{ vendor }}</option>
                                     {% endfor %}
+                                    {% if so.production_vendor and so.production_vendor not in vendors %}
+                                        <option value="{{ so.production_vendor }}" selected>{{ so.production_vendor }} (nonaktif)</option>
+                                    {% endif %}
                                 </select>
                             </form>
                         {% else %}
@@ -224,6 +227,9 @@
                                     {% for vendor in vendors %}
                                         <option value="{{ vendor }}" {% if so.production_vendor == vendor %}selected{% endif %}>{{ vendor }}</option>
                                     {% endfor %}
+                                    {% if so.production_vendor and so.production_vendor not in vendors %}
+                                        <option value="{{ so.production_vendor }}" selected>{{ so.production_vendor }} (nonaktif)</option>
+                                    {% endif %}
                                 </select>
                             </form>
                         {% else %}

@@ -2,11 +2,11 @@ import json
 from datetime import date, datetime, time, timedelta
 
 from database.db import db
-from models import Brand, CustomerAccess, QcChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
+from models import Brand, CustomerAccess, MasterVendor, QcChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
 from services.item_service import component_key, design_components, qc_enabled_components_for_order
 from services.number_generator import generate_tracking_code
 from services.history_service import record_history
-from utils.constants import PRODUCTION_STATUSES, PRODUCTION_VENDORS, normalize_production_status, sort_players_by_size
+from utils.constants import PRODUCTION_STATUSES, normalize_production_status, sort_players_by_size
 
 
 ACTIVE_PRODUCTION_STATUSES = [status for status in PRODUCTION_STATUSES if status != "Finish"]
@@ -71,10 +71,40 @@ def production_summary(orders):
     }
 
 
+def list_active_vendor_names():
+    return [
+        row.name
+        for row in MasterVendor.query.filter_by(status="active")
+        .order_by(db.func.coalesce(MasterVendor.sort_order, 0).asc(), MasterVendor.name.asc())
+        .all()
+    ]
+
+
+def list_production_vendor_options():
+    return list_active_vendor_names()
+
+
+def list_vendor_summary_names(orders):
+    names = []
+    seen = set()
+    for name in list_active_vendor_names():
+        key = name.casefold()
+        if key not in seen:
+            names.append(name)
+            seen.add(key)
+    for order in orders:
+        name = str(order.production_vendor or "").strip()
+        key = name.casefold()
+        if name and key not in seen and is_active_production_order(order):
+            names.append(name)
+            seen.add(key)
+    return names
+
+
 def vendor_summary(orders):
     today = datetime.utcnow().date()
     rows = []
-    for vendor in PRODUCTION_VENDORS:
+    for vendor in list_vendor_summary_names(orders):
         vendor_orders = [order for order in orders if order.production_vendor == vendor and is_active_production_order(order)]
         rows.append(
             {
@@ -97,7 +127,7 @@ def vendor_summary(orders):
 
 
 def vendor_print_rows(vendor):
-    vendor = validate_vendor(vendor)
+    vendor = validate_vendor(vendor, active_only=False)
     db.session.expire_all()
     orders = (
         SalesOrder.query.filter_by(is_deleted=False, approval_status="approved", production_vendor=vendor)
@@ -362,11 +392,31 @@ def seed_production_sample_data():
     return {"created": created, "existing": existing}
 
 
-def validate_vendor(vendor):
+def validate_vendor(vendor, active_only=True):
     vendor = str(vendor or "").strip()
-    if vendor not in PRODUCTION_VENDORS:
+    row = MasterVendor.query.filter(db.func.lower(MasterVendor.name) == vendor.lower()).first() if vendor else None
+    if row and (row.is_active or not active_only):
+        return row.name
+    if not active_only and _vendor_has_production_history(vendor):
+        return vendor
+    if not row or active_only:
         raise ValueError("Vendor produksi tidak valid.")
-    return vendor
+    return row.name
+
+
+def _vendor_has_production_history(vendor):
+    return bool(
+        vendor
+        and SalesOrder.query.filter_by(is_deleted=False, approval_status="approved", production_vendor=vendor).first()
+    )
+
+
+def _validate_assignment_vendor(order, vendor):
+    vendor = str(vendor or "").strip()
+    current_vendor = str(getattr(order, "production_vendor", "") or "").strip()
+    if current_vendor and vendor.casefold() == current_vendor.casefold():
+        return validate_vendor(vendor, active_only=False)
+    return validate_vendor(vendor, active_only=True)
 
 
 def production_status(order):
@@ -436,7 +486,7 @@ def is_late(order, today=None):
 
 
 def assign_vendor(order, vendor):
-    vendor = validate_vendor(vendor)
+    vendor = _validate_assignment_vendor(order, vendor)
     try:
         order.production_vendor = vendor
         order.printing_confirmed = True
@@ -467,7 +517,7 @@ def save_vendor_assignment(order, vendor, deadline):
         raise ValueError("Silakan pilih vendor terlebih dahulu.")
     if not deadline:
         raise ValueError("Silakan tentukan deadline vendor.")
-    vendor = validate_vendor(vendor)
+    vendor = _validate_assignment_vendor(order, vendor)
     deadline_date = _parse_date(deadline)
     try:
         order.production_vendor = vendor

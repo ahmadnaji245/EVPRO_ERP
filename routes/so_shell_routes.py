@@ -4,7 +4,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, s
 from flask_login import current_user, login_required
 
 from database.db import db
-from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
+from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern, MasterVendor
 from models.setting import Setting
 from models.user import User
 from services.brand_service import create_brand, get_brand, list_brands, set_brand_active, update_brand
@@ -15,12 +15,12 @@ from services.pdf_render_service import render_first_pdf_page_to_jpg
 from models.sales_order import SalesOrder
 from services.production_service import (
     PRODUCTION_STATUSES,
-    PRODUCTION_VENDORS,
     can_finish_order,
     cancel_printing_confirmation,
     can_cancel_printing_confirmation,
     confirm_printing_started,
     finish_production,
+    list_production_vendor_options,
     list_production_orders,
     list_vendor_production_rows,
     production_priority,
@@ -88,6 +88,13 @@ SIMPLE_MASTERS = {
         "endpoint": "master.instructions",
         "examples": "Langsung Jahit, Sablon Dulu, Bordir Dulu",
     },
+    "vendors": {
+        "model": MasterVendor,
+        "title": "Master Vendor",
+        "label": "Vendor",
+        "endpoint": "master.vendors",
+        "examples": "Vendor Jepara 1, Vendor Bandung 2",
+    },
 }
 
 
@@ -122,7 +129,7 @@ def production_index():
         unassigned_orders=unassigned_orders,
         active_orders=active_orders,
         search=search,
-        vendors=PRODUCTION_VENDORS,
+        vendors=list_production_vendor_options(),
         summary=production_summary(sales_orders),
         production_status=production_status,
         production_priority=production_priority,
@@ -267,7 +274,7 @@ def production_qc_checklist(sales_order_id):
 @permission_required("production.view")
 def production_vendor_print(vendor_name):
     try:
-        vendor = validate_vendor(vendor_name)
+        vendor = validate_vendor(vendor_name, active_only=False)
     except ValueError:
         abort(404)
     pdf_buffer = _build_vendor_print_pdf(vendor)
@@ -288,7 +295,7 @@ def production_vendor_print(vendor_name):
 @permission_required("production.view")
 def production_vendor_print_jpg(vendor_name):
     try:
-        vendor = validate_vendor(vendor_name)
+        vendor = validate_vendor(vendor_name, active_only=False)
     except ValueError:
         abort(404)
     pdf_buffer = _build_vendor_print_pdf(vendor)
@@ -360,6 +367,7 @@ def master_index():
         materials=list_rows(MasterMaterial),
         patterns=list_rows(MasterPattern),
         instructions=list_rows(MasterInstruction),
+        vendors=list_rows(MasterVendor),
         users=User.query.order_by(User.name).all(),
     )
 
@@ -460,6 +468,13 @@ def instructions():
     if request.method == "POST":
         return _create_simple_master("instructions")
     return _render_simple_master("instructions")
+
+
+@master_bp.route("/vendors", methods=["GET", "POST"])
+def vendors():
+    if request.method == "POST":
+        return _create_simple_master("vendors")
+    return _render_simple_master("vendors")
 
 
 @master_bp.route("/<master_key>/<int:row_id>/edit", methods=["GET", "POST"])

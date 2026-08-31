@@ -37,3 +37,7 @@ class MasterPattern(MasterBase, db.Model):
 
 class MasterInstruction(MasterBase, db.Model):
     __tablename__ = "master_instructions"
+
+
+class MasterVendor(MasterBase, db.Model):
+    __tablename__ = "master_vendors"

@@ -2,7 +2,7 @@ from models.brand import Brand
 from models.crm import CUSTOMER_SOURCES, CUSTOMER_STATUSES, FOLLOW_UP_STATUSES, LEAD_SOURCES, LEAD_STATUSES, Customer, FollowUp, Lead, WhatsAppTemplate
 from models.customer_access import CustomerAccess
 from models.customer_revision_note import CustomerRevisionNote
-from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern
+from models.master_data import MasterInstruction, MasterItem, MasterMaterial, MasterPattern, MasterVendor
 from models.nota import Nota, NotaCustomer, NotaItem, NotaPayment, NotaProduct
 from models.petty_cash import AllowanceReserve, EmployeeCashAdvance, ExpenseCategoryGroup, FinancialAuditLog, PettyCashCategory, PettyCashTransaction
 from models.production_checklist import ProductionChecklist
@@ -31,6 +31,7 @@ __all__ = [
     "MasterItem",
     "MasterMaterial",
     "MasterPattern",
+    "MasterVendor",
     "Nota",
     "NotaCustomer",
     "NotaItem",

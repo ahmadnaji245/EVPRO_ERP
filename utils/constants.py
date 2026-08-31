@@ -11,7 +11,6 @@ CUSTOMER_PORTAL_STATUSES = [
     "Packing",
     "Finish",
 ]
-PRODUCTION_VENDORS = ["Mas Amar", "Mas Syukron"]
 PRODUCTION_STATUSES = [
     "Approval Customer",
     "Setting",

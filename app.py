@@ -9,7 +9,7 @@ from sqlalchemy import inspect, text
 
 from config import Config
 from database.db import db
-from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, SalesOrder, Setting, User
+from models import Brand, MasterInstruction, MasterItem, MasterMaterial, MasterPattern, MasterVendor, SalesOrder, Setting, User
 from routes.crm_routes import crm_bp
 from routes.finance_routes import finance_bp
 from routes.handover_routes import handover_bp
@@ -689,6 +689,7 @@ def seed_initial_data():
     _seed_master(MasterMaterial, ["Milano", "Dryfit"])
     _seed_master(MasterPattern, ["Reguler", "Raglan"])
     _seed_master(MasterInstruction, ["Default"])
+    _seed_master_defaults(MasterVendor, ["Mas Amar", "Mas Syukron"])
     seed_default_nota_products()
     seed_default_petty_cash_categories()
     db.session.commit()
@@ -1503,6 +1504,17 @@ def _seed_master(model, names):
     for index, name in enumerate(names, start=1):
         if name not in existing:
             db.session.add(model(name=name, status="active", sort_order=index))
+
+
+def _seed_master_defaults(model, names):
+    existing = {row.name.casefold(): row for row in model.query.all()}
+    next_order = (db.session.query(db.func.max(model.sort_order)).scalar() or 0) + 1
+    for name in names:
+        key = name.casefold()
+        if key in existing:
+            continue
+        db.session.add(model(name=name, status="active", sort_order=next_order))
+        next_order += 1
 
 
 app = create_app()

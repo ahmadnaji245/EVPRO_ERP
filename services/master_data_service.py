@@ -22,7 +22,7 @@ def validate_master_form(form, model=None, row=None):
     if not name:
         errors.append("Nama data wajib diisi.")
     if model and name:
-        query = model.query.filter(model.name == name)
+        query = model.query.filter(func.lower(model.name) == name.lower())
         if row:
             query = query.filter(model.id != row.id)
         if query.first():

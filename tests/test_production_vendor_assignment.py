@@ -6,8 +6,8 @@ from pathlib import Path
 from app import create_app
 from config import Config
 from database.db import db
-from models import Brand, SalesOrder, User
-from services.production_service import assign_vendor, can_cancel_printing_confirmation, list_vendor_production_rows, save_vendor_assignment, set_vendor_deadline
+from models import Brand, MasterVendor, SalesOrder, User
+from services.production_service import assign_vendor, can_cancel_printing_confirmation, list_production_vendor_options, list_vendor_production_rows, save_vendor_assignment, set_vendor_deadline
 
 
 class TestConfig(Config):
@@ -53,6 +53,91 @@ class ProductionVendorAssignmentTestCase(unittest.TestCase):
         self.assertIn("Vendor berhasil diperbarui.", html)
         self.assertIn("Produksi Aktif", html)
         self.assertIn(">Jahit<", html)
+
+    def test_default_vendors_are_seeded_once(self):
+        self.assertEqual(MasterVendor.query.filter(db.func.lower(MasterVendor.name) == "mas amar").count(), 1)
+        self.assertEqual(MasterVendor.query.filter(db.func.lower(MasterVendor.name) == "mas syukron").count(), 1)
+
+        from app import seed_initial_data
+
+        seed_initial_data()
+
+        self.assertEqual(MasterVendor.query.filter(db.func.lower(MasterVendor.name) == "mas amar").count(), 1)
+        self.assertEqual(MasterVendor.query.filter(db.func.lower(MasterVendor.name) == "mas syukron").count(), 1)
+
+    def test_master_vendor_create_is_available_in_production_dropdown(self):
+        self.client.post("/auth/login", data={"username": "admin", "password": "admin"})
+
+        response = self.client.post("/master/vendors", data={"name": "Mas Budi", "status": "active"}, follow_redirects=True)
+        html = response.data.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Vendor berhasil ditambahkan.", html)
+        self.assertIn("Mas Budi", [vendor.name for vendor in MasterVendor.query.all()])
+        self.assertIn("Mas Budi", list_production_vendor_options())
+
+        self._create_order("DROPDOWN", production_status="Printing", printing_confirmed=True)
+        production_response = self.client.get("/production/")
+        production_html = production_response.data.decode()
+        self.assertIn('<option value="Mas Amar"', production_html)
+        self.assertIn('<option value="Mas Syukron"', production_html)
+        self.assertIn('<option value="Mas Budi"', production_html)
+
+    def test_inactive_vendor_is_hidden_for_new_assignment_but_old_order_still_displays(self):
+        vendor = MasterVendor(name="Mas Budi", status="active", sort_order=99)
+        db.session.add(vendor)
+        db.session.commit()
+        order = self._create_order(
+            "OLDBUDI",
+            production_status="Jahit",
+            production_vendor="Mas Budi",
+            production_vendor_deadline=date(2026, 7, 20),
+            printing_confirmed=True,
+        )
+        unassigned_order = self._create_order("NEWASSIGN", production_status="Printing", printing_confirmed=True)
+        vendor.is_active = False
+        db.session.commit()
+        self.client.post("/auth/login", data={"username": "admin", "password": "admin"})
+
+        response = self.client.get("/production/")
+        html = response.data.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Mas Budi", list_production_vendor_options())
+        self.assertIn(order.so_number, html)
+        self.assertIn("Mas Budi (nonaktif)", html)
+        new_order_section = html[html.index(unassigned_order.so_number) :]
+        self.assertNotIn('<option value="Mas Budi"', new_order_section[: new_order_section.index("</tr>")])
+
+    def test_duplicate_vendor_name_is_rejected_case_insensitive(self):
+        self.client.post("/auth/login", data={"username": "admin", "password": "admin"})
+
+        response = self.client.post("/master/vendors", data={"name": "mas amar", "status": "active"}, follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Nama data sudah digunakan.", response.data.decode())
+        self.assertEqual(MasterVendor.query.filter(db.func.lower(MasterVendor.name) == "mas amar").count(), 1)
+
+    def test_non_master_user_cannot_create_vendor(self):
+        self.client.post("/auth/login", data={"username": "produksi", "password": "produksi"})
+
+        response = self.client.post("/master/vendors", data={"name": "Mas Budi", "status": "active"})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIsNone(MasterVendor.query.filter_by(name="Mas Budi").first())
+
+    def test_legacy_string_vendor_assignment_stays_readable_after_startup_seed(self):
+        order = self._create_order(
+            "LEGACYAMAR",
+            production_status="Jahit",
+            production_vendor="Mas Amar",
+            production_vendor_deadline=date(2026, 7, 20),
+        )
+
+        rows = list_vendor_production_rows()
+
+        row = next(row for row in rows if row["so_number"] == order.so_number)
+        self.assertEqual(row["vendor"], "Mas Amar")
 
     def test_setting_order_waits_in_printing_table_until_confirmed(self):
         order = self._create_order("SETTINGWAIT", production_status="Setting")
