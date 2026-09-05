@@ -10,6 +10,7 @@ from models.production_size_checklist import ProductionSizeChecklist
 from models.qc_checklist import QcChecklist
 from models.revision_history import RevisionHistory
 from models.sales_order import SalesOrder
+from models.sales_order_attachment import SalesOrderAttachment
 from models.sales_order_design import SalesOrderDesign
 from models.sales_order_player import SalesOrderPlayer
 from models.sales_order_production_photo import SalesOrderProductionPhoto
@@ -51,6 +52,7 @@ __all__ = [
     "QcChecklist",
     "RevisionHistory",
     "SalesOrder",
+    "SalesOrderAttachment",
     "SalesOrderDesign",
     "SalesOrderPlayer",
     "SalesOrderProductionPhoto",

@@ -654,6 +654,7 @@ def ensure_database_schema_migrations():
     ensure_handover_schema()
     ensure_printing_confirmation_schema()
     ensure_sales_order_point_schema()
+    ensure_sales_order_attachment_schema()
     ensure_v09_finance_schema()
 
 
@@ -925,6 +926,32 @@ def ensure_sales_order_point_schema():
 
     _add_column_if_missing("sales_orders", "point_per_size", "REAL NOT NULL DEFAULT 1")
     db.session.execute(text("UPDATE sales_orders SET point_per_size = 1 WHERE point_per_size IS NULL"))
+    db.session.commit()
+
+
+def ensure_sales_order_attachment_schema():
+    if _table_exists("sales_order_attachments"):
+        return
+    db.session.execute(
+        text(
+            """
+            CREATE TABLE sales_order_attachments (
+                id INTEGER NOT NULL PRIMARY KEY,
+                sales_order_id INTEGER NOT NULL,
+                file_path VARCHAR(255) NOT NULL,
+                title VARCHAR(150),
+                note TEXT,
+                original_filename VARCHAR(255),
+                created_by_user_id INTEGER,
+                created_by_name VARCHAR(120),
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(sales_order_id) REFERENCES sales_orders (id),
+                FOREIGN KEY(created_by_user_id) REFERENCES users (id)
+            )
+            """
+        )
+    )
+    db.session.execute(text("CREATE INDEX ix_sales_order_attachments_sales_order_id ON sales_order_attachments (sales_order_id)"))
     db.session.commit()
 
 

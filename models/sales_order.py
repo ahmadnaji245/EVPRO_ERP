@@ -73,6 +73,12 @@ class SalesOrder(db.Model):
         cascade="all, delete-orphan",
         order_by="SalesOrderProductionPhoto.sort_order",
     )
+    attachments = db.relationship(
+        "SalesOrderAttachment",
+        back_populates="sales_order",
+        cascade="all, delete-orphan",
+        order_by="SalesOrderAttachment.created_at.asc(), SalesOrderAttachment.id.asc()",
+    )
 
     @property
     def approved(self):

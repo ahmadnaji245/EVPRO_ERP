@@ -2,11 +2,15 @@ from datetime import datetime
 
 from database.db import db
 from utils.constants import (
+    extract_pants_size_from_note,
     has_long_sleeve_marker,
     long_sleeve_size_label,
     long_sleeve_type_label,
+    note_is_empty_for_pants_size,
     normalize_size_key,
+    pants_size_from_player_size,
     size_group_name,
+    sort_pants_size_rows,
     sort_long_sleeve_rows,
     sort_players_by_size,
     sort_size_rows,
@@ -121,6 +125,10 @@ class SalesOrderDesign(db.Model):
         return bool(self.secondary_item_label)
 
     @property
+    def has_pants_item(self):
+        return self.needs_bottom_material
+
+    @property
     def has_design_image(self):
         return bool(self.display_top_image_path or (self.has_secondary_item and self.bottom_image_path))
 
@@ -149,6 +157,19 @@ class SalesOrderDesign(db.Model):
                 grouped[group_name] = [{"size": row["size"], "qty": row["qty"]} for row in rows]
 
         return {"groups": grouped, "long_sleeve": []}
+
+    @property
+    def pants_size_recap(self):
+        rows = {}
+        for player in self.players:
+            size = extract_pants_size_from_note(player.notes)
+            if not size and note_is_empty_for_pants_size(player.notes):
+                size = pants_size_from_player_size(player.size)
+            if not size:
+                continue
+            row = rows.setdefault(size, {"size": size, "qty": 0})
+            row["qty"] += 1
+        return sort_pants_size_rows(rows.values())
 
     @property
     def long_sleeve_recap(self):

@@ -15,6 +15,11 @@ from services.nota_service import billing_status_for_sales_order, get_nota_by_so
 from services.order_status_service import get_display_status
 from services.pdf_service import build_sales_order_pdf
 from services.production_photo_service import add_production_photos, delete_production_photo, get_photo_for_order
+from services.sales_order_attachment_service import (
+    add_sales_order_attachment,
+    delete_sales_order_attachment,
+    get_attachment_for_order,
+)
 from services.production_service import is_finished_production_order
 from services.sales_order_service import (
     PRODUCTION_STATUSES,
@@ -186,6 +191,35 @@ def delete_production_photo_route(sales_order_id, photo_id):
     photo = get_photo_for_order(order, photo_id)
     delete_production_photo(photo)
     flash("Foto hasil produksi dihapus.", "success")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+@sales_orders_bp.route("/<int:sales_order_id>/attachments", methods=["POST"])
+@permission_required("sales_order.manage")
+def upload_attachment(sales_order_id):
+    order = get_sales_order(sales_order_id)
+    try:
+        attachment = add_sales_order_attachment(
+            order,
+            request.files.get("attachment_file"),
+            title=request.form.get("title"),
+            note=request.form.get("note"),
+            user=current_user,
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash(f"Lampiran {attachment.title or 'Lampiran'} berhasil ditambahkan.", "success")
+    return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
+
+
+@sales_orders_bp.route("/<int:sales_order_id>/attachments/<int:attachment_id>/delete", methods=["POST"])
+@permission_required("sales_order.manage")
+def delete_attachment(sales_order_id, attachment_id):
+    order = get_sales_order(sales_order_id)
+    attachment = get_attachment_for_order(order, attachment_id)
+    delete_sales_order_attachment(order, attachment, user=current_user)
+    flash("Lampiran dihapus.", "success")
     return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
 

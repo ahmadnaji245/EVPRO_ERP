@@ -1,3 +1,6 @@
+import re
+
+
 APP_NAME = "EVPRO TEXTILE ERP"
 APP_TAGLINE = "Surat Order Management System"
 
@@ -86,6 +89,12 @@ SIZE_ORDER = {
     "5XL": 28,
     "6XL": 29,
 }
+PANTS_SIZE_ORDER = ("XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL")
+PANTS_SIZE_SORT = {size: index for index, size in enumerate(PANTS_SIZE_ORDER)}
+PANTS_SIZE_PATTERN = re.compile(
+    r"\bcelana\b\s*(?:=|:)?\s*(5XL|4XL|3XL|XXL|XL|XS|S|M|L)\b",
+    re.IGNORECASE,
+)
 
 SIZE_ALIASES = {
     "XXS KIDS": "KXXS",
@@ -135,6 +144,33 @@ def normalize_size_key(size):
         value = value.replace(marker, " ")
     value = " ".join(value.replace("-", " ").replace("_", " ").split())
     return SIZE_ALIASES.get(value, value)
+
+
+def extract_pants_size_from_note(note):
+    match = PANTS_SIZE_PATTERN.search(str(note or ""))
+    if not match:
+        return None
+    return match.group(1).upper()
+
+
+def note_is_empty_for_pants_size(note):
+    return str(note or "").strip() in ("", "-")
+
+
+def pants_size_from_player_size(size):
+    base_size = long_sleeve_size_label(size) or " ".join(str(size or "").split())
+    normalized = normalize_size_key(base_size)
+    return normalized if normalized in PANTS_SIZE_SORT else None
+
+
+def sort_pants_size_rows(rows):
+    return sorted(
+        list(rows or []),
+        key=lambda row: PANTS_SIZE_SORT.get(
+            row.get("size") if isinstance(row, dict) else getattr(row, "size", ""),
+            10_000,
+        ),
+    )
 
 
 def has_long_sleeve_marker(*values):

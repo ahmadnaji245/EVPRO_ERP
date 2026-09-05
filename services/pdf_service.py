@@ -307,7 +307,7 @@ def _design_images(design, styles):
 def _size_recap_flowables(design, styles):
     recap = design.size_recap
     flowables = []
-    if recap["groups"]:
+    if design.needs_top_material and recap["groups"]:
         active_groups = [group for group in ["Kids", "Women", "Reguler"] if recap["groups"].get(group)]
         tables = []
         for group in active_groups:
@@ -327,7 +327,7 @@ def _size_recap_flowables(design, styles):
         )
         flowables.append(_centered_section("Rekap Size", wrapper, styles))
 
-    if design.long_sleeve_recap:
+    if design.needs_top_material and design.long_sleeve_recap:
         if flowables:
             flowables.append(Spacer(1, 3 * mm))
         flowables.append(
@@ -338,6 +338,20 @@ def _size_recap_flowables(design, styles):
             )
         )
     return flowables
+
+
+def _pants_size_recap_flowable(design, styles):
+    if not design.has_pants_item or not design.pants_size_recap:
+        return None
+    return _centered_section(
+        "Rekap Size Celana",
+        _size_qty_table("Size", design.pants_size_recap, h_align="CENTER"),
+        styles,
+    )
+
+
+def _has_jersey_size_recap(design):
+    return design.needs_top_material and (design.size_recap["groups"] or design.long_sleeve_recap)
 
 
 def _centered_section(title, content, styles):
@@ -453,6 +467,74 @@ def _player_table(design, styles):
     return table
 
 
+def _attachment_page_flowables(order, styles):
+    attachments = list(order.attachments or [])
+    image_height = 132 * mm if len(attachments) == 1 else 72 * mm
+    flowables = [
+        Paragraph("LAMPIRAN SALES ORDER", styles["SOTitle"]),
+        Spacer(1, 3 * mm),
+        _attachment_info_table(order, styles),
+        Spacer(1, 5 * mm),
+    ]
+    for index, attachment in enumerate(attachments, start=1):
+        if index > 1:
+            flowables.append(Spacer(1, 4 * mm))
+        flowables.append(_attachment_block(attachment, index, styles, image_height))
+    return flowables
+
+
+def _attachment_info_table(order, styles):
+    table = Table(
+        [
+            [_paragraph("No SO", styles["SOLabel"]), _paragraph(order.so_number, styles["SOTextBold"])],
+            [_paragraph("Team", styles["SOLabel"]), _paragraph(order.team_name, styles["SOTextBold"])],
+        ],
+        colWidths=[26 * mm, 88 * mm],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.25, GRID),
+                ("BACKGROUND", (0, 0), (0, -1), LIGHT),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+    return table
+
+
+def _attachment_block(attachment, index, styles, image_height):
+    title = attachment.title or f"Lampiran {index}"
+    rows = [
+        [_safe_paragraph(str(title).upper(), styles["SOTextBold"])],
+        [_image_flowable(attachment.file_path, "Gambar lampiran tidak tersedia", CONTENT_WIDTH, image_height)],
+    ]
+    if attachment.note:
+        rows.append([_safe_paragraph(f"Keterangan:<br/>{attachment.note}", styles["SOText"])])
+    table = Table(rows, colWidths=[CONTENT_WIDTH], hAlign="CENTER")
+    table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.25, GRID),
+                ("BACKGROUND", (0, 0), (-1, 0), LIGHT),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("ALIGN", (0, 1), (-1, 1), "CENTER"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    return table
+
+
 def _customer_player_table(design, styles):
     header = ["NO", "NAMA", "NP", "SIZE", "KETERANGAN"]
     rows = [header]
@@ -500,7 +582,7 @@ def _customer_player_table(design, styles):
 def _customer_size_recap_flowables(design, styles):
     recap = design.size_recap
     flowables = []
-    if recap["groups"]:
+    if design.needs_top_material and recap["groups"]:
         active_groups = [group for group in ["Kids", "Women", "Reguler"] if recap["groups"].get(group)]
         tables = [
             _size_qty_table(group, recap["groups"][group], h_align="CENTER", total_label=f"Total {group}")
@@ -521,7 +603,7 @@ def _customer_size_recap_flowables(design, styles):
         )
         flowables.append(_centered_section("Rekap Size", wrapper, styles))
 
-    if design.long_sleeve_recap:
+    if design.needs_top_material and design.long_sleeve_recap:
         if flowables:
             flowables.append(Spacer(1, 3 * mm))
         flowables.append(
@@ -557,9 +639,20 @@ def build_sales_order_pdf(order):
         story.append(Spacer(1, 4 * mm))
         for flowable in _size_recap_flowables(design, styles):
             story.append(flowable)
-        if design.size_recap["groups"] or design.long_sleeve_recap:
+        pants_recap = _pants_size_recap_flowable(design, styles)
+        if _has_jersey_size_recap(design):
+            story.append(Spacer(1, 4 * mm))
+        if pants_recap and not design.needs_top_material:
+            story.append(pants_recap)
             story.append(Spacer(1, 4 * mm))
         story.append(_player_table(design, styles))
+        if pants_recap and design.needs_top_material:
+            story.append(Spacer(1, 4 * mm))
+            story.append(pants_recap)
+
+    if order.attachments:
+        story.append(PageBreak())
+        story.extend(_attachment_page_flowables(order, styles))
 
     doc.build(story)
     buffer.seek(0)
@@ -589,9 +682,16 @@ def build_customer_sales_order_pdf(order):
         story.append(Spacer(1, 4 * mm))
         for flowable in _customer_size_recap_flowables(design, styles):
             story.append(flowable)
-        if design.size_recap["groups"] or design.long_sleeve_recap:
+        pants_recap = _pants_size_recap_flowable(design, styles)
+        if _has_jersey_size_recap(design):
+            story.append(Spacer(1, 4 * mm))
+        if pants_recap and not design.needs_top_material:
+            story.append(pants_recap)
             story.append(Spacer(1, 4 * mm))
         story.append(_customer_player_table(design, styles))
+        if pants_recap and design.needs_top_material:
+            story.append(Spacer(1, 4 * mm))
+            story.append(pants_recap)
 
     doc.build(story)
     buffer.seek(0)

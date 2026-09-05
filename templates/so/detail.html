@@ -480,7 +480,72 @@ Terima kasih 🙏{% endset %}
     </div>
 </form>
 
+<div class="panel mb-4">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+        <div>
+            <div class="section-title mb-1">Lampiran</div>
+            <div class="text-muted small">Gambar tambahan untuk kebutuhan internal produksi.</div>
+        </div>
+        {% if has_permission('sales_order.manage') %}
+            <button class="btn btn-sm btn-rdr" type="button" data-bs-toggle="modal" data-bs-target="#addAttachmentModal">+ Tambah Lampiran</button>
+        {% endif %}
+    </div>
+    {% if sales_order.attachments %}
+        <div class="so-attachment-grid">
+            {% for attachment in sales_order.attachments %}
+                <div class="so-attachment-card">
+                    <img src="{{ url_for('static', filename=attachment.file_path) }}" alt="{{ attachment.title or 'Lampiran ' ~ loop.index }}">
+                    <div class="so-attachment-body">
+                        <div>
+                            <div class="fw-semibold">{{ attachment.title or 'Lampiran ' ~ loop.index }}</div>
+                            {% if attachment.note %}
+                                <div class="text-muted small mt-1" style="white-space: pre-line;">{{ attachment.note }}</div>
+                            {% endif %}
+                        </div>
+                        {% if has_permission('sales_order.manage') %}
+                            <form method="post" action="{{ url_for('sales_orders.delete_attachment', sales_order_id=sales_order.id, attachment_id=attachment.id) }}" onsubmit="return confirm('Hapus lampiran ini?')">
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Hapus</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">Belum ada lampiran.</div>
+    {% endif %}
+</div>
+
 {% if has_permission('sales_order.manage') %}
+<div class="modal fade" id="addAttachmentModal" tabindex="-1" aria-labelledby="addAttachmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" method="post" enctype="multipart/form-data" action="{{ url_for('sales_orders.upload_attachment', sales_order_id=sales_order.id) }}">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addAttachmentModalLabel">Tambah Lampiran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Judul Lampiran</label>
+                    <input class="form-control" name="title" maxlength="150" placeholder="Pola Kerah">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">File Gambar</label>
+                    <input class="form-control" name="attachment_file" type="file" accept="image/jpeg,image/png,image/webp" required>
+                </div>
+                <div>
+                    <label class="form-label">Keterangan</label>
+                    <textarea class="form-control" name="note" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button class="btn btn-rdr" type="submit">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="modal fade" id="quickEditDeadlineModal" tabindex="-1" aria-labelledby="quickEditDeadlineModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <form class="modal-content" method="post" action="{{ url_for('sales_orders.quick_edit_deadline', sales_order_id=sales_order.id) }}">
