@@ -1,6 +1,7 @@
 import unittest
 
 from flask import Flask
+from flask import render_template
 import fitz
 
 from models import Brand, SalesOrder, SalesOrderDesign, SalesOrderPlayer
@@ -96,6 +97,68 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertLess(pants_pdf_text.index("Rekap Size Celana"), pants_pdf_text.index("KETERANGAN"))
         self.assertNotIn("Rekap Size Celana", jersey_pdf_text)
 
+    def test_multi_design_pdf_renders_pants_recap_per_design(self):
+        app = Flask(__name__, static_folder="static")
+        with app.app_context():
+            pages = _pdf_text_by_page(_build_multi_design_order())
+
+        self.assertEqual(len(pages), 3)
+        self.assertIn("A", pages[0])
+        self.assertIn("B", pages[0])
+        self.assertIn("Rekap Size Celana", pages[0])
+        self.assertLess(pages[0].index("KETERANGAN"), pages[0].index("Rekap Size Celana"))
+        self.assertEqual(_pants_recap_lines(pages[0]), ["Size", "Qty", "M", "1", "L", "1", "Total", "2"])
+
+        self.assertIn("C", pages[1])
+        self.assertIn("D", pages[1])
+        self.assertIn("E", pages[1])
+        self.assertIn("Rekap Size Celana", pages[1])
+        self.assertLess(pages[1].index("KETERANGAN"), pages[1].index("Rekap Size Celana"))
+        self.assertEqual(_pants_recap_lines(pages[1]), ["Size", "Qty", "XL", "2", "XXL", "1", "Total", "3"])
+
+        self.assertIn("F", pages[2])
+        self.assertNotIn("Rekap Size Celana", pages[2])
+
+    def test_pants_only_pdf_places_pants_recap_before_player_table(self):
+        app = Flask(__name__, static_folder="static")
+        with app.app_context():
+            text = _pdf_text(_build_order("Celana", ["celana = S", "celana = M", "celana = M"]))
+
+        self.assertLess(text.index("Rekap Size Celana"), text.index("KETERANGAN"))
+        self.assertIn("S", text)
+        self.assertIn("M", text)
+        self.assertNotIn("Rekap Size\n", text)
+
+    def test_detail_html_renders_pants_recap_for_current_design_only(self):
+        app = Flask(__name__, template_folder="../templates")
+        with app.app_context():
+            design_one, design_two, design_three = _build_multi_design_order().designs
+            design_four = SalesOrderDesign(design_name="Design 4", item_name="Celana")
+            design_four.players = [
+                SalesOrderPlayer(player_name="G", player_number="7", size="S", notes="celana = S", sort_order=1),
+                SalesOrderPlayer(player_name="H", player_number="8", size="M", notes="celana = M", sort_order=2),
+                SalesOrderPlayer(player_name="I", player_number="9", size="M", notes="celana = M", sort_order=3),
+            ]
+
+            design_one_html = render_template("so/_pants_size_recap.html", design=design_one)
+            design_two_html = render_template("so/_pants_size_recap.html", design=design_two)
+            design_three_html = render_template("so/_pants_size_recap.html", design=design_three)
+            design_four_html = render_template("so/_pants_size_recap.html", design=design_four)
+
+        self.assertIn("Rekap Size Celana", design_one_html)
+        self.assertIn("<td>M</td>", design_one_html)
+        self.assertIn("<td>L</td>", design_one_html)
+        self.assertNotIn("<td>XL</td>", design_one_html)
+
+        self.assertIn("Rekap Size Celana", design_two_html)
+        self.assertIn("<td>XL</td>", design_two_html)
+        self.assertIn("<td>XXL</td>", design_two_html)
+        self.assertNotIn("<td>M</td>", design_two_html)
+
+        self.assertNotIn("Rekap Size Celana", design_three_html)
+        self.assertIn("<td>S</td>", design_four_html)
+        self.assertIn("<td>M</td>", design_four_html)
+
 
 def _build_order(item_name, notes):
     brand = Brand(name="EVPRO", code="EV")
@@ -120,6 +183,61 @@ def _build_order(item_name, notes):
 def _pdf_text(order):
     with fitz.open(stream=build_sales_order_pdf(order).getvalue(), filetype="pdf") as document:
         return "\n".join(page.get_text() for page in document)
+
+
+def _pdf_text_by_page(order):
+    with fitz.open(stream=build_sales_order_pdf(order).getvalue(), filetype="pdf") as document:
+        return [page.get_text() for page in document]
+
+
+def _pants_recap_lines(page_text):
+    lines = [line.strip() for line in page_text.splitlines()]
+    start = lines.index("Rekap Size Celana") + 1
+    return lines[start : start + 8]
+
+
+def _build_multi_design_order():
+    brand = Brand(name="EVPRO", code="EV")
+    order = SalesOrder(
+        so_number="SO-MULTI-DESIGN",
+        tracking_code="TRK-MULTI-DESIGN",
+        team_name="Sample Multi Design",
+        customer_code="CUST",
+        access_code="ACC-MULTI-DESIGN",
+        brand=brand,
+        grade="A",
+    )
+    specs = [
+        ("Design 1", "Jersey + Celana", [("A", "M", "celana = M"), ("B", "L", "celana = L")]),
+        (
+            "Design 2",
+            "Jersey + Celana",
+            [("C", "XL", "celana = XL"), ("D", "XL", "celana = XL"), ("E", "XXL", "celana = XXL")],
+        ),
+        ("Design 3", "Jersey", [("F", "L", "celana = L")]),
+    ]
+    designs = []
+    for design_index, (design_name, item_name, players) in enumerate(specs, start=1):
+        design = SalesOrderDesign(
+            design_name=design_name,
+            item_name=item_name,
+            sales_order=order,
+            grade=str(design_index),
+            sort_order=design_index,
+        )
+        design.players = [
+            SalesOrderPlayer(
+                player_name=name,
+                player_number=str(player_index),
+                size=size,
+                notes=note,
+                sort_order=player_index,
+            )
+            for player_index, (name, size, note) in enumerate(players, start=1)
+        ]
+        designs.append(design)
+    order.designs = designs
+    return order
 
 
 if __name__ == "__main__":

@@ -367,6 +367,9 @@ Terima kasih 🙏{% endset %}
         </div>
     </div>
 {% endif %}
+{% if design.has_pants_item and not design.needs_top_material %}
+    {% include "so/_pants_size_recap.html" %}
+{% endif %}
             <div class="table-responsive mt-4">
                 <table class="table align-middle so-table">
                     <thead>
@@ -416,6 +419,9 @@ Terima kasih 🙏{% endset %}
                     </tbody>
                 </table>
             </div>
+{% if design.has_pants_item and design.needs_top_material %}
+    {% include "so/_pants_size_recap.html" %}
+{% endif %}
         </div>
     {% endfor %}
     <div class="d-flex justify-content-end mb-4">

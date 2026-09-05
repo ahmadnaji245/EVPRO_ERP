@@ -1,0 +1,29 @@
+{% if design.has_pants_item and design.pants_size_recap %}
+    <div class="mt-4" data-pants-size-recap>
+        <div class="fw-semibold mb-2">Rekap Size Celana</div>
+        <div class="card border">
+            <div class="card-body p-0">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Size</th>
+                            <th class="text-center" style="width: 80px;">Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in design.pants_size_recap %}
+                            <tr>
+                                <td>{{ row.size }}</td>
+                                <td class="text-center fw-semibold">{{ row.qty }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="fw-bold">
+                            <td>Total</td>
+                            <td class="text-center">{{ design.pants_size_recap | sum(attribute='qty') }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endif %}
