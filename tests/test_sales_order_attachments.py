@@ -10,7 +10,7 @@ from app import create_app
 from config import Config
 from database.db import db
 from models import Brand, CustomerAccess, RevisionHistory, SalesOrder, SalesOrderAttachment, SalesOrderDesign, SalesOrderPlayer, User
-from services.pdf_service import build_sales_order_pdf
+from services.pdf_service import build_customer_sales_order_pdf, build_sales_order_pdf
 
 
 class TestConfig(Config):
@@ -53,6 +53,32 @@ class SalesOrderAttachmentTestCase(unittest.TestCase):
         self.assertNotIn("LAMPIRAN SALES ORDER", "\n".join(text_by_page[:3]))
         self.assertIn("LAMPIRAN SALES ORDER", text_by_page[3])
         self.assertIn("POLA KERAH", text_by_page[3])
+
+    def test_customer_pdf_renders_attachment_after_all_design_pages(self):
+        order = self._create_order("CUSTPDF", design_count=3)
+        order.attachments = [
+            SalesOrderAttachment(file_path="images/evpro.png.png", title="Pola Kerah", note="Model V-neck", created_at=datetime(2026, 7, 1))
+        ]
+        text_by_page = self._customer_pdf_text_by_page(order)
+
+        self.assertEqual(len(text_by_page), 4)
+        self.assertNotIn("LAMPIRAN SALES ORDER", "\n".join(text_by_page[:3]))
+        self.assertIn("LAMPIRAN SALES ORDER", text_by_page[3])
+        self.assertIn("POLA KERAH", text_by_page[3])
+
+    def test_customer_portal_shows_attachment_at_bottom_when_available(self):
+        order = self._create_order("CUSTVIEW")
+        order.attachments = [
+            SalesOrderAttachment(file_path="images/evpro.png.png", title="Pola Kerah", note="Model V-neck", created_at=datetime(2026, 7, 1))
+        ]
+        db.session.commit()
+
+        body = self.client.get(f"/tracking/{order.access_code}").data.decode()
+
+        self.assertIn("Lampiran", body)
+        self.assertIn("Pola Kerah", body)
+        self.assertIn("Model V-neck", body)
+        self.assertIn("Lihat Lampiran", body)
 
     def test_upload_attachment_links_to_sales_order(self):
         order = self._create_order("UPLOAD")
@@ -187,6 +213,10 @@ class SalesOrderAttachmentTestCase(unittest.TestCase):
 
     def _pdf_text_by_page(self, order):
         with fitz.open(stream=build_sales_order_pdf(order).getvalue(), filetype="pdf") as document:
+            return [page.get_text() for page in document]
+
+    def _customer_pdf_text_by_page(self, order):
+        with fitz.open(stream=build_customer_sales_order_pdf(order).getvalue(), filetype="pdf") as document:
             return [page.get_text() for page in document]
 
 

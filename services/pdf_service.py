@@ -693,6 +693,10 @@ def build_customer_sales_order_pdf(order):
             story.append(Spacer(1, 4 * mm))
             story.append(pants_recap)
 
+    if order.attachments:
+        story.append(PageBreak())
+        story.extend(_attachment_page_flowables(order, styles))
+
     doc.build(story)
     buffer.seek(0)
     return buffer

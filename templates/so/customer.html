@@ -361,6 +361,30 @@
             </div>
         {% endfor %}
     </div>
+
+    {% if sales_order.attachments %}
+        <div class="panel mt-4">
+            <div class="section-title mb-3">Lampiran</div>
+            <div class="so-attachment-grid">
+                {% for attachment in sales_order.attachments %}
+                    <div class="so-attachment-card">
+                        <a href="{{ url_for('static', filename=attachment.file_path) }}" target="_blank" rel="noopener" aria-label="Lihat {{ attachment.title or 'Lampiran ' ~ loop.index }}">
+                            <img src="{{ url_for('static', filename=attachment.file_path) }}" alt="{{ attachment.title or 'Lampiran ' ~ loop.index }}">
+                        </a>
+                        <div class="so-attachment-body">
+                            <div>
+                                <div class="fw-semibold">{{ attachment.title or 'Lampiran ' ~ loop.index }}</div>
+                                {% if attachment.note %}
+                                    <div class="text-muted small mt-1" style="white-space: pre-line;">{{ attachment.note }}</div>
+                                {% endif %}
+                            </div>
+                            <a class="btn btn-sm btn-outline-dark" href="{{ url_for('static', filename=attachment.file_path) }}" target="_blank" rel="noopener">Lihat Lampiran</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
 {% else %}
     <div class="row justify-content-center">
         <div class="col-md-7 col-lg-5">
