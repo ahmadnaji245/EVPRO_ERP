@@ -121,6 +121,7 @@ SIZE_GROUPS = {
 }
 LONG_SLEEVE_MARKERS = ("LENGAN PANJANG", "LONG SLEEVE", "LP")
 LONG_SLEEVE_THREE_QUARTER_MARKERS = ("3/4", "3 / 4", "¾")
+LONG_SLEEVE_SEVEN_EIGHTH_MARKERS = ("7/8", "7 / 8", "⅞")
 
 
 def normalize_production_status(status):
@@ -141,6 +142,8 @@ def normalize_size_key(size):
     for marker in LONG_SLEEVE_MARKERS:
         value = value.replace(marker, " ")
     for marker in LONG_SLEEVE_THREE_QUARTER_MARKERS:
+        value = value.replace(marker, " ")
+    for marker in LONG_SLEEVE_SEVEN_EIGHTH_MARKERS:
         value = value.replace(marker, " ")
     value = " ".join(value.replace("-", " ").replace("_", " ").split())
     return SIZE_ALIASES.get(value, value)
@@ -184,16 +187,18 @@ def has_long_sleeve_marker(*values):
 
 
 def long_sleeve_type_label(*values):
-    combined = " ".join(str(value or "").upper().replace("¾", "3/4") for value in values)
+    combined = " ".join(str(value or "").upper().replace("¾", "3/4").replace("⅞", "7/8") for value in values)
     if not any(marker in combined for marker in LONG_SLEEVE_MARKERS):
         return ""
     if any(marker in combined for marker in LONG_SLEEVE_THREE_QUARTER_MARKERS):
         return "Lengan Panjang 3/4"
+    if any(marker in combined for marker in LONG_SLEEVE_SEVEN_EIGHTH_MARKERS):
+        return "Lengan Panjang 7/8"
     return "Lengan Panjang"
 
 
 def long_sleeve_size_label(size):
-    value = " ".join(str(size or "").strip().replace("¾", "3/4").split())
+    value = " ".join(str(size or "").strip().replace("¾", "3/4").replace("⅞", "7/8").split())
     if not value:
         return ""
     cleaned = value
@@ -203,12 +208,18 @@ def long_sleeve_size_label(size):
         cleaned = cleaned.replace(marker.lower(), " ")
     for marker in LONG_SLEEVE_THREE_QUARTER_MARKERS:
         cleaned = cleaned.replace(marker, " ")
+    for marker in LONG_SLEEVE_SEVEN_EIGHTH_MARKERS:
+        cleaned = cleaned.replace(marker, " ")
     cleaned = cleaned.replace("(", " ").replace(")", " ")
     return " ".join(cleaned.split())
 
 
 def long_sleeve_sort_rank(sleeve_type):
-    return 1 if sleeve_type == "Lengan Panjang 3/4" else 0
+    return {
+        "Lengan Panjang": 0,
+        "Lengan Panjang 3/4": 1,
+        "Lengan Panjang 7/8": 2,
+    }.get(sleeve_type, 99)
 
 
 def size_sort_rank(size):

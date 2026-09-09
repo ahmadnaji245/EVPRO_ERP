@@ -43,6 +43,9 @@ VALID_PLAYER_SIZES = [
     "M Lengan Panjang 3/4",
     "L Lengan Panjang 3/4",
     "XL Lengan Panjang 3/4",
+    "M Lengan Panjang 7/8",
+    "L Lengan Panjang 7/8",
+    "XL Lengan Panjang 7/8",
 ]
 PLAYER_SIZE_LOOKUP = {size.casefold(): size for size in VALID_PLAYER_SIZES}
 PLAYER_SIZE_LOOKUP.update(

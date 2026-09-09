@@ -6,7 +6,12 @@ import fitz
 
 from models import Brand, SalesOrder, SalesOrderDesign, SalesOrderPlayer
 from services.pdf_service import build_sales_order_pdf
-from utils.constants import extract_pants_size_from_note, pants_size_from_player_size
+from utils.constants import (
+    extract_pants_size_from_note,
+    long_sleeve_size_label,
+    long_sleeve_type_label,
+    pants_size_from_player_size,
+)
 
 
 class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
@@ -75,6 +80,24 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertEqual(pants_size_from_player_size("XL Lengan Panjang"), "XL")
         self.assertEqual(pants_size_from_player_size("XL Women"), "XL Women")
         self.assertEqual(pants_size_from_player_size("S Kids Lengan Panjang"), "S Kids")
+
+    def test_long_sleeve_recap_reads_seven_eighth(self):
+        design = SalesOrderDesign(design_name="Home", item_name="Jersey")
+        design.players = [
+            SalesOrderPlayer(player_name="A", player_number="1", size="XL Lengan Panjang 7/8", notes="-", sort_order=1),
+            SalesOrderPlayer(player_name="B", player_number="2", size="XL", notes="Lengan Panjang 7/8", sort_order=2),
+            SalesOrderPlayer(player_name="C", player_number="3", size="L Lengan Panjang 3/4", notes="-", sort_order=3),
+        ]
+
+        self.assertEqual(long_sleeve_size_label("XL Lengan Panjang 7/8"), "XL")
+        self.assertEqual(long_sleeve_type_label("XL", "Lengan Panjang 7/8"), "Lengan Panjang 7/8")
+        self.assertEqual(
+            design.long_sleeve_recap,
+            [
+                {"size": "L Lengan Panjang 3/4", "qty": 1},
+                {"size": "XL Lengan Panjang 7/8", "qty": 2},
+            ],
+        )
 
     def test_pants_size_recap_is_per_design(self):
         design_one = SalesOrderDesign(design_name="Design 1", item_name="Jersey + Celana")
