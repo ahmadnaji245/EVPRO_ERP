@@ -20,6 +20,7 @@ GRID = colors.HexColor("#c8ced6")
 LIGHT = colors.HexColor("#f3f5f7")
 CHECKBOX = "□"
 CONTENT_WIDTH = 184 * mm
+IMAGE_NOTE_WIDTH = 86 * mm
 
 rl_config.canvas_basefontname = "Times-Roman"
 
@@ -261,7 +262,7 @@ def _note_box(title, text, styles):
     return table
 
 
-def _design_images(design, styles):
+def _design_images(design, styles, size_recap_flowables=None, pants_recap_flowable=None):
     label_style = styles["SOLabel"]
     image_columns = [
         (
@@ -286,11 +287,20 @@ def _design_images(design, styles):
         [_image_flowable(column[1], "Gambar desain belum tersedia", 88 * mm, 74 * mm) for column in image_columns],
         [_note_box(column[2], column[3], styles) for column in image_columns],
     ]
+    if size_recap_flowables or pants_recap_flowable:
+        recap_row = []
+        for column_index, _column in enumerate(image_columns):
+            if column_index == 0 and size_recap_flowables:
+                recap_row.append(_spaced_flowables(size_recap_flowables))
+            elif column_index == 1 and pants_recap_flowable:
+                recap_row.append([pants_recap_flowable])
+            else:
+                recap_row.append("")
+        rows.append(recap_row)
     table = Table(rows, colWidths=widths, hAlign="CENTER")
     table.setStyle(
         TableStyle(
             [
-                
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
                 ("ALIGN", (0, 1), (-1, -1), "CENTER"),
@@ -304,7 +314,16 @@ def _design_images(design, styles):
     return table
 
 
-def _size_recap_flowables(design, styles):
+def _spaced_flowables(flowables, spacer_height=2 * mm):
+    spaced = []
+    for index, flowable in enumerate(flowables):
+        if index:
+            spaced.append(Spacer(1, spacer_height))
+        spaced.append(flowable)
+    return spaced
+
+
+def _size_recap_flowables(design, styles, section_width=CONTENT_WIDTH, stacked=False):
     recap = design.size_recap
     flowables = []
     if design.needs_top_material and recap["groups"]:
@@ -312,20 +331,8 @@ def _size_recap_flowables(design, styles):
         tables = []
         for group in active_groups:
             tables.append(_size_table(group, recap["groups"][group], design.size_setting_done))
-        wrapper = Table([tables], colWidths=[sum(table._argW) + 6 * mm for table in tables], hAlign="CENTER")
-        wrapper.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ]
-            )
-        )
-        flowables.append(_centered_section("Rekap Size", wrapper, styles))
+        wrapper = _recap_table_wrapper(tables, stacked=stacked, stacked_width=64 * mm)
+        flowables.append(_centered_section("Rekap Size", wrapper, styles, width=section_width))
 
     if design.needs_top_material and design.long_sleeve_recap:
         if flowables:
@@ -335,18 +342,40 @@ def _size_recap_flowables(design, styles):
                 "Rekap Lengan Panjang",
                 _size_qty_table("Size", design.long_sleeve_recap, h_align="CENTER"),
                 styles,
+                width=section_width,
             )
         )
     return flowables
 
 
-def _pants_size_recap_flowable(design, styles):
+def _recap_table_wrapper(tables, stacked=False, stacked_width=None):
+    if stacked:
+        wrapper = Table([[table] for table in tables], colWidths=[stacked_width], hAlign="CENTER")
+    else:
+        wrapper = Table([tables], colWidths=[sum(table._argW) + 6 * mm for table in tables], hAlign="CENTER")
+    wrapper.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    return wrapper
+
+
+def _pants_size_recap_flowable(design, styles, section_width=CONTENT_WIDTH):
     if not design.has_pants_item or not design.pants_size_recap:
         return None
     return _centered_section(
         "Rekap Size Celana",
         _size_qty_table("Size", design.pants_size_recap, h_align="CENTER"),
         styles,
+        width=section_width,
     )
 
 
@@ -354,10 +383,10 @@ def _has_jersey_size_recap(design):
     return design.needs_top_material and (design.size_recap["groups"] or design.long_sleeve_recap)
 
 
-def _centered_section(title, content, styles):
+def _centered_section(title, content, styles, width=CONTENT_WIDTH):
     table = Table(
         [[Paragraph(title, styles["SOTextBold"])], [content]],
-        colWidths=[CONTENT_WIDTH],
+        colWidths=[width],
         hAlign="CENTER",
     )
     table.setStyle(
@@ -579,7 +608,7 @@ def _customer_player_table(design, styles):
     return table
 
 
-def _customer_size_recap_flowables(design, styles):
+def _customer_size_recap_flowables(design, styles, section_width=CONTENT_WIDTH, stacked=False):
     recap = design.size_recap
     flowables = []
     if design.needs_top_material and recap["groups"]:
@@ -588,20 +617,8 @@ def _customer_size_recap_flowables(design, styles):
             _size_qty_table(group, recap["groups"][group], h_align="CENTER", total_label=f"Total {group}")
             for group in active_groups
         ]
-        wrapper = Table([tables], colWidths=[sum(table._argW) + 6 * mm for table in tables], hAlign="CENTER")
-        wrapper.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ]
-            )
-        )
-        flowables.append(_centered_section("Rekap Size", wrapper, styles))
+        wrapper = _recap_table_wrapper(tables, stacked=stacked, stacked_width=54 * mm)
+        flowables.append(_centered_section("Rekap Size", wrapper, styles, width=section_width))
 
     if design.needs_top_material and design.long_sleeve_recap:
         if flowables:
@@ -611,9 +628,31 @@ def _customer_size_recap_flowables(design, styles):
                 "Rekap Lengan Panjang",
                 _size_qty_table("Size", design.long_sleeve_recap, h_align="CENTER"),
                 styles,
+                width=section_width,
             )
         )
     return flowables
+
+
+def _recaps_below_design_notes(design, styles, customer=False):
+    pants_recap = _pants_size_recap_flowable(design, styles, section_width=IMAGE_NOTE_WIDTH)
+    if not pants_recap or not design.has_secondary_item or not design.needs_top_material:
+        return None, None
+    if customer:
+        size_recap_flowables = _customer_size_recap_flowables(
+            design,
+            styles,
+            section_width=IMAGE_NOTE_WIDTH,
+            stacked=True,
+        )
+    else:
+        size_recap_flowables = _size_recap_flowables(
+            design,
+            styles,
+            section_width=IMAGE_NOTE_WIDTH,
+            stacked=True,
+        )
+    return size_recap_flowables, pants_recap
 
 
 def build_sales_order_pdf(order):
@@ -635,20 +674,19 @@ def build_sales_order_pdf(order):
             story.append(PageBreak())
         story.append(_brand_header(order, design, styles))
         story.append(Spacer(1, 4 * mm))
-        story.append(_design_images(design, styles))
+        inline_size_recaps, inline_pants_recap = _recaps_below_design_notes(design, styles)
+        story.append(_design_images(design, styles, inline_size_recaps, inline_pants_recap))
         story.append(Spacer(1, 4 * mm))
-        for flowable in _size_recap_flowables(design, styles):
-            story.append(flowable)
-        pants_recap = _pants_size_recap_flowable(design, styles)
-        if _has_jersey_size_recap(design):
-            story.append(Spacer(1, 4 * mm))
-        if pants_recap and not design.needs_top_material:
-            story.append(pants_recap)
-            story.append(Spacer(1, 4 * mm))
+        if not inline_pants_recap:
+            for flowable in _size_recap_flowables(design, styles):
+                story.append(flowable)
+            pants_recap = _pants_size_recap_flowable(design, styles)
+            if _has_jersey_size_recap(design):
+                story.append(Spacer(1, 4 * mm))
+            if pants_recap and not design.needs_top_material:
+                story.append(pants_recap)
+                story.append(Spacer(1, 4 * mm))
         story.append(_player_table(design, styles))
-        if pants_recap and design.needs_top_material:
-            story.append(Spacer(1, 4 * mm))
-            story.append(pants_recap)
 
     if order.attachments:
         story.append(PageBreak())
@@ -678,20 +716,19 @@ def build_customer_sales_order_pdf(order):
             story.append(PageBreak())
         story.append(_brand_header(order, design, styles))
         story.append(Spacer(1, 4 * mm))
-        story.append(_design_images(design, styles))
+        inline_size_recaps, inline_pants_recap = _recaps_below_design_notes(design, styles, customer=True)
+        story.append(_design_images(design, styles, inline_size_recaps, inline_pants_recap))
         story.append(Spacer(1, 4 * mm))
-        for flowable in _customer_size_recap_flowables(design, styles):
-            story.append(flowable)
-        pants_recap = _pants_size_recap_flowable(design, styles)
-        if _has_jersey_size_recap(design):
-            story.append(Spacer(1, 4 * mm))
-        if pants_recap and not design.needs_top_material:
-            story.append(pants_recap)
-            story.append(Spacer(1, 4 * mm))
+        if not inline_pants_recap:
+            for flowable in _customer_size_recap_flowables(design, styles):
+                story.append(flowable)
+            pants_recap = _pants_size_recap_flowable(design, styles)
+            if _has_jersey_size_recap(design):
+                story.append(Spacer(1, 4 * mm))
+            if pants_recap and not design.needs_top_material:
+                story.append(pants_recap)
+                story.append(Spacer(1, 4 * mm))
         story.append(_customer_player_table(design, styles))
-        if pants_recap and design.needs_top_material:
-            story.append(Spacer(1, 4 * mm))
-            story.append(pants_recap)
 
     if order.attachments:
         story.append(PageBreak())

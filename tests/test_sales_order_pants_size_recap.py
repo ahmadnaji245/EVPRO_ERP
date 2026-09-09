@@ -93,7 +93,7 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
             jersey_pdf_text = _pdf_text(_build_order("Jersey", ["celana = M", "celana = L", "celana = XL"]))
 
         self.assertLess(combined_pdf_text.index("Rekap Size"), combined_pdf_text.index("KETERANGAN"))
-        self.assertLess(combined_pdf_text.index("KETERANGAN"), combined_pdf_text.index("Rekap Size Celana"))
+        self.assertLess(combined_pdf_text.index("Rekap Size Celana"), combined_pdf_text.index("KETERANGAN"))
         self.assertLess(pants_pdf_text.index("Rekap Size Celana"), pants_pdf_text.index("KETERANGAN"))
         self.assertNotIn("Rekap Size Celana", jersey_pdf_text)
 
@@ -106,14 +106,14 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertIn("A", pages[0])
         self.assertIn("B", pages[0])
         self.assertIn("Rekap Size Celana", pages[0])
-        self.assertLess(pages[0].index("KETERANGAN"), pages[0].index("Rekap Size Celana"))
+        self.assertLess(pages[0].index("Rekap Size Celana"), pages[0].index("KETERANGAN"))
         self.assertEqual(_pants_recap_lines(pages[0]), ["Size", "Qty", "M", "1", "L", "1", "Total", "2"])
 
         self.assertIn("C", pages[1])
         self.assertIn("D", pages[1])
         self.assertIn("E", pages[1])
         self.assertIn("Rekap Size Celana", pages[1])
-        self.assertLess(pages[1].index("KETERANGAN"), pages[1].index("Rekap Size Celana"))
+        self.assertLess(pages[1].index("Rekap Size Celana"), pages[1].index("KETERANGAN"))
         self.assertEqual(_pants_recap_lines(pages[1]), ["Size", "Qty", "XL", "2", "XXL", "1", "Total", "3"])
 
         self.assertIn("F", pages[2])
@@ -128,6 +128,18 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertIn("S", text)
         self.assertIn("M", text)
         self.assertNotIn("Rekap Size\n", text)
+
+    def test_pdf_places_pants_recap_under_pants_notes_when_player_recaps_are_full(self):
+        app = Flask(__name__, static_folder="static")
+        with app.app_context():
+            text = _pdf_text(_build_mixed_size_set_order())
+
+        self.assertIn("Kids", text)
+        self.assertIn("Women", text)
+        self.assertIn("Reguler", text)
+        self.assertIn("Rekap Size Celana", text)
+        self.assertLess(text.index("CATATAN KHUSUS CELANA"), text.index("Rekap Size Celana"))
+        self.assertLess(text.index("Rekap Size Celana"), text.index("KETERANGAN"))
 
     def test_detail_html_renders_pants_recap_for_current_design_only(self):
         app = Flask(__name__, template_folder="../templates")
@@ -175,6 +187,31 @@ def _build_order(item_name, notes):
     design.players = [
         SalesOrderPlayer(player_name=f"Player {index}", player_number=str(index), size=size, notes=note, sort_order=index)
         for index, (size, note) in enumerate(zip(["S", "M", "L"], notes), start=1)
+    ]
+    order.designs = [design]
+    return order
+
+
+def _build_mixed_size_set_order():
+    brand = Brand(name="EVPRO", code="EV")
+    order = SalesOrder(
+        so_number="SO-MIXED-SIZE-SET",
+        tracking_code="TRK-MIXED-SIZE-SET",
+        team_name="Mixed Size Team",
+        customer_code="CUST",
+        access_code="ACC-MIXED-SIZE-SET",
+        brand=brand,
+        grade="A",
+    )
+    design = SalesOrderDesign(design_name="Home", item_name="Jersey + Celana", sales_order=order, grade="A")
+    players = [
+        ("Kids", "7", "XS Kids", "celana = S"),
+        ("Women", "8", "XL Women", "celana = M"),
+        ("Reguler", "9", "L", "celana = L"),
+    ]
+    design.players = [
+        SalesOrderPlayer(player_name=name, player_number=number, size=size, notes=note, sort_order=index)
+        for index, (name, number, size, note) in enumerate(players, start=1)
     ]
     order.designs = [design]
     return order
