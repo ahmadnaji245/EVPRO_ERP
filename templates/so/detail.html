@@ -3,8 +3,8 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
-        <h1 class="page-title">{{ sales_order.so_number }}</h1>
-        <p class="text-muted mb-0">{{ sales_order.team_name }} · {{ sales_order.brand.name }}</p>
+        <h1 class="page-title">{{ sales_order.team_name }} · {{ sales_order.brand.name }}</h1>
+        <p class="text-muted mb-0">{{ sales_order.so_number }}</p>
         <div class="mt-2">
             {% if sales_order.approved %}
                 <span class="badge text-bg-success">Approved by {{ 'Customer' if sales_order.approved_source == 'customer' else 'Admin' }}</span>
