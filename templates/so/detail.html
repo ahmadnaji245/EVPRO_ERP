@@ -337,6 +337,68 @@ Terima kasih 🙏{% endset %}
                     <div class="border rounded p-3 bg-light so-notes-box">
                         {{ design.display_top_notes or '-' }}
                     </div>
+                    {% if recap.groups %}
+                        <div class="mt-4">
+                            <div class="fw-semibold mb-2">Rekap Size</div>
+                            <div class="card border">
+                                <div class="card-body p-0">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Size</th>
+                                                <th class="text-center" style="width: 80px;">Qty</th>
+                                                <th class="text-center" style="width: 90px;">Setting</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in recap.rows %}
+                                                <tr>
+                                                    <td>{{ row.size }}</td>
+                                                    <td class="text-center fw-semibold">{{ row.qty }}</td>
+                                                    <td class="text-center">
+                                                        <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %} {% if not can_update_setting_checklist %}disabled{% endif %}>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                            <tr class="fw-bold">
+                                                <td>Total</td>
+                                                <td class="text-center">{{ recap.rows | sum(attribute='qty') }}</td>
+                                                <td class="text-center">-</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if design.long_sleeve_recap %}
+                        <div class="mt-4">
+                            <div class="fw-semibold mb-2">Rekap Lengan Panjang</div>
+                            <div class="card border">
+                                <div class="card-body p-0">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Size</th>
+                                                <th class="text-center" style="width: 80px;">Qty</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in design.long_sleeve_recap %}
+                                                <tr>
+                                                    <td>{{ row.size }}</td>
+                                                    <td class="text-center fw-semibold">{{ row.qty }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if design.pants_size_recap and not design.has_secondary_item %}
+                        {% include "so/_pants_size_recap.html" %}
+                    {% endif %}
                 </div>
                 {% if design.has_secondary_item %}
                     <div class="col-lg-6">
@@ -344,72 +406,12 @@ Terima kasih 🙏{% endset %}
                         <div class="border rounded p-3 bg-light so-notes-box">
                             {{ design.bottom_notes or '-' }}
                         </div>
+                        {% if design.pants_size_recap %}
+                            {% include "so/_pants_size_recap.html" %}
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>
-            
-{% if recap.groups %}
-    <div class="mt-4">
-        <div class="fw-semibold mb-2">Rekap Size</div>
-        <div class="card border">
-            <div class="card-body p-0">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Size</th>
-                            <th class="text-center" style="width: 80px;">Qty</th>
-                            <th class="text-center" style="width: 90px;">Setting</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in recap.rows %}
-                            <tr>
-                                <td>{{ row.size }}</td>
-                                <td class="text-center fw-semibold">{{ row.qty }}</td>
-                                <td class="text-center">
-                                    <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %} {% if not can_update_setting_checklist %}disabled{% endif %}>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        <tr class="fw-bold">
-                            <td>Total</td>
-                            <td class="text-center">{{ recap.rows | sum(attribute='qty') }}</td>
-                            <td class="text-center">-</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-{% endif %}
-{% if design.long_sleeve_recap %}
-    <div class="mt-4">
-        <div class="fw-semibold mb-2">Rekap Lengan Panjang</div>
-        <div class="card border">
-            <div class="card-body p-0">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Size</th>
-                            <th class="text-center" style="width: 80px;">Qty</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in design.long_sleeve_recap %}
-                            <tr>
-                                <td>{{ row.size }}</td>
-                                <td class="text-center fw-semibold">{{ row.qty }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-{% endif %}
-{% if design.pants_size_recap and not design.needs_top_material %}
-    {% include "so/_pants_size_recap.html" %}
-{% endif %}
             <div class="table-responsive mt-4">
                 <table class="table align-middle so-table">
                     <thead>
@@ -459,9 +461,6 @@ Terima kasih 🙏{% endset %}
                     </tbody>
                 </table>
             </div>
-{% if design.pants_size_recap and design.needs_top_material %}
-    {% include "so/_pants_size_recap.html" %}
-{% endif %}
         </div>
     {% endfor %}
     <div class="d-flex justify-content-end mb-4">
