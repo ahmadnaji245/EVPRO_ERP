@@ -351,51 +351,34 @@ Terima kasih 🙏{% endset %}
 {% if recap.groups %}
     <div class="mt-4">
         <div class="fw-semibold mb-2">Rekap Size</div>
-
-        <div class="row g-4">
-
-            {% for group_name in ['Kids', 'Women', 'Reguler'] %}
-                {% set rows = recap.groups.get(group_name, []) %}
-
-                {% if rows %}
-                    <div class="col-md-4">
-                        <div class="card border h-100">
-                            <div class="card-header bg-light fw-semibold text-center">
-                                {{ group_name }}
-                            </div>
-
-                            <div class="card-body p-0">
-                                <table class="table table-sm align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Size</th>
-                                            <th class="text-center" style="width: 80px;">Qty</th>
-                                            <th class="text-center" style="width: 90px;">Setting</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody>
-                                        {% for row in rows %}
-                                            <tr>
-                                                <td>{{ row.size }}</td>
-                                                <td class="text-center fw-semibold">{{ row.qty }}</td>
-                                                <td class="text-center">
-                                                    <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %} {% if not can_update_setting_checklist %}disabled{% endif %}>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                        <tr class="fw-bold">
-                                            <td>Total {{ group_name }}</td>
-                                            <td class="text-center">{{ rows | sum(attribute='qty') }}</td>
-                                            <td class="text-center">-</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-            {% endfor %}
+        <div class="card border">
+            <div class="card-body p-0">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Size</th>
+                            <th class="text-center" style="width: 80px;">Qty</th>
+                            <th class="text-center" style="width: 90px;">Setting</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in recap.rows %}
+                            <tr>
+                                <td>{{ row.size }}</td>
+                                <td class="text-center fw-semibold">{{ row.qty }}</td>
+                                <td class="text-center">
+                                    <input class="form-check-input" type="checkbox" name="size_setting_done" value="{{ design.id }}|{{ row.size }}" {% if design.size_setting_done(row.size) %}checked{% endif %} {% if not can_update_setting_checklist %}disabled{% endif %}>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="fw-bold">
+                            <td>Total</td>
+                            <td class="text-center">{{ recap.rows | sum(attribute='qty') }}</td>
+                            <td class="text-center">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 {% endif %}
@@ -424,7 +407,7 @@ Terima kasih 🙏{% endset %}
         </div>
     </div>
 {% endif %}
-{% if design.has_pants_item and not design.needs_top_material %}
+{% if design.pants_size_recap and not design.needs_top_material %}
     {% include "so/_pants_size_recap.html" %}
 {% endif %}
             <div class="table-responsive mt-4">
@@ -476,7 +459,7 @@ Terima kasih 🙏{% endset %}
                     </tbody>
                 </table>
             </div>
-{% if design.has_pants_item and design.needs_top_material %}
+{% if design.pants_size_recap and design.needs_top_material %}
     {% include "so/_pants_size_recap.html" %}
 {% endif %}
         </div>

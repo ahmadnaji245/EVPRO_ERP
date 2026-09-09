@@ -6,7 +6,6 @@ from utils.constants import (
     has_long_sleeve_marker,
     long_sleeve_size_label,
     long_sleeve_type_label,
-    note_is_empty_for_pants_size,
     normalize_size_key,
     pants_size_from_player_size,
     size_group_name,
@@ -151,19 +150,22 @@ class SalesOrderDesign(db.Model):
             row["qty"] += 1
 
         grouped = {}
+        combined_rows = []
         for group_name in ("Kids", "Women", "Reguler"):
             rows = sort_size_rows(grouped_rows.get(group_name, {}).values())
             if rows:
-                grouped[group_name] = [{"size": row["size"], "qty": row["qty"]} for row in rows]
+                display_rows = [{"size": row["size"], "qty": row["qty"]} for row in rows]
+                grouped[group_name] = display_rows
+                combined_rows.extend(display_rows)
 
-        return {"groups": grouped, "long_sleeve": []}
+        return {"groups": grouped, "rows": combined_rows, "long_sleeve": []}
 
     @property
     def pants_size_recap(self):
         rows = {}
         for player in self.players:
             size = extract_pants_size_from_note(player.notes)
-            if not size and note_is_empty_for_pants_size(player.notes):
+            if not size and self.has_pants_item:
                 size = pants_size_from_player_size(player.size)
             if not size:
                 continue

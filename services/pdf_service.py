@@ -327,11 +327,7 @@ def _size_recap_flowables(design, styles, section_width=CONTENT_WIDTH, stacked=F
     recap = design.size_recap
     flowables = []
     if design.needs_top_material and recap["groups"]:
-        active_groups = [group for group in ["Kids", "Women", "Reguler"] if recap["groups"].get(group)]
-        tables = []
-        for group in active_groups:
-            tables.append(_size_table(group, recap["groups"][group], design.size_setting_done))
-        wrapper = _recap_table_wrapper(tables, stacked=stacked, stacked_width=64 * mm)
+        wrapper = _size_table("Size", recap["rows"], design.size_setting_done, h_align="CENTER")
         flowables.append(_centered_section("Rekap Size", wrapper, styles, width=section_width))
 
     if design.needs_top_material and design.long_sleeve_recap:
@@ -369,7 +365,7 @@ def _recap_table_wrapper(tables, stacked=False, stacked_width=None):
 
 
 def _pants_size_recap_flowable(design, styles, section_width=CONTENT_WIDTH):
-    if not design.has_pants_item or not design.pants_size_recap:
+    if not design.pants_size_recap:
         return None
     return _centered_section(
         "Rekap Size Celana",
@@ -405,11 +401,11 @@ def _centered_section(title, content, styles, width=CONTENT_WIDTH):
     return table
 
 
-def _size_table(first_header, rows, checked_lookup=None, h_align=None):
+def _size_table(first_header, rows, checked_lookup=None, h_align=None, total_label="Total"):
     checked_lookup = checked_lookup or (lambda size: False)
     data = [[first_header, "Qty", "setting"]]
     data.extend([[row["size"], row["qty"], PdfCheckbox(checked_lookup(row["size"]))] for row in rows])
-    data.append([f"Total {first_header}", sum(row["qty"] for row in rows), "-"])
+    data.append([total_label, sum(row["qty"] for row in rows), "-"])
     table = Table(data, colWidths=[30 * mm, 11 * mm, 14 * mm], repeatRows=1, hAlign=h_align)
     table.setStyle(_compact_table_style())
     return table
@@ -612,12 +608,7 @@ def _customer_size_recap_flowables(design, styles, section_width=CONTENT_WIDTH, 
     recap = design.size_recap
     flowables = []
     if design.needs_top_material and recap["groups"]:
-        active_groups = [group for group in ["Kids", "Women", "Reguler"] if recap["groups"].get(group)]
-        tables = [
-            _size_qty_table(group, recap["groups"][group], h_align="CENTER", total_label=f"Total {group}")
-            for group in active_groups
-        ]
-        wrapper = _recap_table_wrapper(tables, stacked=stacked, stacked_width=54 * mm)
+        wrapper = _size_qty_table("Size", recap["rows"], h_align="CENTER")
         flowables.append(_centered_section("Rekap Size", wrapper, styles, width=section_width))
 
     if design.needs_top_material and design.long_sleeve_recap:
@@ -683,7 +674,7 @@ def build_sales_order_pdf(order):
             pants_recap = _pants_size_recap_flowable(design, styles)
             if _has_jersey_size_recap(design):
                 story.append(Spacer(1, 4 * mm))
-            if pants_recap and not design.needs_top_material:
+            if pants_recap:
                 story.append(pants_recap)
                 story.append(Spacer(1, 4 * mm))
         story.append(_player_table(design, styles))
@@ -725,7 +716,7 @@ def build_customer_sales_order_pdf(order):
             pants_recap = _pants_size_recap_flowable(design, styles)
             if _has_jersey_size_recap(design):
                 story.append(Spacer(1, 4 * mm))
-            if pants_recap and not design.needs_top_material:
+            if pants_recap:
                 story.append(pants_recap)
                 story.append(Spacer(1, 4 * mm))
         story.append(_customer_player_table(design, styles))

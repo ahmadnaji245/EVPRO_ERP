@@ -89,10 +89,10 @@ SIZE_ORDER = {
     "5XL": 28,
     "6XL": 29,
 }
-PANTS_SIZE_ORDER = ("XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL")
-PANTS_SIZE_SORT = {size: index for index, size in enumerate(PANTS_SIZE_ORDER)}
+PANTS_BASE_SIZES = ("XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL")
+PANTS_SIZE_SORT = SIZE_ORDER
 PANTS_SIZE_PATTERN = re.compile(
-    r"\bcelana\b\s*(?:=|:)?\s*(5XL|4XL|3XL|XXL|XL|XS|S|M|L)\b",
+    r"\bcelana\b\s*(?:=|:)?\s*(5XL|4XL|3XL|XXL|XXS|XL|XS|S|M|L)(?:\s+(kids|women))?\b",
     re.IGNORECASE,
 )
 
@@ -150,24 +150,29 @@ def extract_pants_size_from_note(note):
     match = PANTS_SIZE_PATTERN.search(str(note or ""))
     if not match:
         return None
-    return match.group(1).upper()
+    return _canonical_pants_size(match.group(1), match.group(2))
 
 
-def note_is_empty_for_pants_size(note):
-    return str(note or "").strip() in ("", "-")
+def _canonical_pants_size(base_size, group=None):
+    base = str(base_size or "").strip().upper()
+    if base not in PANTS_BASE_SIZES:
+        return None
+    group_label = str(group or "").strip().title()
+    size = f"{base} {group_label}" if group_label in ("Kids", "Women") else base
+    return size if normalize_size_key(size) in SIZE_ORDER else None
 
 
 def pants_size_from_player_size(size):
     base_size = long_sleeve_size_label(size) or " ".join(str(size or "").split())
     normalized = normalize_size_key(base_size)
-    return normalized if normalized in PANTS_SIZE_SORT else None
+    return base_size if normalized in SIZE_ORDER else None
 
 
 def sort_pants_size_rows(rows):
     return sorted(
         list(rows or []),
         key=lambda row: PANTS_SIZE_SORT.get(
-            row.get("size") if isinstance(row, dict) else getattr(row, "size", ""),
+            normalize_size_key(row.get("size") if isinstance(row, dict) else getattr(row, "size", "")),
             10_000,
         ),
     )

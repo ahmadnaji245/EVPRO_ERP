@@ -20,6 +20,8 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
             "celana = XXL": "XXL",
             "celana = 3XL": "3XL",
             "celana 4xl": "4XL",
+            "celana = XL Kids": "XL Kids",
+            "celana = l women": "L Women",
             "request / celana = 5XL / lengan panjang": "5XL",
             "lengan panjang XL": None,
             "jersey XL": None,
@@ -46,16 +48,18 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
                 {"size": "M", "qty": 1},
                 {"size": "L", "qty": 2},
                 {"size": "XL", "qty": 1},
+                {"size": "XXL", "qty": 1},
             ],
         )
 
-    def test_pants_size_recap_falls_back_to_player_size_when_note_is_empty(self):
+    def test_pants_size_recap_falls_back_to_player_size_without_pants_note(self):
         design = SalesOrderDesign(design_name="Home", item_name="Jersey + Celana")
         design.players = [
             SalesOrderPlayer(player_name="-", player_number="-", size="L", notes="celana XL", sort_order=1),
             SalesOrderPlayer(player_name="-", player_number="-", size="M", notes="-", sort_order=2),
             SalesOrderPlayer(player_name="-", player_number="-", size="XL", notes="celana = L", sort_order=3),
             SalesOrderPlayer(player_name="-", player_number="-", size="S", notes="celana M | Lengan Panjang", sort_order=4),
+            SalesOrderPlayer(player_name="-", player_number="-", size="XL", notes="Lengan Panjang", sort_order=5),
         ]
 
         self.assertEqual(
@@ -63,13 +67,14 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
             [
                 {"size": "M", "qty": 2},
                 {"size": "L", "qty": 1},
-                {"size": "XL", "qty": 1},
+                {"size": "XL", "qty": 2},
             ],
         )
 
-    def test_pants_size_fallback_keeps_valid_regular_sizes_only(self):
+    def test_pants_size_fallback_keeps_valid_size_labels(self):
         self.assertEqual(pants_size_from_player_size("XL Lengan Panjang"), "XL")
-        self.assertEqual(pants_size_from_player_size("XL Women"), None)
+        self.assertEqual(pants_size_from_player_size("XL Women"), "XL Women")
+        self.assertEqual(pants_size_from_player_size("S Kids Lengan Panjang"), "S Kids")
 
     def test_pants_size_recap_is_per_design(self):
         design_one = SalesOrderDesign(design_name="Design 1", item_name="Jersey + Celana")
@@ -90,7 +95,7 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         with app.app_context():
             combined_pdf_text = _pdf_text(_build_order("Jersey + Celana", ["celana = M", "celana = L", "celana = XL"]))
             pants_pdf_text = _pdf_text(_build_order("Celana", ["celana = M", "celana = L", "celana = XL"]))
-            jersey_pdf_text = _pdf_text(_build_order("Jersey", ["celana = M", "celana = L", "celana = XL"]))
+            jersey_pdf_text = _pdf_text(_build_order("Jersey", ["-", "-", "-"]))
 
         self.assertLess(combined_pdf_text.index("Rekap Size"), combined_pdf_text.index("KETERANGAN"))
         self.assertLess(combined_pdf_text.index("Rekap Size Celana"), combined_pdf_text.index("KETERANGAN"))
@@ -117,7 +122,17 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertEqual(_pants_recap_lines(pages[1]), ["Size", "Qty", "XL", "2", "XXL", "1", "Total", "3"])
 
         self.assertIn("F", pages[2])
-        self.assertNotIn("Rekap Size Celana", pages[2])
+        self.assertIn("Rekap Size Celana", pages[2])
+        self.assertEqual(_pants_recap_lines(pages[2])[:6], ["Size", "Qty", "L", "1", "Total", "1"])
+
+    def test_jersey_pdf_renders_pants_recap_when_note_mentions_pants(self):
+        app = Flask(__name__, static_folder="static")
+        with app.app_context():
+            text = _pdf_text(_build_order("Jersey", ["-", "Celana XL", "-"]))
+
+        self.assertIn("Rekap Size Celana", text)
+        self.assertIn("XL", text)
+        self.assertLess(text.index("Rekap Size Celana"), text.index("KETERANGAN"))
 
     def test_pants_only_pdf_places_pants_recap_before_player_table(self):
         app = Flask(__name__, static_folder="static")
@@ -134,12 +149,35 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         with app.app_context():
             text = _pdf_text(_build_mixed_size_set_order())
 
-        self.assertIn("Kids", text)
-        self.assertIn("Women", text)
-        self.assertIn("Reguler", text)
+        self.assertIn("XS Kids", text)
+        self.assertIn("XL Women", text)
         self.assertIn("Rekap Size Celana", text)
         self.assertLess(text.index("CATATAN KHUSUS CELANA"), text.index("Rekap Size Celana"))
         self.assertLess(text.index("Rekap Size Celana"), text.index("KETERANGAN"))
+
+    def test_pdf_combines_size_recap_groups_into_one_table(self):
+        app = Flask(__name__, static_folder="static")
+        with app.app_context():
+            text = _pdf_text(_build_mixed_size_set_order())
+
+        self.assertNotIn("Total Kids", text)
+        self.assertNotIn("Total Women", text)
+        self.assertNotIn("Total Reguler", text)
+        self.assertIn("Total\n3", text)
+
+    def test_pdf_pants_recap_keeps_kids_and_women_labels(self):
+        app = Flask(__name__, static_folder="static")
+        with app.app_context():
+            text = _pdf_text(
+                _build_order(
+                    "Jersey + Celana",
+                    ["celana = XL Kids", "celana = L Women", "celana = M"],
+                )
+            )
+
+        self.assertIn("XL Kids", text)
+        self.assertIn("L Women", text)
+        self.assertIn("M", text)
 
     def test_detail_html_renders_pants_recap_for_current_design_only(self):
         app = Flask(__name__, template_folder="../templates")
@@ -167,7 +205,8 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertIn("<td>XXL</td>", design_two_html)
         self.assertNotIn("<td>M</td>", design_two_html)
 
-        self.assertNotIn("Rekap Size Celana", design_three_html)
+        self.assertIn("Rekap Size Celana", design_three_html)
+        self.assertIn("<td>L</td>", design_three_html)
         self.assertIn("<td>S</td>", design_four_html)
         self.assertIn("<td>M</td>", design_four_html)
 
