@@ -66,6 +66,31 @@ class SalesOrderAttachmentTestCase(unittest.TestCase):
         self.assertIn("LAMPIRAN SALES ORDER", text_by_page[3])
         self.assertIn("POLA KERAH", text_by_page[3])
 
+    def test_sales_order_pdfs_preserve_japanese_player_names(self):
+        order = self._create_japanese_player_order()
+
+        internal_text = "\n".join(self._pdf_text_by_page(order))
+        customer_text = "\n".join(self._customer_pdf_text_by_page(order))
+
+        for text in (internal_text, customer_text):
+            for expected in ("KIKY", "YOGA LIONG", "Ahmad Naji", "06", "サン", "ジル", "ユス", "トビ", "イブ"):
+                self.assertIn(expected, text)
+            self.assertNotIn("■■", text)
+            self.assertNotIn("□□", text)
+            self.assertNotIn("�", text)
+
+    def test_sales_order_pdfs_use_japanese_capable_font(self):
+        order = self._create_japanese_player_order()
+
+        for pdf in (build_sales_order_pdf(order), build_customer_sales_order_pdf(order)):
+            with fitz.open(stream=pdf.getvalue(), filetype="pdf") as document:
+                fonts = {font[3] for page in document for font in page.get_fonts()}
+
+            self.assertIn("Times-Roman", fonts)
+            self.assertIn("Times-Bold", fonts)
+            self.assertTrue(any("MPLUS1p-Regular" in font for font in fonts))
+            self.assertTrue(any("MPLUS1p-Bold" in font for font in fonts))
+
     def test_customer_portal_shows_attachment_at_bottom_when_available(self):
         order = self._create_order("CUSTVIEW")
         order.attachments = [
@@ -193,6 +218,69 @@ class SalesOrderAttachmentTestCase(unittest.TestCase):
                 sort_order=index,
             )
             SalesOrderPlayer(design=design, player_name=f"Player {index}", player_number=str(index), size="L", sort_order=1)
+        db.session.add(order)
+        db.session.flush()
+        db.session.add(CustomerAccess(sales_order_id=order.id, access_code=order.access_code, customer_name=order.team_name))
+        db.session.commit()
+        return order
+
+    def _create_japanese_player_order(self):
+        order = SalesOrder(
+            so_number="TEST/UNICODE-JP",
+            tracking_code="TRKUNICODEJP",
+            team_name="Unicode Team",
+            brand_id=self.brand.id,
+            customer_code="CUST-UNICODE",
+            access_code="access-unicode-jp",
+            production_days=7,
+            point_per_size=1,
+            deadline=date(2026, 7, 8),
+            approval_status="pending",
+            customer_portal_status="Approval Customer",
+            production_status="Approval Customer",
+            created_at=datetime(2026, 7, 1),
+            created_by_id=self.admin.id,
+        )
+        player_groups = [
+            [
+                ("KIKY", "1", "M", "-"),
+                ("YOGA LIONG", "2", "L", "-"),
+                ("サン", "3", "M", "Ahmad Naji 06"),
+                ("ジル", "4", "L", "-"),
+                ("ユス", "5", "XL", "-"),
+                ("トビ", "6", "M", "-"),
+            ],
+            [
+                ("ヤブ", "7", "S", "-"),
+                ("ヤン", "8", "M", "-"),
+                ("モハン", "9", "L", "-"),
+                ("ヌル", "10", "XL", "-"),
+                ("PAK DOL", "11", "M", "-"),
+                ("ロフ", "12", "L", "-"),
+                ("スピン", "13", "XL", "-"),
+                ("イブ", "14", "M", "-"),
+            ],
+        ]
+
+        for design_index, players in enumerate(player_groups, start=1):
+            design = SalesOrderDesign(
+                sales_order=order,
+                design_name=f"Design {design_index}",
+                item_name="Jersey + Celana",
+                grade=str(design_index),
+                deadline=order.deadline,
+                sort_order=design_index,
+            )
+            for player_index, (name, number, size, note) in enumerate(players, start=1):
+                SalesOrderPlayer(
+                    design=design,
+                    player_name=name,
+                    player_number=number,
+                    size=size,
+                    notes=note,
+                    sort_order=player_index,
+                )
+
         db.session.add(order)
         db.session.flush()
         db.session.add(CustomerAccess(sales_order_id=order.id, access_code=order.access_code, customer_name=order.team_name))

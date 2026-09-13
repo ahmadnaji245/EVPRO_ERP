@@ -10,6 +10,9 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus import Flowable
 
@@ -21,8 +24,30 @@ LIGHT = colors.HexColor("#f3f5f7")
 CHECKBOX = "□"
 CONTENT_WIDTH = 184 * mm
 IMAGE_NOTE_WIDTH = 86 * mm
+PDF_BASE_FONT_REGULAR = "Times-Roman"
+PDF_BASE_FONT_BOLD = "Times-Bold"
+PDF_PLAYER_FONT_REGULAR = "MPLUS1p-Regular"
+PDF_PLAYER_FONT_BOLD = "MPLUS1p-Bold"
+PDF_FONT_DIR = Path(__file__).resolve().parent.parent / "static" / "fonts"
+PDF_PLAYER_FONT_REGULAR_PATH = PDF_FONT_DIR / "MPLUS1p-Regular.ttf"
+PDF_PLAYER_FONT_BOLD_PATH = PDF_FONT_DIR / "MPLUS1p-Bold.ttf"
+PDF_FALLBACK_CID_FONT = "HeiseiKakuGo-W5"
 
-rl_config.canvas_basefontname = "Times-Roman"
+
+def _register_pdf_fonts():
+    if PDF_PLAYER_FONT_REGULAR_PATH.exists():
+        pdfmetrics.registerFont(TTFont(PDF_PLAYER_FONT_REGULAR, str(PDF_PLAYER_FONT_REGULAR_PATH)))
+        bold_path = PDF_PLAYER_FONT_BOLD_PATH if PDF_PLAYER_FONT_BOLD_PATH.exists() else PDF_PLAYER_FONT_REGULAR_PATH
+        pdfmetrics.registerFont(TTFont(PDF_PLAYER_FONT_BOLD, str(bold_path)))
+        return
+
+    pdfmetrics.registerFont(UnicodeCIDFont(PDF_FALLBACK_CID_FONT))
+    globals()["PDF_PLAYER_FONT_REGULAR"] = PDF_FALLBACK_CID_FONT
+    globals()["PDF_PLAYER_FONT_BOLD"] = PDF_FALLBACK_CID_FONT
+
+
+_register_pdf_fonts()
+rl_config.canvas_basefontname = PDF_BASE_FONT_REGULAR
 
 
 def _styles():
@@ -31,7 +56,7 @@ def _styles():
         ParagraphStyle(
             name="SOTitle",
             parent=styles["Title"],
-            fontName="Times-Bold",
+            fontName=PDF_BASE_FONT_BOLD,
             fontSize=20,
             leading=23,
             textColor=INK,
@@ -42,7 +67,7 @@ def _styles():
         ParagraphStyle(
             name="SOSubtitle",
             parent=styles["BodyText"],
-            fontName="Times-Bold",
+            fontName=PDF_BASE_FONT_BOLD,
             fontSize=9,
             leading=11,
             textColor=MUTED,
@@ -52,7 +77,7 @@ def _styles():
         ParagraphStyle(
             name="SOLabel",
             parent=styles["BodyText"],
-            fontName="Times-Bold",
+            fontName=PDF_BASE_FONT_BOLD,
             fontSize=7.5,
             leading=9,
             textColor=MUTED,
@@ -62,7 +87,7 @@ def _styles():
         ParagraphStyle(
             name="SOText",
             parent=styles["BodyText"],
-            fontName="Times-Roman",
+            fontName=PDF_BASE_FONT_REGULAR,
             fontSize=8.5,
             leading=10.5,
             textColor=INK,
@@ -72,14 +97,28 @@ def _styles():
         ParagraphStyle(
             name="SOTextBold",
             parent=styles["SOText"],
-            fontName="Times-Bold",
+            fontName=PDF_BASE_FONT_BOLD,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="SOPlayerText",
+            parent=styles["SOText"],
+            fontName=PDF_PLAYER_FONT_REGULAR,
+        )
+    )
+    styles.add(
+        ParagraphStyle(
+            name="SOPlayerTextBold",
+            parent=styles["SOPlayerText"],
+            fontName=PDF_PLAYER_FONT_BOLD,
         )
     )
     styles.add(
         ParagraphStyle(
             name="SOGrade",
             parent=styles["BodyText"],
-            fontName="Times-Bold",
+            fontName=PDF_BASE_FONT_BOLD,
             fontSize=20,
             leading=17,
             textColor=INK,
@@ -91,7 +130,7 @@ def _styles():
         ParagraphStyle(
             name="SOInstruction",
             parent=styles["BodyText"],
-            fontName="Times-Roman",
+            fontName=PDF_BASE_FONT_REGULAR,
             fontSize=16,
             leading=15,
             textColor=INK,
@@ -138,7 +177,7 @@ def _empty_box(label, width, height):
             [
                 ("GRID", (0, 0), (-1, -1), 0.5, GRID),
                 ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
@@ -164,7 +203,7 @@ def _brand_header(order, design, styles):
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("TOPPADDING", (0, 0), (-1, -1), 1),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
@@ -184,7 +223,7 @@ def _brand_header(order, design, styles):
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
@@ -197,7 +236,7 @@ def _brand_header(order, design, styles):
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -229,7 +268,7 @@ def _info_table(order, design, styles):
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (0, -1), LIGHT),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
                 ("TOPPADDING", (0, 0), (-1, -1), 2),
@@ -251,7 +290,7 @@ def _note_box(title, text, styles):
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (-1, 0), LIGHT),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("LEFTPADDING", (0, 0), (-1, -1), 4),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -302,7 +341,7 @@ def _design_images(design, styles, size_recap_flowables=None, pants_recap_flowab
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("ALIGN", (0, 1), (-1, -1), "CENTER"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -353,7 +392,7 @@ def _recap_table_wrapper(tables, stacked=False, stacked_width=None):
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -389,7 +428,7 @@ def _centered_section(title, content, styles, width=CONTENT_WIDTH):
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -425,10 +464,10 @@ def _compact_table_style():
         [
             ("GRID", (0, 0), (-1, -1), 0.25, GRID),
             ("BACKGROUND", (0, 0), (-1, 0), LIGHT),
-            ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-            ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+            ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
+            ("FONTNAME", (0, 0), (-1, 0), PDF_BASE_FONT_BOLD),
             ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("FONTNAME", (0, -1), (-1, -1), "Times-Bold"),
+            ("FONTNAME", (0, -1), (-1, -1), PDF_BASE_FONT_BOLD),
             ("ALIGN", (1, 0), (-1, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -452,10 +491,10 @@ def _player_table(design, styles):
         rows.append(
             [
                 index,
-                _paragraph(player.player_name, styles["SOText"]),
+                _paragraph(player.player_name, styles["SOPlayerText"]),
                 player.player_number or "-",
                 player.size,
-                _paragraph(player.notes or "-", styles["SOText"]),
+                _paragraph(player.notes or "-", styles["SOPlayerText"]),
                 setting,
                 cek,
             ]
@@ -475,8 +514,8 @@ def _player_table(design, styles):
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (-1, 0), INK),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_PLAYER_FONT_REGULAR),
+                ("FONTNAME", (0, 0), (-1, 0), PDF_PLAYER_FONT_BOLD),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (2, 0), (3, -1), "CENTER"),
@@ -522,7 +561,7 @@ def _attachment_info_table(order, styles):
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (0, -1), LIGHT),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("LEFTPADDING", (0, 0), (-1, -1), 4),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -548,7 +587,7 @@ def _attachment_block(attachment, index, styles, image_height):
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (-1, 0), LIGHT),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("ALIGN", (0, 1), (-1, 1), "CENTER"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 5),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5),
@@ -567,10 +606,10 @@ def _customer_player_table(design, styles):
         rows.append(
             [
                 index,
-                _paragraph(player.player_name, styles["SOText"]),
+                _paragraph(player.player_name, styles["SOPlayerText"]),
                 player.player_number or "-",
                 player.size,
-                _paragraph(player.notes or "-", styles["SOText"]),
+                _paragraph(player.notes or "-", styles["SOPlayerText"]),
             ]
         )
     if len(rows) == 1:
@@ -588,8 +627,8 @@ def _customer_player_table(design, styles):
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (-1, 0), INK),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_PLAYER_FONT_REGULAR),
+                ("FONTNAME", (0, 0), (-1, 0), PDF_PLAYER_FONT_BOLD),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (2, 0), (3, -1), "CENTER"),
@@ -780,9 +819,9 @@ def _report_table(group, styles):
                 ("BACKGROUND", (0, 0), (-1, 0), INK),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("BACKGROUND", (0, subtotal_index), (-1, subtotal_index), LIGHT),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
-                ("FONTNAME", (0, subtotal_index), (-1, subtotal_index), "Times-Bold"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
+                ("FONTNAME", (0, 0), (-1, 0), PDF_BASE_FONT_BOLD),
+                ("FONTNAME", (0, subtotal_index), (-1, subtotal_index), PDF_BASE_FONT_BOLD),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (total_start_col, 0), (total_end_col, -1), "RIGHT"),
@@ -816,10 +855,10 @@ def _grand_total_table(report, styles):
             [
                 ("GRID", (0, 0), (-1, -1), 0.25, GRID),
                 ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
-                ("FONTNAME", (0, 0), (-1, -1), "Times-Roman"),
-                ("FONTNAME", (0, 0), (0, 0), "Times-Bold"),
-                ("FONTNAME", (2, 0), (2, 0), "Times-Bold"),
-                ("FONTNAME", (4, 0), (4, 0), "Times-Bold"),
+                ("FONTNAME", (0, 0), (-1, -1), PDF_BASE_FONT_REGULAR),
+                ("FONTNAME", (0, 0), (0, 0), PDF_BASE_FONT_BOLD),
+                ("FONTNAME", (2, 0), (2, 0), PDF_BASE_FONT_BOLD),
+                ("FONTNAME", (4, 0), (4, 0), PDF_BASE_FONT_BOLD),
                 ("FONTSIZE", (0, 0), (-1, -1), 8.5),
                 ("ALIGN", (2, 0), (2, 0), "RIGHT"),
                 ("ALIGN", (4, 0), (4, 0), "RIGHT"),
@@ -960,8 +999,8 @@ def _order_production_list_table(rows, styles):
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#111827")),
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
+                ("FONTNAME", (0, 0), (-1, 0), PDF_BASE_FONT_BOLD),
+                ("FONTNAME", (0, 1), (-1, -1), PDF_BASE_FONT_REGULAR),
                 ("FONTSIZE", (0, 0), (-1, -1), 6.5),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (1, 0), (1, -1), "CENTER"),
@@ -1010,8 +1049,8 @@ def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#111827")),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
-        ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
+        ("FONTNAME", (0, 0), (-1, 0), PDF_BASE_FONT_BOLD),
+        ("FONTNAME", (0, 1), (-1, -1), PDF_BASE_FONT_REGULAR),
         ("FONTSIZE", (0, 0), (-1, -1), 7.2),
         ("ALIGN", (0, 0), (0, -1), "CENTER"),
         ("ALIGN", (3, 0), (3, -1), "CENTER"),
@@ -1031,7 +1070,7 @@ def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
                 [
                     ("BACKGROUND", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#dc2626")),
                     ("TEXTCOLOR", (deadline_col, row_index), (deadline_col, row_index), colors.white),
-                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), "Times-Bold"),
+                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), PDF_BASE_FONT_BOLD),
                 ]
             )
         elif css_class == "deadline-h1":
@@ -1039,7 +1078,7 @@ def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
                 [
                     ("BACKGROUND", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#f97316")),
                     ("TEXTCOLOR", (deadline_col, row_index), (deadline_col, row_index), colors.white),
-                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), "Times-Bold"),
+                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), PDF_BASE_FONT_BOLD),
                 ]
             )
         elif css_class == "deadline-h2":
@@ -1047,7 +1086,7 @@ def _vendor_production_table(rows, quantity_columns, styles, deadline_class):
                 [
                     ("BACKGROUND", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#fde047")),
                     ("TEXTCOLOR", (deadline_col, row_index), (deadline_col, row_index), colors.HexColor("#111827")),
-                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), "Times-Bold"),
+                    ("FONTNAME", (deadline_col, row_index), (deadline_col, row_index), PDF_BASE_FONT_BOLD),
                 ]
             )
 

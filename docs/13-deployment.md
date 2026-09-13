@@ -78,6 +78,10 @@ Deployment VPS perlu:
 - Backup database.
 - Monitoring log.
 
+## PDF Font Assets
+
+PDF Sales Order tetap memakai font dasar Times. Khusus tabel data player, PDF memakai font lokal `static/fonts/MPLUS1p-Regular.ttf` dan `static/fonts/MPLUS1p-Bold.ttf` agar karakter Unicode/Jepang dapat dirender dan di-embed oleh ReportLab tanpa bergantung pada font OS atau akses internet runtime.
+
 ## Cloud
 
 Cloud deployment Planned. Opsi:
