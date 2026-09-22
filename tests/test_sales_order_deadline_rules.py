@@ -52,11 +52,15 @@ class SalesOrderDeadlineRulesTestCase(unittest.TestCase):
         detail_html = self._as_admin_get(f"/sales-order/{order.id}")
         portal_html = self.client.get(f"/tracking/{order.access_code}").data.decode()
         self.assertIn("Belum ditentukan", detail_html)
-        self.assertIn("Tambahan Hari", portal_html)
+        self.assertIn("Tambahan Hari", detail_html)
+        self.assertIn("Belum ditentukan", portal_html)
         self.assertIn("Deadline dihitung setelah pesanan disetujui.", portal_html)
+        self.assertCustomerPortalHidesDeadlineMethod(portal_html)
 
         for text in self._pdf_texts(order):
             self.assertIn("Deadline: -", text)
+            self.assertNotIn("Jenis Deadline", text)
+            self.assertNotIn("Tambahan Hari", text)
             self.assertNotIn("02/10/2026", text)
 
     def test_flexible_customer_approval_calculates_from_approval_date(self):
@@ -78,6 +82,9 @@ class SalesOrderDeadlineRulesTestCase(unittest.TestCase):
         self.assertEqual(order.deadline, date(2026, 10, 4))
         self.assertTrue(all(design.deadline == expected for design in order.designs))
         self.assertNotEqual(order.deadline, date(2026, 10, 2))
+        portal_html = response.data.decode()
+        self.assertIn("04/10/2026", portal_html)
+        self.assertCustomerPortalHidesDeadlineMethod(portal_html)
 
     def test_fixed_deadline_visible_before_and_after_approval(self):
         order = create_sales_order(self._form(deadline_type="fixed", deadline="2026-10-05"), self.admin)
@@ -85,9 +92,13 @@ class SalesOrderDeadlineRulesTestCase(unittest.TestCase):
         self.assertEqual(order.deadline_type, "fixed")
         self.assertEqual(order.deadline, date(2026, 10, 5))
         self.assertIn("05/10/2026", self._as_admin_get(f"/sales-order/{order.id}"))
-        self.assertIn("05/10/2026", self.client.get(f"/tracking/{order.access_code}").data.decode())
+        portal_html = self.client.get(f"/tracking/{order.access_code}").data.decode()
+        self.assertIn("05/10/2026", portal_html)
+        self.assertCustomerPortalHidesDeadlineMethod(portal_html)
         for text in self._pdf_texts(order):
             self.assertIn("05/10/2026", text)
+            self.assertNotIn("Jenis Deadline", text)
+            self.assertNotIn("Tambahan Hari", text)
 
         self.client.post(f"/tracking/{order.access_code}/approve", follow_redirects=True)
         db.session.refresh(order)
@@ -227,6 +238,10 @@ class SalesOrderDeadlineRulesTestCase(unittest.TestCase):
                 rows.append(f"{label.getPlainText()}: {value.getPlainText()}")
             texts.append("\n".join(rows))
         return texts
+
+    def assertCustomerPortalHidesDeadlineMethod(self, html):
+        self.assertNotIn("Jenis Deadline", html)
+        self.assertNotIn("Tambahan Hari", html)
 
 
 if __name__ == "__main__":
