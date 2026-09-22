@@ -6,6 +6,11 @@ from database.db import db
 from utils.constants import normalize_production_status
 
 
+DEADLINE_TYPE_FLEXIBLE = "flexible"
+DEADLINE_TYPE_FIXED = "fixed"
+DEADLINE_TYPES = (DEADLINE_TYPE_FLEXIBLE, DEADLINE_TYPE_FIXED)
+
+
 class SalesOrder(db.Model):
     __tablename__ = "sales_orders"
 
@@ -21,6 +26,7 @@ class SalesOrder(db.Model):
     pattern = db.Column(db.String(80))
     grade = db.Column(db.String(20))
     production_days = db.Column(db.Integer, nullable=False, default=7)
+    deadline_type = db.Column(db.String(20), nullable=False, default=DEADLINE_TYPE_FLEXIBLE)
     point_per_size = db.Column(db.Float, nullable=False, default=1.0)
     deadline = db.Column(db.Date)
     instructions = db.Column(db.Text)
@@ -113,6 +119,16 @@ class SalesOrder(db.Model):
         if self.approval_status != "approved":
             return "Approval Customer"
         return normalize_production_status(self.customer_portal_status or self.production_status or "Approval Customer")
+
+    @property
+    def normalized_deadline_type(self):
+        if self.deadline_type in DEADLINE_TYPES:
+            return self.deadline_type
+        return DEADLINE_TYPE_FIXED if self.deadline else DEADLINE_TYPE_FLEXIBLE
+
+    @property
+    def deadline_type_label(self):
+        return "Ditentukan" if self.normalized_deadline_type == DEADLINE_TYPE_FIXED else "Fleksibel"
 
 
 @event.listens_for(SalesOrder, "before_update")

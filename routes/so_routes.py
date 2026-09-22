@@ -21,6 +21,7 @@ from services.sales_order_attachment_service import (
     get_attachment_for_order,
 )
 from services.production_service import is_finished_production_order
+from services.sales_order_deadline_service import apply_calculated_deadline, sync_design_deadlines
 from services.sales_order_service import (
     PRODUCTION_STATUSES,
     create_sales_order,
@@ -232,6 +233,7 @@ def approve_admin(sales_order_id):
         order.approved_by = "Admin"
         order.approved_source = "admin"
         order.approved_at = datetime.utcnow()
+        apply_calculated_deadline(order)
         set_production_stage(order, "Setting")
         record_history(
             order,
@@ -314,9 +316,9 @@ def quick_edit_deadline(sales_order_id):
         return redirect(url_for("sales_orders.detail", sales_order_id=order.id))
 
     old_deadline = order.deadline
+    order.deadline_type = "fixed"
     order.deadline = new_deadline
-    for design in order.designs:
-        design.deadline = new_deadline
+    sync_design_deadlines(order)
 
     record_history(
         order,

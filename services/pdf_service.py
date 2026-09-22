@@ -256,7 +256,7 @@ def _info_table(order, design, styles):
     rows.extend(design.material_display_rows)
     rows.extend([
         ("Pola", design.pattern or order.pattern or "-"),
-        ("Deadline", _date(design.deadline or order.deadline)),
+        ("Deadline", _date(order.deadline) if order.deadline else "-"),
     ])
     table = Table(
         [[_paragraph(label, styles["SOLabel"]), _paragraph(value, styles["SOTextBold"])] for label, value in rows],

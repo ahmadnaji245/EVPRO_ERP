@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 
 from database.db import db
 from models import Brand, CustomerAccess, ProductionChecklist, SalesOrder, SalesOrderDesign, SalesOrderPlayer
@@ -6,8 +6,15 @@ from models.master_data import MasterInstruction
 from services.history_service import record_history
 from services.crm_service import mark_lead_converted_for_order, sync_sales_order_customer
 from services.number_generator import generate_access_code, generate_customer_code, generate_so_number, generate_tracking_code
+from services.sales_order_deadline_service import (
+    apply_calculated_deadline,
+    normalize_deadline_type,
+    reset_flexible_deadline_for_approval_reset,
+    sync_design_deadlines,
+)
 from services.upload_service import save_upload
 from utils.constants import PRODUCTION_STATUSES, normalize_production_status
+from models.sales_order import DEADLINE_TYPE_FIXED, DEADLINE_TYPE_FLEXIBLE
 
 
 VALID_PLAYER_SIZES = [
@@ -74,11 +81,26 @@ def _parse_date(value):
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def _parse_date_or_none(value):
+    try:
+        return _parse_date(value)
+    except ValueError:
+        return None
+
+
 def _parse_int(value, default=7):
     try:
         return int(value or default)
     except (TypeError, ValueError):
         return default
+
+
+def _parse_required_positive_int(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 1 else None
 
 
 def _parse_point_per_size(value, default=1):
@@ -281,11 +303,18 @@ def _fill_sales_order(order, form):
         order.material = form.get("material", "").strip() or None
     order.pattern = form.get("pattern", "").strip() or None
     order.grade = form.get("grade", "").strip() or None
-    order.production_days = _parse_int(form.get("production_days"))
+    order.deadline_type = normalize_deadline_type(form.get("deadline_type"), order)
+    if order.deadline_type == DEADLINE_TYPE_FLEXIBLE:
+        order.production_days = _parse_int(form.get("production_days"))
+    else:
+        order.production_days = _parse_int(form.get("production_days"), default=order.production_days or 7)
     if order.id is None:
         parsed_point = _parse_point_per_size(form.get("point_per_size"), default=1)
         order.point_per_size = parsed_point if parsed_point is not None else 1
-    order.deadline = order_date + timedelta(days=order.production_days)
+    if order.deadline_type == DEADLINE_TYPE_FIXED:
+        order.deadline = _parse_date(form.get("deadline"))
+    else:
+        apply_calculated_deadline(order)
     order.created_at = datetime.combine(order_date, time.min)
     order.instructions = form.get("instructions", "").strip() or None
     order.notes = form.get("notes", "").strip() or None
@@ -408,6 +437,15 @@ def validate_sales_order_form(form):
                 errors.append("Nama seller wajib diisi untuk brand Evpro.")
     if "point_per_size" in form and _parse_point_per_size(form.get("point_per_size"), default=1) is None:
         errors.append("Poin tidak valid.")
+    deadline_type = normalize_deadline_type(form.get("deadline_type"))
+    if deadline_type == DEADLINE_TYPE_FLEXIBLE:
+        if _parse_required_positive_int(form.get("production_days")) is None:
+            errors.append("Tambahan Hari wajib diisi minimal 1 hari.")
+    elif deadline_type == DEADLINE_TYPE_FIXED:
+        if not _parse_date_or_none(form.get("deadline")):
+            errors.append("Tanggal Deadline wajib diisi untuk Deadline Ditentukan.")
+    else:
+        errors.append("Jenis Deadline tidak valid.")
     instruction = form.get("instructions", "").strip()
     if not instruction:
         errors.append("Instruksi Khusus wajib dipilih.")
@@ -473,6 +511,7 @@ def create_sales_order(form, user, files=None):
     order.tracking_code = generate_tracking_code()
     order.customer_portal_status = "Approval Customer"
     _sync_designs(order, form, files)
+    sync_design_deadlines(order)
     order.customer_access = CustomerAccess(
         access_code=order.access_code,
         customer_name=form.get("customer_name", "").strip() or order.team_name,
@@ -498,6 +537,7 @@ def update_sales_order(order, form, files=None, user=None):
         order.customer_portal_status = "Approval Customer"
         order.production_status = "Approval Customer"
         order.production_status_updated_at = datetime.utcnow()
+        reset_flexible_deadline_for_approval_reset(order)
         actor_name = user.name if user else "System"
         record_history(
             order,
@@ -508,6 +548,10 @@ def update_sales_order(order, form, files=None, user=None):
             new_value="pending",
             user=user,
         )
+    elif order.normalized_deadline_type == DEADLINE_TYPE_FLEXIBLE:
+        apply_calculated_deadline(order)
+    else:
+        sync_design_deadlines(order)
     if was_customer_approved:
         reason = form.get("revision_reason_admin", "").strip() or "Sales Order diperbarui oleh admin."
         order.revision_reason_admin = reason

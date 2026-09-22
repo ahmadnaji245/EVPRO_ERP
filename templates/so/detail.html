@@ -134,10 +134,14 @@ Terima kasih 🙏{% endset %}
                 <dt class="col-5">Kode Akses Lama</dt><dd class="col-7">{{ sales_order.access_code }}</dd>
                 <dt class="col-5">Tanggal Masuk</dt>
                 <dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
+                <dt class="col-5">Jenis Deadline</dt><dd class="col-7">{{ sales_order.deadline_type_label }}</dd>
+                {% if sales_order.normalized_deadline_type == 'flexible' %}
+                    <dt class="col-5">Tambahan Hari</dt><dd class="col-7">{{ sales_order.production_days }} Hari</dd>
+                {% endif %}
                 <dt class="col-5">Deadline</dt>
                 <dd class="col-7">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span>{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</span>
+                        <span>{{ sales_order.deadline|pretty_date if sales_order.deadline else 'Belum ditentukan' }}</span>
                         {% if has_permission('sales_order.manage') %}
                             <button class="btn btn-outline-secondary btn-sm py-0" type="button" data-bs-toggle="modal" data-bs-target="#quickEditDeadlineModal">Ubah Deadline</button>
                         {% endif %}

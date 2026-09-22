@@ -2,6 +2,7 @@
 {% set form_top_materials = form.getlist('top_material[]') if form.getlist is defined else [] %}
 {% set form_bottom_materials = form.getlist('bottom_material[]') if form.getlist is defined else [] %}
 {% set material_names = materials|map(attribute='name')|list %}
+{% set selected_deadline_type = form.get('deadline_type', sales_order.normalized_deadline_type if sales_order else 'flexible') %}
 <div class="row g-4">
     <div class="col-12">
         <div class="panel">
@@ -54,12 +55,19 @@
                     <input class="form-control" name="order_date" type="date" value="{{ form.get('order_date', sales_order.created_at.date().isoformat() if sales_order and sales_order.created_at else '') }}" data-order-date>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Lama Produksi</label>
+                    <label class="form-label">Jenis Deadline</label>
+                    <select class="form-select" name="deadline_type" required data-deadline-type>
+                        <option value="flexible" {% if selected_deadline_type == 'flexible' %}selected{% endif %}>Fleksibel</option>
+                        <option value="fixed" {% if selected_deadline_type == 'fixed' %}selected{% endif %}>Deadline Ditentukan</option>
+                    </select>
+                </div>
+                <div class="col-md-3" data-flexible-deadline-field>
+                    <label class="form-label">Tambahan Hari</label>
                     <input class="form-control" name="production_days" type="number" min="1" value="{{ form.get('production_days', sales_order.production_days if sales_order else 7) }}" data-production-days>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Deadline</label>
-                    <input class="form-control" name="deadline_display" type="date" value="{{ sales_order.deadline.isoformat() if sales_order and sales_order.deadline else '' }}" data-deadline readonly>
+                <div class="col-md-3" data-fixed-deadline-field>
+                    <label class="form-label">Tanggal Deadline</label>
+                    <input class="form-control" name="deadline" type="date" value="{{ form.get('deadline', sales_order.deadline.isoformat() if sales_order and sales_order.deadline else '') }}" data-fixed-deadline>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Pattern</label>

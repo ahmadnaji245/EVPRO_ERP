@@ -17,3 +17,4 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(days=int(os.environ.get("SESSION_DAYS", "365")))
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Jakarta")

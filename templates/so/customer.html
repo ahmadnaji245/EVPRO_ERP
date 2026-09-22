@@ -59,7 +59,14 @@
                     <dt class="col-5">Nomor SO</dt><dd class="col-7">{{ sales_order.so_number }}</dd>
                     <dt class="col-5">Brand</dt><dd class="col-7">{{ sales_order.brand.name }}</dd>
                     <dt class="col-5">Tanggal Masuk</dt><dd class="col-7">{{ sales_order.created_at|pretty_date if sales_order.created_at else '-' }}</dd>
-                    <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else '-' }}</dd>
+                    <dt class="col-5">Jenis Deadline</dt><dd class="col-7">{{ sales_order.deadline_type_label }}</dd>
+                    {% if sales_order.normalized_deadline_type == 'flexible' %}
+                        <dt class="col-5">Tambahan Hari</dt><dd class="col-7">{{ sales_order.production_days }} Hari</dd>
+                    {% endif %}
+                    <dt class="col-5">Deadline</dt><dd class="col-7">{{ sales_order.deadline|pretty_date if sales_order.deadline else 'Belum ditentukan' }}</dd>
+                    {% if sales_order.normalized_deadline_type == 'flexible' and not sales_order.deadline %}
+                        <dt class="col-5"></dt><dd class="col-7 text-muted small">Deadline dihitung setelah pesanan disetujui.</dd>
+                    {% endif %}
                     <dt class="col-5">Total Size</dt><dd class="col-7">{{ sales_order.total_size }}</dd>
                     <dt class="col-5">Status</dt><dd class="col-7">{{ portal_order_status.status }}</dd>
                     {% if portal_order_status.pickup_date %}

@@ -1,7 +1,10 @@
 (() => {
   const orderDateInput = document.querySelector("[data-order-date]");
   const productionDaysInput = document.querySelector("[data-production-days]");
-  const deadlineInput = document.querySelector("[data-deadline]");
+  const deadlineTypeInput = document.querySelector("[data-deadline-type]");
+  const flexibleDeadlineField = document.querySelector("[data-flexible-deadline-field]");
+  const fixedDeadlineField = document.querySelector("[data-fixed-deadline-field]");
+  const fixedDeadlineInput = document.querySelector("[data-fixed-deadline]");
   const designList = document.querySelector("[data-design-list]");
   const designTemplate = document.querySelector("[data-design-template]");
   const addButton = document.querySelector("[data-add-design]");
@@ -17,14 +20,16 @@
     return `${year}-${month}-${day}`;
   };
 
-  const updateDeadline = () => {
-    if (!orderDateInput || !productionDaysInput || !deadlineInput) return;
+  const ensureOrderDate = () => {
     if (!orderDateInput.value) orderDateInput.value = toDateValue(today);
-    const days = Number.parseInt(productionDaysInput.value || "0", 10);
-    if (!days || days < 1) return;
-    const date = new Date(`${orderDateInput.value}T00:00:00`);
-    date.setDate(date.getDate() + days);
-    deadlineInput.value = toDateValue(date);
+  };
+
+  const updateDeadlineFields = () => {
+    const isFixed = deadlineTypeInput?.value === "fixed";
+    flexibleDeadlineField?.classList.toggle("d-none", isFixed);
+    fixedDeadlineField?.classList.toggle("d-none", !isFixed);
+    if (productionDaysInput) productionDaysInput.required = !isFixed;
+    if (fixedDeadlineInput) fixedDeadlineInput.required = isFixed;
   };
 
   const refreshDesignTitles = () => {
@@ -64,10 +69,11 @@
     refreshDesignTitles();
   });
 
-  orderDateInput?.addEventListener("change", updateDeadline);
-  productionDaysInput?.addEventListener("input", updateDeadline);
+  orderDateInput?.addEventListener("change", ensureOrderDate);
+  deadlineTypeInput?.addEventListener("change", updateDeadlineFields);
   brandSelect?.addEventListener("change", updateSellerField);
-  updateDeadline();
+  ensureOrderDate();
+  updateDeadlineFields();
   updateSellerField();
   refreshDesignTitles();
 })();

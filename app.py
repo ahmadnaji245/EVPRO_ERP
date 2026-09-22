@@ -29,6 +29,7 @@ from services.production_service import PRODUCTION_STATUSES, seed_production_sam
 from services.nota_pdf_ff_apparel_service import build_ff_apparel_pdf
 from services.nota_pdf_service import build_customer_invoice_pdf
 from services.number_generator import generate_tracking_code
+from services.sales_order_deadline_service import apply_calculated_deadline
 from services.sales_order_service import get_sales_order_by_tracking_code, set_production_stage
 from utils.formatters import register_filters
 from utils.helpers import active_class, ensure_upload_folders, nota_pdf_download_name, sales_order_pdf_download_name
@@ -187,6 +188,7 @@ def approve_customer(access_code):
         order.approved_by = access_record.customer_name or order.team_name
         order.approved_source = "customer"
         order.approved_at = datetime.utcnow()
+        apply_calculated_deadline(order)
         set_production_stage(order, "Setting")
         record_history(
             order,
@@ -212,6 +214,7 @@ def approve_customer_order(order):
         order.approved_by = access_record.customer_name or order.team_name
         order.approved_source = "customer"
         order.approved_at = datetime.utcnow()
+        apply_calculated_deadline(order)
         set_production_stage(order, "Setting")
         record_history(
             order,
@@ -643,6 +646,7 @@ def _execute_startup_database_tasks():
 
 
 def ensure_database_schema_migrations():
+    ensure_sales_order_deadline_type_schema()
     ensure_v04_schema()
     ensure_v05_schema()
     ensure_v06_schema()
@@ -656,6 +660,29 @@ def ensure_database_schema_migrations():
     ensure_sales_order_point_schema()
     ensure_sales_order_attachment_schema()
     ensure_v09_finance_schema()
+
+
+def ensure_sales_order_deadline_type_schema():
+    inspector = inspect(db.engine)
+    if "sales_orders" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("sales_orders")}
+    if "deadline_type" not in columns:
+        db.session.execute(text("ALTER TABLE sales_orders ADD COLUMN deadline_type VARCHAR(20) NOT NULL DEFAULT 'flexible'"))
+        db.session.execute(
+            text(
+                """
+                UPDATE sales_orders
+                SET deadline_type = CASE
+                    WHEN deadline IS NOT NULL THEN 'fixed'
+                    ELSE 'flexible'
+                END
+                WHERE deadline_type IS NULL OR deadline_type = 'flexible'
+                """
+            )
+        )
+        db.session.commit()
 
 
 def seed_initial_data():
