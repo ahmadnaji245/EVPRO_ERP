@@ -62,6 +62,20 @@ USER_ROLE_ALIASES = {
 
 UPLOAD_SUBFOLDERS = ["brands", "designs", "customers", "pdf", "temp", "petty_cash"]
 
+KIDS_SIZE_LABELS = ("XXS Kids", "XS Kids", "S Kids", "M Kids", "L Kids", "XL Kids", "XXL Kids")
+WOMEN_SIZE_LABELS = (
+    "XS Women",
+    "S Women",
+    "M Women",
+    "L Women",
+    "XL Women",
+    "XXL Women",
+    "3XL Women",
+    "4XL Women",
+    "5XL Women",
+)
+REGULAR_SIZE_LABELS = ("XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL", "Custom")
+
 SIZE_ORDER = {
     "KXXS": 1,
     "KXS": 2,
@@ -88,11 +102,15 @@ SIZE_ORDER = {
     "4XL": 27,
     "5XL": 28,
     "6XL": 29,
+    "7XL": 30,
+    "CUSTOM": 31,
 }
-PANTS_BASE_SIZES = ("XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL")
+PANTS_BASE_SIZES = ("XXS", *REGULAR_SIZE_LABELS)
+PANTS_BASE_SIZE_KEYS = {size.upper() for size in PANTS_BASE_SIZES}
 PANTS_SIZE_SORT = SIZE_ORDER
+PANTS_SIZE_PATTERN_VALUES = ("Custom", "7XL", "6XL", "5XL", "4XL", "3XL", "XXL", "XXS", "XL", "XS", "S", "M", "L")
 PANTS_SIZE_PATTERN = re.compile(
-    r"\bcelana\b\s*(?:=|:)?\s*(5XL|4XL|3XL|XXL|XXS|XL|XS|S|M|L)(?:\s+(kids|women))?\b",
+    rf"\bcelana\b\s*(?:=|:)?\s*({'|'.join(PANTS_SIZE_PATTERN_VALUES)})(?:\s+(kids|women))?\b",
     re.IGNORECASE,
 )
 
@@ -157,11 +175,13 @@ def extract_pants_size_from_note(note):
 
 
 def _canonical_pants_size(base_size, group=None):
-    base = str(base_size or "").strip().upper()
-    if base not in PANTS_BASE_SIZES:
+    raw_base = str(base_size or "").strip()
+    base = raw_base.upper()
+    if base not in PANTS_BASE_SIZE_KEYS:
         return None
+    base_label = "Custom" if base == "CUSTOM" else base
     group_label = str(group or "").strip().title()
-    size = f"{base} {group_label}" if group_label in ("Kids", "Women") else base
+    size = f"{base_label} {group_label}" if group_label in ("Kids", "Women") else base_label
     return size if normalize_size_key(size) in SIZE_ORDER else None
 
 

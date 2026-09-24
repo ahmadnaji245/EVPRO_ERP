@@ -101,6 +101,14 @@ class SalesOrderQuickEditAndChecklistOwnershipTestCase(unittest.TestCase):
 
         self.assertEqual(order.point_per_size, 1)
 
+    def test_create_sales_order_saves_5xl_6xl_7xl_and_custom_players(self):
+        form = self._sales_order_form()
+        form.setlist("players[]", ["A, 01, 5XL\nB, 02, 6XL\nC, 03, 7XL\nD, 04, Custom"])
+
+        order = create_sales_order(form, self.admin)
+
+        self.assertEqual([player.size for player in order.designs[0].players], ["5XL", "6XL", "7XL", "Custom"])
+
     def test_detail_sales_order_shows_point_and_quick_edit_button(self):
         order, _design, _players = self._create_approved_order("QPOINTDETAIL", point_per_size=0.5)
         self._login("admin", "admin")

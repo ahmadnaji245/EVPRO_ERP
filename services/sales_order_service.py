@@ -13,36 +13,20 @@ from services.sales_order_deadline_service import (
     sync_design_deadlines,
 )
 from services.upload_service import save_upload
-from utils.constants import PRODUCTION_STATUSES, normalize_production_status
+from utils.constants import (
+    KIDS_SIZE_LABELS,
+    PRODUCTION_STATUSES,
+    REGULAR_SIZE_LABELS,
+    WOMEN_SIZE_LABELS,
+    normalize_production_status,
+)
 from models.sales_order import DEADLINE_TYPE_FIXED, DEADLINE_TYPE_FLEXIBLE
 
 
 VALID_PLAYER_SIZES = [
-    "XXS Kids",
-    "XS Kids",
-    "S Kids",
-    "M Kids",
-    "L Kids",
-    "XL Kids",
-    "XXL Kids",
-    "XS Women",
-    "S Women",
-    "M Women",
-    "L Women",
-    "XL Women",
-    "XXL Women",
-    "3XL Women",
-    "4XL Women",
-    "5XL Women",
-    "XS",
-    "S",
-    "M",
-    "L",
-    "XL",
-    "XXL",
-    "3XL",
-    "4XL",
-    "5XL",
+    *KIDS_SIZE_LABELS,
+    *WOMEN_SIZE_LABELS,
+    *REGULAR_SIZE_LABELS,
     "S Kids Lengan Panjang",
     "L Women Lengan Panjang",
     "XL Lengan Panjang",

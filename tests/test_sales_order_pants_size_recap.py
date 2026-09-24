@@ -5,7 +5,7 @@ from flask import render_template
 import fitz
 
 from models import Brand, SalesOrder, SalesOrderDesign, SalesOrderPlayer
-from services.pdf_service import build_sales_order_pdf
+from services.pdf_service import build_customer_sales_order_pdf, build_sales_order_pdf
 from utils.constants import (
     extract_pants_size_from_note,
     long_sleeve_size_label,
@@ -25,6 +25,15 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
             "celana = XXL": "XXL",
             "celana = 3XL": "3XL",
             "celana 4xl": "4XL",
+            "celana = 6XL": "6XL",
+            "celana 6XL": "6XL",
+            "celana=6XL": "6XL",
+            "celana = 7XL": "7XL",
+            "celana 7XL": "7XL",
+            "celana=7XL": "7XL",
+            "celana = Custom": "Custom",
+            "celana custom": "Custom",
+            "celana=Custom": "Custom",
             "celana = XL Kids": "XL Kids",
             "celana = l women": "L Women",
             "request / celana = 5XL / lengan panjang": "5XL",
@@ -54,6 +63,25 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
                 {"size": "L", "qty": 2},
                 {"size": "XL", "qty": 1},
                 {"size": "XXL", "qty": 1},
+            ],
+        )
+
+    def test_pants_size_recap_orders_new_regular_sizes(self):
+        design = SalesOrderDesign(design_name="Home", item_name="Jersey + Celana")
+        design.players = [
+            SalesOrderPlayer(player_name="A", player_number="1", size="S", notes="celana = 7XL", sort_order=1),
+            SalesOrderPlayer(player_name="B", player_number="2", size="M", notes="celana = 6XL", sort_order=2),
+            SalesOrderPlayer(player_name="C", player_number="3", size="L", notes="celana = Custom", sort_order=3),
+            SalesOrderPlayer(player_name="D", player_number="4", size="XL", notes="celana = 5XL", sort_order=4),
+        ]
+
+        self.assertEqual(
+            design.pants_size_recap,
+            [
+                {"size": "5XL", "qty": 1},
+                {"size": "6XL", "qty": 1},
+                {"size": "7XL", "qty": 1},
+                {"size": "Custom", "qty": 1},
             ],
         )
 
@@ -188,6 +216,21 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
         self.assertNotIn("Total Reguler", text)
         self.assertIn("Total\n3", text)
 
+    def test_admin_and_customer_pdf_render_new_regular_sizes(self):
+        app = Flask(__name__, static_folder="static")
+        order = _build_new_regular_size_order()
+        with app.app_context():
+            admin_text = _pdf_text(order, build_sales_order_pdf)
+            customer_text = _pdf_text(order, build_customer_sales_order_pdf)
+
+        for text in (admin_text, customer_text):
+            self.assertIn("5XL", text)
+            self.assertIn("6XL", text)
+            self.assertIn("7XL", text)
+            self.assertIn("Custom", text)
+            self.assertIn("LD 65 / PB 80", text)
+            self.assertIn("Total\n4", text)
+
     def test_pdf_pants_recap_keeps_kids_and_women_labels(self):
         app = Flask(__name__, static_folder="static")
         with app.app_context():
@@ -279,8 +322,8 @@ def _build_mixed_size_set_order():
     return order
 
 
-def _pdf_text(order):
-    with fitz.open(stream=build_sales_order_pdf(order).getvalue(), filetype="pdf") as document:
+def _pdf_text(order, builder=build_sales_order_pdf):
+    with fitz.open(stream=builder(order).getvalue(), filetype="pdf") as document:
         return "\n".join(page.get_text() for page in document)
 
 
@@ -336,6 +379,32 @@ def _build_multi_design_order():
         ]
         designs.append(design)
     order.designs = designs
+    return order
+
+
+def _build_new_regular_size_order():
+    brand = Brand(name="EVPRO", code="EV")
+    order = SalesOrder(
+        so_number="SO-NEW-SIZES",
+        tracking_code="TRK-NEW-SIZES",
+        team_name="New Size Team",
+        customer_code="CUST",
+        access_code="ACC-NEW-SIZES",
+        brand=brand,
+        grade="A",
+    )
+    design = SalesOrderDesign(design_name="Home", item_name="Jersey", sales_order=order, grade="A")
+    players = [
+        ("A", "1", "5XL", "-"),
+        ("B", "2", "6XL", "-"),
+        ("C", "3", "7XL", "-"),
+        ("AHMAD", "10", "Custom", "LD 65 / PB 80"),
+    ]
+    design.players = [
+        SalesOrderPlayer(player_name=name, player_number=number, size=size, notes=note, sort_order=index)
+        for index, (name, number, size, note) in enumerate(players, start=1)
+    ]
+    order.designs = [design]
     return order
 
 
