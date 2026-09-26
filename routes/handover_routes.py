@@ -108,7 +108,7 @@ def pickup(sales_order_id):
                 form=request.form,
                 default_date=default_pickup_date(),
             )
-        flash(f"Serah terima {order.so_number} berhasil ditandai sudah diambil.", "success")
+        flash(f"Handover {order.so_number} berhasil ditandai sudah diambil.", "success")
         return redirect(url_for("handover.index", tab="sudah"))
     return render_template(
         "handover/pickup.html",

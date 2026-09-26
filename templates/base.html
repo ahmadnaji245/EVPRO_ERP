@@ -23,8 +23,10 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <div class="navbar-nav ms-auto">
                 {% if current_user.is_authenticated %}
-                    {% set so_module_prefixes = ('sales_orders.', 'sales_orders_approval.', 'production.', 'handover.', 'master.', 'reports.', 'settings.') %}
+                    {% set so_module_prefixes = ('sales_orders.', 'sales_orders_approval.', 'master.', 'reports.', 'settings.') %}
                     {% set is_so_module = request.endpoint and request.endpoint.startswith(so_module_prefixes) %}
+                    {% set production_module_prefixes = ('production.', 'handover.') %}
+                    {% set is_production_module = request.endpoint and request.endpoint.startswith(production_module_prefixes) %}
                     {% set is_nota_module = request.endpoint and request.endpoint.startswith('nota.') %}
                     {% set is_crm_module = request.endpoint and request.endpoint.startswith('crm.') %}
                     {% set is_finance_module = request.endpoint and request.endpoint.startswith('finance.') %}
@@ -33,6 +35,9 @@
                     {% endif %}
                     {% if has_permission('sales_order.view') %}
                         <a class="nav-link {{ 'active' if is_so_module else '' }}" href="{{ url_for('sales_orders.index') }}">Surat Order</a>
+                    {% endif %}
+                    {% if has_permission('production.view') or has_permission('handover.view') %}
+                        <a class="nav-link {{ 'active' if is_production_module else '' }}" href="{{ url_for('production.index') if has_permission('production.view') else url_for('handover.index') }}">Produksi</a>
                     {% endif %}
                     {% if has_permission('nota.view') %}
                         <a class="nav-link {{ 'active' if is_nota_module else '' }}" href="{{ url_for('nota.index') }}">Nota</a>
@@ -52,7 +57,7 @@
     </div>
 </nav>
 
-{% set so_shell_prefixes = ('sales_orders.', 'sales_orders_approval.', 'production.', 'handover.', 'master.', 'reports.', 'settings.') %}
+{% set so_shell_prefixes = ('sales_orders.', 'sales_orders_approval.', 'master.', 'reports.', 'settings.') %}
 {% set so_shell_excluded = ('sales_orders.print_view', 'sales_orders.pdf') %}
 {% set show_so_shell = current_user.is_authenticated and request.endpoint and request.endpoint.startswith(so_shell_prefixes) and request.endpoint not in so_shell_excluded %}
 {% if show_so_shell %}
@@ -65,12 +70,6 @@
                 {% if has_permission('sales_order.view') %}
                     <a class="so-subnav-link {{ 'active' if request.endpoint and request.endpoint.startswith(('sales_orders.', 'sales_orders_approval.')) and request.endpoint != 'sales_orders.dashboard' else '' }}" href="{{ url_for('sales_orders.index') }}">Surat Order</a>
                 {% endif %}
-                {% if has_permission('production.view') %}
-                    <a class="so-subnav-link {{ active_class('production.') }}" href="{{ url_for('production.index') }}">Produksi</a>
-                {% endif %}
-                {% if has_permission('handover.view') %}
-                    <a class="so-subnav-link {{ active_class('handover.') }}" href="{{ url_for('handover.index') }}">Serah Terima</a>
-                {% endif %}
                 {% if has_permission('master.view') %}
                     <a class="so-subnav-link {{ active_class('master.') }}" href="{{ url_for('master.index') }}">Master Data</a>
                 {% endif %}
@@ -79,6 +78,31 @@
                 {% endif %}
                 {% if has_permission('settings.view') %}
                     <a class="so-subnav-link {{ active_class('settings.') }}" href="{{ url_for('settings.index') }}">Setting</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+{% endif %}
+
+{% set show_production_shell = current_user.is_authenticated and request.endpoint and request.endpoint.startswith(('production.', 'handover.')) %}
+{% if show_production_shell and (has_permission('production.view') or has_permission('handover.view')) %}
+    <nav class="so-subnav" aria-label="Produksi navigation">
+        <div class="container-fluid">
+            <div class="so-subnav-inner">
+                {% if has_permission('production.view') %}
+                    <a class="so-subnav-link {{ 'active' if request.endpoint and request.endpoint.startswith('production.') and request.endpoint != 'production.report' else '' }}" href="{{ url_for('production.index') }}">
+                        <i class="bi bi-gear me-1"></i>Produksi
+                    </a>
+                {% endif %}
+                {% if has_permission('handover.view') %}
+                    <a class="so-subnav-link {{ active_class('handover.') }}" href="{{ url_for('handover.index') }}">
+                        <i class="bi bi-box-arrow-right me-1"></i>Handover
+                    </a>
+                {% endif %}
+                {% if has_permission('production.view') %}
+                    <a class="so-subnav-link {{ 'active' if request.endpoint == 'production.report' else '' }}" href="{{ url_for('production.report') }}">
+                        <i class="bi bi-clipboard-data me-1"></i>Laporan
+                    </a>
                 {% endif %}
             </div>
         </div>

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Laporan Produksi - EVPRO TEXTILE ERP{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Tracking Produksi</h1>
+        <p class="text-muted mb-0">Monitoring perjalanan Sales Order dari masuk produksi sampai handover.</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="metric production-metric production-metric-primary"><span>Total SO Produksi</span><strong>{{ summary.total }}</strong></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="metric production-metric production-metric-info"><span>Sedang Berjalan</span><strong>{{ summary.running }}</strong></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="metric production-metric production-metric-success"><span>Selesai</span><strong>{{ summary.finished }}</strong></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="metric production-metric production-metric-warning"><span>Menunggu Handover</span><strong>{{ summary.waiting_handover }}</strong></div>
+    </div>
+</div>
+
+<form class="panel mb-4" method="get" action="{{ url_for('production.report') }}">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3 col-xl-2">
+            <label class="form-label" for="month">Bulan</label>
+            <select class="form-select" id="month" name="month">
+                <option value="">Semua Bulan</option>
+                {% for value, label in month_options %}
+                    <option value="{{ value }}" {% if filters.month == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label class="form-label" for="year">Tahun</label>
+            <select class="form-select" id="year" name="year">
+                <option value="">Semua Tahun</option>
+                {% for year in year_options %}
+                    <option value="{{ year }}" {% if filters.year == year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label class="form-label" for="brand_id">Brand</label>
+            <select class="form-select" id="brand_id" name="brand_id">
+                <option value="">Semua Brand</option>
+                {% for brand in brand_options %}
+                    <option value="{{ brand.id }}" {% if filters.brand_id == brand.id %}selected{% endif %}>{{ brand.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label class="form-label" for="vendor">Vendor</label>
+            <select class="form-select" id="vendor" name="vendor">
+                <option value="">Semua Vendor</option>
+                {% for vendor in vendor_options %}
+                    <option value="{{ vendor }}" {% if filters.vendor == vendor %}selected{% endif %}>{{ vendor }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label class="form-label" for="status">Status Produksi</label>
+            <select class="form-select" id="status" name="status">
+                {% for value, label in status_options %}
+                    <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label class="form-label" for="handover_status">Status Handover</label>
+            <select class="form-select" id="handover_status" name="handover_status">
+                {% for value, label in handover_status_options %}
+                    <option value="{{ value }}" {% if filters.handover_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6 col-xl">
+            <label class="form-label" for="q">Search</label>
+            <input class="form-control" id="q" name="q" value="{{ filters.q }}" placeholder="No SO / Nama Team">
+        </div>
+        <div class="col-md-auto d-flex gap-2">
+            <button class="btn btn-rdr" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('production.report') }}">Reset</a>
+        </div>
+    </div>
+</form>
+
+<div class="panel table-panel">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle production-table">
+            <thead>
+            <tr>
+                <th>No</th>
+                <th>No SO</th>
+                <th>Tanggal Masuk</th>
+                <th>Nama Team/Customer</th>
+                <th>Brand</th>
+                <th class="text-end">Total Qty</th>
+                <th>Vendor</th>
+                <th>Tanggal Mulai Produksi</th>
+                <th>Deadline</th>
+                <th>Progress</th>
+                <th>Status Produksi</th>
+                <th>Tanggal Selesai</th>
+                <th>Status Handover</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="fw-semibold">
+                        <a href="{{ url_for('sales_orders.detail', sales_order_id=row.order.id) }}">{{ row.so_number }}</a>
+                    </td>
+                    <td>{{ row.tanggal_masuk|pretty_date if row.tanggal_masuk else '-' }}</td>
+                    <td>{{ row.team_name }}</td>
+                    <td>{{ row.brand_code }}</td>
+                    <td class="text-end">{{ row.total_qty }}</td>
+                    <td>{{ row.vendor }}</td>
+                    <td>{{ row.production_started_at|pretty_date if row.production_started_at else '-' }}</td>
+                    <td>
+                        {% if row.deadline %}
+                            {{ row.deadline|pretty_date }}
+                            {% if row.deadline_state == 'late' %}
+                                <span class="badge text-bg-danger ms-1">Terlambat</span>
+                            {% elif row.deadline_state == 'soon' %}
+                                <span class="badge text-bg-warning ms-1">Mendekati</span>
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="small">
+                            <div>Setting: <strong>{{ row.progress.setting_label }}</strong></div>
+                            <div>QC: <strong>{{ row.progress.qc_label }}</strong></div>
+                        </div>
+                    </td>
+                    <td><span class="badge text-bg-light">{{ row.production_status }}</span></td>
+                    <td>{{ row.completed_at|pretty_date if row.completed_at else '-' }}</td>
+                    <td>
+                        <span class="badge {% if row.handover_date %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ row.handover_status }}</span>
+                        {% if row.handover_date %}
+                            <div class="small text-muted mt-1">{{ row.handover_date|pretty_date }}</div>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="13" class="text-center text-muted py-4">Tidak ada data produksi sesuai filter.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

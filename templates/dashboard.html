@@ -14,7 +14,16 @@
             <div class="module-card-icon"><i class="bi bi-clipboard-check"></i></div>
             <div>
                 <h2>Surat Order</h2>
-                <p>Kelola order, produksi, serah terima, master data, laporan, dan setting Surat Order.</p>
+                <p>Kelola data order, approval customer, deadline, dokumen SO, master data, laporan, dan setting.</p>
+            </div>
+        </a>
+    {% endif %}
+    {% if has_permission('production.view') or has_permission('handover.view') %}
+        <a class="module-card" href="{{ url_for('production.index') if has_permission('production.view') else url_for('handover.index') }}">
+            <div class="module-card-icon"><i class="bi bi-gear-wide-connected"></i></div>
+            <div>
+                <h2>Produksi</h2>
+                <p>Kelola produksi, vendor, checklist, QC, handover, dan tracking laporan produksi.</p>
             </div>
         </a>
     {% endif %}

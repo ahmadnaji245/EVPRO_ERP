@@ -39,6 +39,7 @@ from services.production_service import (
     vendor_print_quantity_columns,
     vendor_summary,
 )
+from services.production_report_service import production_tracking_report
 from services.report_service import (
     MONTH_OPTIONS,
     brand_filter_options,
@@ -174,6 +175,13 @@ def production_vendors_pdf():
 def production_orders_pdf():
     _production_access_required()
     return redirect(url_for("production.vendors_pdf"))
+
+
+@production_bp.route("/laporan", endpoint="report")
+@permission_required("production.view")
+def production_report_page():
+    report = production_tracking_report(request.args)
+    return render_template("production/report.html", **report)
 
 
 @production_bp.route("/<int:sales_order_id>", endpoint="detail")

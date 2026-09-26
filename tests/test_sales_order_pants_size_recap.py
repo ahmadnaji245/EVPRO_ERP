@@ -35,6 +35,7 @@ class SalesOrderPantsSizeRecapTestCase(unittest.TestCase):
             "celana custom": "Custom",
             "celana=Custom": "Custom",
             "celana = XL Kids": "XL Kids",
+            "celana = 3XL Kids": "3XL Kids",
             "celana = l women": "L Women",
             "request / celana = 5XL / lengan panjang": "5XL",
             "lengan panjang XL": None,
